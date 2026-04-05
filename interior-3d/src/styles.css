@@ -21,34 +21,36 @@ html, body, #root {
 
 .tab-bar {
   display: flex;
-  gap: 2px;
-  padding: 8px 12px 0;
+  gap: 4px;
+  padding: 10px 16px 0;
   background: #16213e;
-  border-bottom: 1px solid #0f3460;
+  border-bottom: 2px solid #0f3460;
   flex-shrink: 0;
 }
 
 .tab-bar a {
-  padding: 10px 24px;
+  padding: 12px 28px;
   border-radius: 8px 8px 0 0;
   text-decoration: none;
-  color: #8899aa;
-  font-size: 14px;
-  font-weight: 500;
+  color: #aabbcc;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
   transition: all 0.2s;
   border: 1px solid transparent;
   border-bottom: none;
 }
 
 .tab-bar a:hover {
-  color: #c0d0e0;
-  background: rgba(255,255,255,0.05);
+  color: #ffffff;
+  background: rgba(255,255,255,0.1);
 }
 
 .tab-bar a[data-status="active"] {
-  color: #e0e8f0;
+  color: #ffffff;
   background: #1a1a2e;
-  border-color: #0f3460;
+  border-color: #3a7bd5;
+  border-width: 2px;
 }
 
 .canvas-container {

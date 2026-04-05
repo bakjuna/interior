@@ -1,7 +1,7 @@
 import { Canvas } from '@react-three/fiber'
 import { OrthographicCamera, Line, Text, MapControls } from '@react-three/drei'
 import { useMemo } from 'react'
-import { walls, rooms, doors, doorArcs, LR_W, LR_D, MB_W, WALL_THICKNESS, mbBathLeft, mbBathRight, mbBathTop, mbBathBottom, mbBathInnerW, mbBathInnerD, verandaInnerD, BABY_INNER_W, BABY_INNER_D, babyLeft, babyRight, babyTop, babyBottomZ, laundryBotZ, stairLeftX, stair1Z, stair2X, stair3Z, stair4endX, rightWallX, right1Z, right2X } from '../data/apartment'
+import { walls, rooms, doors, doorArcs, windows, LR_W, LR_D, MB_W, WALL_THICKNESS, mbBathLeft, mbBathRight, mbBathTop, mbBathBottom, mbBathInnerW, mbBathInnerD, verandaInnerD, BABY_INNER_W, BABY_INNER_D, babyLeft, babyRight, babyTop, babyBottomZ, laundryBotZ, stairLeftX, stair1Z, stair2X, stair3Z, stair4endX, rightWallX, right1Z, right2X } from '../data/apartment'
 
 const verandaWallEndZ = LR_D + WALL_THICKNESS + verandaInnerD + WALL_THICKNESS / 2
 
@@ -29,13 +29,16 @@ function FloorPlanScene() {
         zoom={100}
         near={0.1}
         far={100}
-        rotation={[-Math.PI / 2, 0, 0]}
+        up={[0, 0, -1]}
       />
       <MapControls
         enableRotate={false}
+        enableDamping={false}
         screenSpacePanning
-        maxPolarAngle={0}
-        minPolarAngle={0}
+        maxPolarAngle={Math.PI / 2}
+        minPolarAngle={Math.PI / 2}
+        maxAzimuthAngle={0}
+        minAzimuthAngle={0}
       />
       <ambientLight intensity={1.0} />
 
@@ -108,6 +111,46 @@ function FloorPlanScene() {
         )
       })}
 
+      {/* 창문 표시 (도면 스타일: 이중선 + 벽 개구부) */}
+      {windows.map((w, i) => {
+        const cx = w.position[0]
+        const cz = w.position[1]
+        const ww = w.width
+        const t = WALL_THICKNESS
+        const isX = w.axis === 'x'
+
+        if (isX) {
+          // 수평벽 창문: X 방향으로 열림
+          return (
+            <group key={`win-${i}`}>
+              {/* 벽 개구부 배경 */}
+              <mesh position={[cx, 0.06, cz]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[ww, t + 0.04]} />
+                <meshBasicMaterial color="#aaddff" />
+              </mesh>
+              {/* 이중선 — 상 */}
+              <Line points={[[cx - ww / 2, 0.08, cz - t / 2 + 0.02], [cx + ww / 2, 0.08, cz - t / 2 + 0.02]]} color="#4488bb" lineWidth={1.5} />
+              <Line points={[[cx - ww / 2, 0.08, cz + t / 2 - 0.02], [cx + ww / 2, 0.08, cz + t / 2 - 0.02]]} color="#4488bb" lineWidth={1.5} />
+              {/* 중심선 */}
+              <Line points={[[cx - ww / 2, 0.08, cz], [cx + ww / 2, 0.08, cz]]} color="#4488bb" lineWidth={0.5} />
+            </group>
+          )
+        } else {
+          // 수직벽 창문: Z 방향으로 열림
+          return (
+            <group key={`win-${i}`}>
+              <mesh position={[cx, 0.06, cz]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[t + 0.04, ww]} />
+                <meshBasicMaterial color="#aaddff" />
+              </mesh>
+              <Line points={[[cx - t / 2 + 0.02, 0.08, cz - ww / 2], [cx - t / 2 + 0.02, 0.08, cz + ww / 2]]} color="#4488bb" lineWidth={1.5} />
+              <Line points={[[cx + t / 2 - 0.02, 0.08, cz - ww / 2], [cx + t / 2 - 0.02, 0.08, cz + ww / 2]]} color="#4488bb" lineWidth={1.5} />
+              <Line points={[[cx, 0.08, cz - ww / 2], [cx, 0.08, cz + ww / 2]]} color="#4488bb" lineWidth={0.5} />
+            </group>
+          )
+        }
+      })}
+
       {/* 도어 표시 — 개구부 바닥색 + 호 */}
       {doors.map((door, i) => (
         <mesh
@@ -145,10 +188,10 @@ function FloorPlanScene() {
         label={`${((Math.abs((-T2 - 1.591 - T2) - (right1Z - 0.770 + 0.795 + 1.418 + 0.429 - 0.1 + T2))) * 1000).toFixed(0)}`}
         vertical
       />
-      {/* 작업실 좌측벽 내측 3071 */}
+      {/* 작업실 좌측벽 내측 치수 (329 포함) */}
       <DimensionLine
         start={[rightWallX + 2.555 + T2 + 0.1, 0.1, -T2 - 1.591 - T2]}
-        end={[rightWallX + 2.555 + T2 + 0.1, 0.1, right1Z - 0.770 + 0.795 + 1.418 + 0.429 - 0.1 + T2 + 0.329]}
+        end={[rightWallX + 2.555 + T2 + 0.1, 0.1, right1Z - 0.770 + 0.795 + 1.418 + T2]}
         label="3071"
         vertical
         labelRight
@@ -458,7 +501,11 @@ export function FloorPlanView() {
         <FloorPlanScene />
       </Canvas>
       <div className="overlay-info">
-        스크롤: 확대/축소 / 드래그: 이동
+        <strong>평면도</strong> (치수 표시)
+        <br />
+        스크롤: 확대/축소
+        <br />
+        드래그: 이동
       </div>
     </>
   )
