@@ -53,6 +53,7 @@ interface ApartmentModelProps {
   playerPos?: [number, number]  // [x, z] — 워크스루 전용, 현재 위치
   isNight?: boolean             // 워크스루 야간 모드 (조명 ON 판정)
   allLightsOn?: boolean         // 조감도용, 전체 조명 ON/OFF
+  showCityBackground?: boolean  // 외부 도시 배경 이미지 표시 (조감도에서는 false)
 }
 
 // 전체 내측 범위
@@ -62,7 +63,7 @@ const totalW = totalRight - totalLeft
 const centerX = (totalLeft + totalRight) / 2
 const centerZ = LR_D / 2
 
-export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, isNight = true, allLightsOn = false }: ApartmentModelProps) {
+export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, isNight = true, allLightsOn = false, showCityBackground = true }: ApartmentModelProps) {
   // 도어 인터랙션은 항상 raw 사용. 조명 로직은 야간일 때만 playerPos 사용.
   const playerPos = isNight ? rawPlayerPos : undefined
   const floorTex = useLoader(TextureLoader, '/textures/walnut-floor.png')
@@ -147,7 +148,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
   return (
     <group>
       {/* 외부 뷰 배경 (북쪽) — 주방/작업실 창문 방향 billboard plane */}
-      {cityNorthTex && (
+      {showCityBackground && cityNorthTex && (
         <mesh position={[LR_W / 2, 0, babyTop - 40]}>
           <planeGeometry args={[140, 70]} />
           <meshBasicMaterial
@@ -160,7 +161,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
       )}
 
       {/* 외부 뷰 배경 (남쪽) — 거실/안방 창문 방향 billboard plane, 카메라쪽(-Z)을 향하도록 회전 */}
-      {citySouthTex && (
+      {showCityBackground && citySouthTex && (
         <mesh position={[LR_W / 2, 0, LR_D + 40]} rotation={[0, Math.PI, 0]}>
           <planeGeometry args={[140, 70]} />
           <meshBasicMaterial
@@ -2704,19 +2705,26 @@ function FlushDoor({
     : Infinity
   const inRange = dist < 1.5
 
-  // 'g' 키 토글 — 범위 안일 때만
+  // 도어 토글 요청(CustomEvent) — 가장 가까운 문 하나만 응답하도록
+  // (반경 1.5m: 'F' 키, 모바일 버튼은 자체적으로 반경 ~3m 까지 허용)
   useEffect(() => {
-    if (!inRange) return
-    const handler = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase()
-      if (k === 'f' || k === 'ㄹ') {
-        e.preventDefault()
-        setIsOpen((o) => !o)
+    const handler = (e: Event) => {
+      const ev = e as CustomEvent<{ best: { dist: number; toggle: () => void } | null; maxDist: number }>
+      const max = ev.detail.maxDist ?? 1.5
+      if (dist > max) return
+      const detail = ev.detail
+      if (!detail.best || dist < detail.best.dist) {
+        detail.best = { dist, toggle: () => setIsOpen((o) => !o) }
       }
     }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [inRange])
+    window.addEventListener('door-toggle-request', handler as EventListener)
+    return () => window.removeEventListener('door-toggle-request', handler as EventListener)
+  }, [dist])
+
+  // isOpen 이 바뀌면 (애니메이션 시작) 카메라가 멈춰있어도 프레임 루프 재개
+  useEffect(() => {
+    invalidate()
+  }, [isOpen, invalidate])
 
   const panelTex = useMemo(() => {
     if (!tex) return undefined
@@ -3200,18 +3208,25 @@ function JungmunSwingDoor({
     : Infinity
   const inRange = dist < 1.8
 
+  // 도어 토글 요청(CustomEvent) — 가장 가까운 문 하나만 응답
   useEffect(() => {
-    if (!inRange) return
-    const handler = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase()
-      if (k === 'f' || k === 'ㄹ') {
-        e.preventDefault()
-        setIsOpen((o) => !o)
+    const handler = (e: Event) => {
+      const ev = e as CustomEvent<{ best: { dist: number; toggle: () => void } | null; maxDist: number }>
+      const max = ev.detail.maxDist ?? 1.8
+      if (dist > max) return
+      const detail = ev.detail
+      if (!detail.best || dist < detail.best.dist) {
+        detail.best = { dist, toggle: () => setIsOpen((o) => !o) }
       }
     }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [inRange])
+    window.addEventListener('door-toggle-request', handler as EventListener)
+    return () => window.removeEventListener('door-toggle-request', handler as EventListener)
+  }, [dist])
+
+  // isOpen 변경 시 프레임 루프 재개
+  useEffect(() => {
+    invalidate()
+  }, [isOpen, invalidate])
 
   const sign = freeEndZ > hingeWorld[1] ? 1 : -1
   const maxOpenAngle = -sign * (95 * Math.PI / 180)

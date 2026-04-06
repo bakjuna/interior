@@ -83,13 +83,13 @@ export function BirdsEyeView() {
         <WASDController controlsRef={controlsRef} />
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 15, 5]} intensity={1.0} />
-        <ApartmentModel showCeiling={false} allLightsOn={lightsOn} />
+        <ApartmentModel showCeiling={false} allLightsOn={lightsOn} showCityBackground={false} />
         <gridHelper args={[10, 10, '#334', '#223']} position={[LR_W / 2, -0.01, LR_D / 2]} />
       </Canvas>
       <div className="overlay-info">
         <strong>조감도</strong> (천장 제거)
         <br />
-        좌클릭: 회전 / 우클릭: 이동 / 스크롤: 줌
+        좌클릭: 회전 / 두 손가락 스크롤: 이동 / 핀치: 줌
         <br />
         <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 이동 (한/영)
       </div>
