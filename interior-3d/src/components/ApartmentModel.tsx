@@ -129,6 +129,17 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
     return tex
   }, [walnutDoorTex])
 
+  // 모든 캐비넷 본체(상부장/하부장 박스, 측면, 필러) 공통 호두 텍스처
+  // 도어와 동일한 톤을 위해 closetDoorTex 사용. face별로 1타일 매핑.
+  const walnutBodyTex = useMemo(() => {
+    const tex = closetDoorTex.clone()
+    tex.wrapS = THREE.RepeatWrapping
+    tex.wrapT = THREE.RepeatWrapping
+    tex.repeat.set(1, 1)
+    tex.colorSpace = THREE.SRGBColorSpace
+    return tex
+  }, [closetDoorTex])
+
   // 방별 바닥 텍스처 — 1번만 생성 (매 렌더마다 clone 방지)
   const roomFloorTextures = useMemo(() => {
     return rooms.map((room) => {
@@ -337,7 +348,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
             {/* 본체 (뒤판) */}
             <mesh position={c.position} castShadow receiveShadow>
               <boxGeometry args={c.size} />
-              <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
 
             {/* 문짝들 */}
@@ -753,7 +764,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
             {/* 하부장 전체 (kitLeft~kitRight) */}
             <mesh position={[lowerCabX, 0.41, cabinetZ]}>
               <boxGeometry args={[lowerCabW, 0.82, 0.6]} />
-              <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
             {/* 하부장 문들 */}
             {Array.from({ length: Math.round(lowerCabW / 0.5) }).map((_, di) => {
@@ -787,7 +798,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
               <>
                 <mesh position={[kitLeft + upperLeftW / 2, 1.80, upperZ]}>
                   <boxGeometry args={[upperLeftW, 0.7, 0.35]} />
-                  <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                  <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                 </mesh>
                 {/* 상부장 문들 */}
                 {Array.from({ length: Math.max(1, Math.round(upperLeftW / 0.5)) }).map((_, di) => {
@@ -815,7 +826,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
               <>
                 <mesh position={[kitRight - 0.175, 1.80, (urStartZ + urEndZ) / 2]}>
                   <boxGeometry args={[0.35, 0.7, urLen]} />
-                  <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                  <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                 </mesh>
                 {Array.from({ length: Math.max(1, Math.round(urLen / 0.5)) }).map((_, di) => {
                   const dw = urLen / Math.max(1, Math.round(urLen / 0.5))
@@ -857,7 +868,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                   {/* 하부장 — 식기세척기 앞 */}
                   {cabBeforeLen > 0.01 && <mesh position={[extCabCenterX, 0.41, (extStartZ + dishZstart) / 2]}>
                     <boxGeometry args={[0.6, 0.82, cabBeforeLen]} />
-                    <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>}
                   {/* 식기세척기 (싱크 바로 왼쪽 600mm) */}
                   <mesh position={[extCabCenterX, 0.41, (dishZstart + dishZend) / 2]}>
@@ -882,7 +893,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                   {/* 하부장 — 싱크 뒤 */}
                   {cabAfterLen > 0.01 && <mesh position={[extCabCenterX, 0.41, (sinkZpos + sinkHalfD + extEndZ) / 2]}>
                     <boxGeometry args={[0.6, 0.82, cabAfterLen]} />
-                    <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>}
                   {/* 하부장 문 — 식기세척기 앞 섹션만 */}
                   {cabBeforeLen > 0.2 && Array.from({ length: Math.max(1, Math.round(cabBeforeLen / 0.5)) }).map((_, di) => {
@@ -1028,7 +1039,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                     )
                   })()}
                   {/* 상부장 */}
-                  <mesh position={[extUpperCenterX, 1.80, extCenterZ]}><boxGeometry args={[0.35, 0.7, extLen]} /><meshStandardMaterial color="#3d2b1a" roughness={0.7} /></mesh>
+                  <mesh position={[extUpperCenterX, 1.80, extCenterZ]}><boxGeometry args={[0.35, 0.7, extLen]} /><meshStandardMaterial map={walnutBodyTex} roughness={0.45} /></mesh>
                   {[0.25, 0.75].map((t, di) => {
                     const dt2 = closetDoorTex.clone(); dt2.wrapS = THREE.RepeatWrapping; dt2.wrapT = THREE.RepeatWrapping; dt2.repeat.set(1, 1); dt2.colorSpace = THREE.SRGBColorSpace
                     return (<mesh key={`ext-uc-${di}`} position={[extUpperCenterX - 0.176, 1.80, extStartZ + extLen * t]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[extLen / 2 - 0.005, 0.68]} /><meshStandardMaterial map={dt2} roughness={0.45} /></mesh>)
@@ -1056,10 +1067,10 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
               const fridgeX = kitRight - fridgeD / 2
               return (
                 <group>
-                  {/* 본체 (옆면 새까만색) */}
+                  {/* 본체 — 빌트인 호두 마감 (도어 갭 사이로 보이는 면) */}
                   <mesh position={[fridgeX, fridgeH / 2, fridgeZ]}>
                     <boxGeometry args={[fridgeD, fridgeH, fridgeW]} />
-                    <meshStandardMaterial color="#111" roughness={0.5} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
                   {/* 상단 좌문 (베이지) */}
                   <mesh position={[fridgeX - fridgeD / 2 - 0.001, fridgeH * 0.75, fridgeZ - fridgeW / 4]} rotation={[0, -Math.PI / 2, 0]}>
@@ -1100,10 +1111,10 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                     const botH = f2H * 0.22   // 하단 서랍
                     return (
                       <group>
-                        {/* 본체 (검정) */}
+                        {/* 본체 — 빌트인 호두 마감 */}
                         <mesh position={[f2X, f2H / 2, f2Z]}>
                           <boxGeometry args={[f2D, f2H, f2W]} />
-                          <meshStandardMaterial color="#111" roughness={0.5} />
+                          <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                         </mesh>
                         {/* 상단 좌문 (베이지) */}
                         <mesh position={[frontFace - 0.001, f2H - topH / 2 - 0.01, f2Z - f2W / 4]} rotation={[0, -Math.PI / 2, 0]}>
@@ -1180,7 +1191,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                         {/* 상부장 본체 — 측면 벽 포함한 외곽 Z 전체 */}
                         <mesh position={[cabX, cabCenterY, outerCenterZ]} castShadow receiveShadow>
                           <boxGeometry args={[cabDepth, cabH, outerLen]} />
-                          <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                          <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                         </mesh>
 
                         {/* 문짝들 (전면, -X 면) — 냉장고 구간에만 */}
@@ -1206,13 +1217,13 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                         {/* 북쪽 30mm 측면 벽 — 상부장 아래 ~ 바닥까지 */}
                         <mesh position={[cabX, cabBottomY / 2, outerZStart + sideT / 2]} castShadow receiveShadow>
                           <boxGeometry args={[cabDepth, cabBottomY, sideT]} />
-                          <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                          <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                         </mesh>
 
                         {/* 남쪽 30mm 측면 벽 — 상부장 아래 ~ 바닥까지 */}
                         <mesh position={[cabX, cabBottomY / 2, outerZEnd - sideT / 2]} castShadow receiveShadow>
                           <boxGeometry args={[cabDepth, cabBottomY, sideT]} />
-                          <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                          <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                         </mesh>
 
                         {/* 김치냉장고 후면 필러 (김치냉장고 뒤 ~ 벽 사이, 깊이 130mm) */}
@@ -1224,7 +1235,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                           return (
                             <mesh position={[fillerX, 1.800 / 2, (kimchiZStart + kimchiZEnd) / 2]} castShadow receiveShadow>
                               <boxGeometry args={[fillerD, 1.800, f2W]} />
-                              <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                             </mesh>
                           )
                         })()}
@@ -1353,7 +1364,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
               const doorCount = Math.max(2, Math.round(leftLen / 0.5))
               return (
                 <>
-                  <mesh position={[leftCabX, 0.41, leftCenterZ]}><boxGeometry args={[leftCabDepth, 0.82, leftLen]} /><meshStandardMaterial color="#3d2b1a" roughness={0.7} /></mesh>
+                  <mesh position={[leftCabX, 0.41, leftCenterZ]}><boxGeometry args={[leftCabDepth, 0.82, leftLen]} /><meshStandardMaterial map={walnutBodyTex} roughness={0.45} /></mesh>
                   {Array.from({ length: doorCount }).map((_, di) => {
                     const dw = leftLen / doorCount
                     const dz = leftEndZ + dw / 2 + di * dw  // negative Z부터 시작
@@ -1409,7 +1420,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                   {[shelfY1, shelfY2].map((y, i) => (
                     <mesh key={`kit-shelf-${i}`} position={[shelfX, y, cabCenterZ]}>
                       <boxGeometry args={[shelfDepth, shelfThick, shelfLen]} />
-                      <meshStandardMaterial map={shelfTex} color="#3d2b1a" roughness={0.55} metalness={0.05} />
+                      <meshStandardMaterial map={shelfTex} roughness={0.55} metalness={0.05} />
                     </mesh>
                   ))}
                 </>
@@ -1839,7 +1850,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
             </mesh>
             <mesh position={[vanityX, 0.37, vanityZ]}>
               <boxGeometry args={[vanityW, 0.72, 0.58]} />
-              <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
             {[0.55, 0.25].map((yRatio, di) => {
               const dt = closetDoorTex.clone()
@@ -2114,7 +2125,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                   {/* 본체 */}
                   <mesh position={[bL + ucD / 2, ucCY, toiletZ]}>
                     <boxGeometry args={[ucD, ucH, ucW]} />
-                    <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
                   {/* 문들 + 손잡이 */}
                   {Array.from({ length: doorCount }).map((_, di) => {
@@ -2248,7 +2259,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                   {/* 본체 */}
                   <mesh position={[toilet2X, ucCY, bB2 + ucD / 2]}>
                     <boxGeometry args={[ucW, ucH, ucD]} />
-                    <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
                   {/* 문들 + 손잡이 */}
                   {Array.from({ length: doorCount }).map((_, di) => {
@@ -2675,7 +2686,7 @@ function FlushDoor({
   maxOpenAngle = 95,
   wallThickness = WALL_THICKNESS,
   tex,
-  color = '#3a2618',
+  color = '#ffffff',
   style = 'flush',
   handleStyle = 'lever',
   playerPos,
