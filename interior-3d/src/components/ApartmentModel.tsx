@@ -1,12 +1,12 @@
-import { useMemo, useRef, useEffect, useCallback, Suspense } from 'react'
+import { useMemo, useRef, useEffect, useCallback, useState, Suspense } from 'react'
 import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
-import { useLoader, useThree } from '@react-three/fiber'
+import { useLoader, useThree, useFrame } from '@react-three/fiber'
 
 // RectAreaLight 초기화 (한 번만)
 RectAreaLightUniformsLib.init()
 import { TextureLoader } from 'three'
-import { useGLTF } from '@react-three/drei'
+import { useGLTF, Html, RoundedBox } from '@react-three/drei'
 import {
   walls,
   rooms,
@@ -22,6 +22,9 @@ import {
   BABY_INNER_W,
   BABY_INNER_D,
   mbBathLeft,
+  mbBathRight,
+  mbBathTop,
+  mbBathBottom,
   babyLeft,
   babyRight,
   babyTop,
@@ -34,6 +37,12 @@ import {
   stair4endX,
   laundryBotZ,
   rightWallX,
+  mbDoorHinge,
+  mbDoorEnd,
+  bath2RightWallX,
+  babyBottom,
+  babyRightWallX,
+  babyTopWallZ,
 } from '../data/apartment'
 
 const T2 = WALL_THICKNESS / 2
@@ -41,7 +50,8 @@ const mbLeft = -WALL_THICKNESS - MB_W
 
 interface ApartmentModelProps {
   showCeiling?: boolean
-  playerPos?: [number, number]  // [x, z] — 워크스루 전용, 현재 위치 기반 조명
+  playerPos?: [number, number]  // [x, z] — 워크스루 전용, 현재 위치
+  isNight?: boolean             // 워크스루 야간 모드 (조명 ON 판정)
   allLightsOn?: boolean         // 조감도용, 전체 조명 ON/OFF
 }
 
@@ -52,11 +62,44 @@ const totalW = totalRight - totalLeft
 const centerX = (totalLeft + totalRight) / 2
 const centerZ = LR_D / 2
 
-export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = false }: ApartmentModelProps) {
+export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, isNight = true, allLightsOn = false }: ApartmentModelProps) {
+  // 도어 인터랙션은 항상 raw 사용. 조명 로직은 야간일 때만 playerPos 사용.
+  const playerPos = isNight ? rawPlayerPos : undefined
   const floorTex = useLoader(TextureLoader, '/textures/walnut-floor.png')
   const porcelainTex = useLoader(TextureLoader, '/textures/porcelain-tile.png')
   const entranceTex = useLoader(TextureLoader, '/textures/entrance-tile.png')
   const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
+  const walnutDoorTex = useLoader(TextureLoader, '/textures/walnut_door.png')
+  const silkTex = useLoader(TextureLoader, '/textures/silk.png')
+
+  // 외부 뷰 텍스처 — 북/남 각각 낮/밤 (파일 없으면 조용히 skip)
+  const [cityNorthDayTex, setCityNorthDayTex] = useState<THREE.Texture | null>(null)
+  const [cityNorthNightTex, setCityNorthNightTex] = useState<THREE.Texture | null>(null)
+  const [citySouthDayTex, setCitySouthDayTex] = useState<THREE.Texture | null>(null)
+  const [citySouthNightTex, setCitySouthNightTex] = useState<THREE.Texture | null>(null)
+  useEffect(() => {
+    const loader = new TextureLoader()
+    const setup = (tex: THREE.Texture) => {
+      tex.colorSpace = THREE.SRGBColorSpace
+      tex.wrapS = THREE.ClampToEdgeWrapping
+      tex.wrapT = THREE.ClampToEdgeWrapping
+      return tex
+    }
+    const loadOne = (path: string, setter: (t: THREE.Texture) => void) => {
+      loader.load(
+        path,
+        (tex) => setter(setup(tex)),
+        undefined,
+        () => console.warn(`[city-view] ${path} not found`)
+      )
+    }
+    loadOne('/textures/city-view-north-day.jpg', setCityNorthDayTex)
+    loadOne('/textures/city-view-north-night.jpg', setCityNorthNightTex)
+    loadOne('/textures/city-view-south-day.jpg', setCitySouthDayTex)
+    loadOne('/textures/city-view-south-night.jpg', setCitySouthNightTex)
+  }, [])
+  const cityNorthTex = isNight ? cityNorthNightTex : cityNorthDayTex
+  const citySouthTex = isNight ? citySouthNightTex : citySouthDayTex
 
   const floorTexture = useMemo(() => {
     const tex = floorTex.clone()
@@ -67,19 +110,71 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
     return tex
   }, [floorTex])
 
+  // 신발장 오픈 선반 월넛 라이너 — 2x1, 1x1 2개만 사용
+  const walnutLinerTex2x1 = useMemo(() => {
+    const tex = walnutDoorTex.clone()
+    tex.wrapS = THREE.RepeatWrapping
+    tex.wrapT = THREE.RepeatWrapping
+    tex.repeat.set(2, 1)
+    tex.colorSpace = THREE.SRGBColorSpace
+    return tex
+  }, [walnutDoorTex])
+  const walnutLinerTex1x1 = useMemo(() => {
+    const tex = walnutDoorTex.clone()
+    tex.wrapS = THREE.RepeatWrapping
+    tex.wrapT = THREE.RepeatWrapping
+    tex.repeat.set(1, 1)
+    tex.colorSpace = THREE.SRGBColorSpace
+    return tex
+  }, [walnutDoorTex])
+
+  // 방별 바닥 텍스처 — 1번만 생성 (매 렌더마다 clone 방지)
+  const roomFloorTextures = useMemo(() => {
+    return rooms.map((room) => {
+      const baseTex = room.floorTile === 'porcelain' ? porcelainTex
+                    : room.floorTile === 'entrance' ? entranceTex
+                    : floorTex
+      const tex = baseTex.clone()
+      tex.wrapS = THREE.RepeatWrapping
+      tex.wrapT = THREE.RepeatWrapping
+      tex.colorSpace = THREE.SRGBColorSpace
+      const tileSize = room.tileSize ?? 1
+      tex.repeat.set(room.size[0] / tileSize, room.size[1] / tileSize)
+      return tex
+    })
+  }, [floorTex, porcelainTex, entranceTex])
+
   return (
     <group>
+      {/* 외부 뷰 배경 (북쪽) — 주방/작업실 창문 방향 billboard plane */}
+      {cityNorthTex && (
+        <mesh position={[LR_W / 2, 0, babyTop - 40]}>
+          <planeGeometry args={[140, 70]} />
+          <meshBasicMaterial
+            map={cityNorthTex}
+            side={THREE.DoubleSide}
+            toneMapped={false}
+            fog={false}
+          />
+        </mesh>
+      )}
+
+      {/* 외부 뷰 배경 (남쪽) — 거실/안방 창문 방향 billboard plane, 카메라쪽(-Z)을 향하도록 회전 */}
+      {citySouthTex && (
+        <mesh position={[LR_W / 2, 0, LR_D + 40]} rotation={[0, Math.PI, 0]}>
+          <planeGeometry args={[140, 70]} />
+          <meshBasicMaterial
+            map={citySouthTex}
+            side={THREE.DoubleSide}
+            toneMapped={false}
+            fog={false}
+          />
+        </mesh>
+      )}
+
       {/* 바닥 */}
-      {rooms.map((room) => {
-        let baseTex = floorTex
-        if (room.floorTile === 'porcelain') baseTex = porcelainTex
-        else if (room.floorTile === 'entrance') baseTex = entranceTex
-        const tex = baseTex.clone()
-        tex.wrapS = THREE.RepeatWrapping
-        tex.wrapT = THREE.RepeatWrapping
-        tex.colorSpace = THREE.SRGBColorSpace
-        const tileSize = room.tileSize ?? 1
-        tex.repeat.set(room.size[0] / tileSize, room.size[1] / tileSize)
+      {rooms.map((room, ri) => {
+        const tex = roomFloorTextures[ri]
         const fY = room.floorY ?? 0
         return (
           <mesh
@@ -106,6 +201,13 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
         const h = wall.bottomY !== undefined ? specifiedH : specifiedH + 0.03  // bottomY 미지정 시 높이 30mm 추가
         const t = wall.thickness
 
+        // 실크 벽지 텍스처 — 가로는 2m당 1회 반복, 세로는 벽 전체 높이에 1회(하단 100px 흰색 = 걸레받이)
+        const silk = silkTex.clone()
+        silk.wrapS = THREE.RepeatWrapping
+        silk.wrapT = THREE.ClampToEdgeWrapping
+        silk.repeat.set(length / 2, 1)
+        silk.colorSpace = THREE.SRGBColorSpace
+
         return (
           <mesh
             key={i}
@@ -118,7 +220,14 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
             receiveShadow
           >
             <boxGeometry args={[isH ? length : t, h, isH ? t : length]} />
-            <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
+            <meshPhysicalMaterial
+              map={silk}
+              roughness={0.55}
+              metalness={0}
+              sheen={1}
+              sheenColor={'#ffffff'}
+              sheenRoughness={0.3}
+            />
           </mesh>
         )
       })}
@@ -299,10 +408,10 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
           <>
             {/* 모든 다운라이트 하우징 (항상 보임) */}
             {downlights.map(([x, z], i) => {
-              // playerPos 없음(조감도) → allLightsOn prop, 있음(워크스루) → 현재 방만
-              const isActive = playerPos
-                ? activeGroup?.lights.some(([lx, lz]) => lx === x && lz === z) ?? false
-                : !!allLightsOn
+              // allLightsOn=true 이면 전체 ON, 아니면 조감도=off / 워크스루=현재 방만
+              const isActive = !!allLightsOn || (playerPos
+                ? (activeGroup?.lights.some(([lx, lz]) => lx === x && lz === z) ?? false)
+                : false)
 
               // 단내림 영역: 안방/거실 하단 + 아기방/작업실 상단
               const isDropCeilingBottom = z > LR_D - 0.8 && x >= mbLeft && x <= LR_W
@@ -319,7 +428,7 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
                     <circleGeometry args={[0.035, 16]} />
                     <meshStandardMaterial
                       color={isActive ? '#fff' : '#888'}
-                      emissive={isActive ? ((Math.abs(x - (mbLeft + 0.550 + 0.3)) < 0.05 && z > LR_D - 0.8) ? '#fff5e6' : '#ffe0b0') : '#222'}
+                      emissive={isActive ? ((Math.abs(x - (mbLeft + 1.013)) < 0.05 && z < 0.8) ? '#fff5e6' : '#ffe0b0') : '#222'}
                       emissiveIntensity={isActive ? 1.0 : 0.1}
                     />
                   </mesh>
@@ -331,8 +440,8 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
                   {/* 워크스루: 모든 다운라이트를 SpotLight로 */}
                   <DropCeilingLight x={x} z={z} ceilingY={ceilingY} active={isActive}
                     color={
-                      // 화장대 앞 다운라이트 (안방 좌측 하단) → 흰색
-                      (Math.abs(x - (mbLeft + 0.550 + 0.3)) < 0.05 && z > LR_D - 0.8) ? '#fff5e6' : '#ffe0b0'
+                      // 화장대 앞 다운라이트 (안방 좌측 상단) → 흰색
+                      (Math.abs(x - (mbLeft + 1.013)) < 0.05 && z < 0.8) ? '#fff5e6' : '#ffe0b0'
                     }
                   />
                 </group>
@@ -359,8 +468,8 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
           {/* 간접조명 — 단내림 앞쪽 코브 LED */}
           {/* 안방 간접조명 — playerPos 연동 */}
           {(() => {
-            const mbActive = (!playerPos ? allLightsOn : false) || (playerPos && playerPos[0] >= mbLeft && playerPos[0] <= -WALL_THICKNESS && playerPos[1] >= 0 && playerPos[1] <= LR_D)
-            const lrActive = (!playerPos ? allLightsOn : false) || (playerPos && playerPos[0] >= 0 && playerPos[0] <= LR_W && playerPos[1] >= 0 && playerPos[1] <= LR_D)
+            const mbActive = allLightsOn || (playerPos && playerPos[0] >= mbLeft && playerPos[0] <= -WALL_THICKNESS && playerPos[1] >= 0 && playerPos[1] <= LR_D)
+            const lrActive = allLightsOn || (playerPos && playerPos[0] >= 0 && playerPos[0] <= LR_W && playerPos[1] >= 0 && playerPos[1] <= LR_D)
             return (
               <>
                 {/* 안방 LED 스트립 */}
@@ -415,7 +524,7 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
           </mesh>
           {/* 아기방 간접조명 */}
           {(() => {
-            const babyActive = (!playerPos ? allLightsOn : false) || (playerPos && playerPos[0] >= babyLeft && playerPos[0] <= babyRight && playerPos[1] >= babyTop && playerPos[1] <= babyBottomZ)
+            const babyActive = allLightsOn || (playerPos && playerPos[0] >= babyLeft && playerPos[0] <= babyRight && playerPos[1] >= babyTop && playerPos[1] <= babyBottomZ)
             return (
               <>
                 <mesh position={[(babyLeft + babyRight + 0.2) / 2, WALL_HEIGHT - 0.008, babyTop + 0.8 + 0.01]}>
@@ -443,7 +552,7 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
             const workTopZ = right1Z - 0.770 + 0.795 + 1.418 + 0.1  // screen top (most negative)
             const workW = workRightX - workLeftX
             const workCenterX = (workLeftX + workRightX) / 2
-            const workActive = (!playerPos ? allLightsOn : false) || (playerPos && playerPos[0] >= workLeftX - 0.2 && playerPos[0] <= workRightX + 0.1 && playerPos[1] <= -0.1 - 1.591 - 0.1 && playerPos[1] >= workTopZ - 0.2)
+            const workActive = allLightsOn || (playerPos && playerPos[0] >= workLeftX - 0.2 && playerPos[0] <= workRightX + 0.1 && playerPos[1] <= -0.1 - 1.591 - 0.1 && playerPos[1] >= workTopZ - 0.2)
             return (
               <>
                 <mesh position={[workCenterX, WALL_HEIGHT - 0.075, workTopZ + 0.4]}>
@@ -485,7 +594,7 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
         // 주방 bounds
         const kitchenRight = kitchenLeft + 2.5 - WALL_THICKNESS
         const kitchenBottom = -T2 - 1.591 + T2
-        const kitchenActive = (!playerPos ? allLightsOn : false) || (playerPos && (
+        const kitchenActive = allLightsOn || (playerPos && (
           playerPos[0] >= kitchenLeft - 0.1 && playerPos[0] <= kitchenRight + 0.1 &&
           playerPos[1] >= kitchenTopInner - 0.1 && playerPos[1] <= kitchenBottom + 0.1
         ))
@@ -675,7 +784,7 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
             {/* 상부장 — 인덕션~창문 시작 */}
             {upperLeftW > 0.1 && (
               <>
-                <mesh position={[kitLeft + upperLeftW / 2, 1.75, upperZ]}>
+                <mesh position={[kitLeft + upperLeftW / 2, 1.80, upperZ]}>
                   <boxGeometry args={[upperLeftW, 0.7, 0.35]} />
                   <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
                 </mesh>
@@ -687,7 +796,7 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
                   dt.wrapS = THREE.RepeatWrapping; dt.wrapT = THREE.RepeatWrapping
                   dt.repeat.set(1, 1); dt.colorSpace = THREE.SRGBColorSpace
                   return (
-                    <mesh key={`uc-l-${di}`} position={[dx, 1.75, upperZ + 0.176]}>
+                    <mesh key={`uc-l-${di}`} position={[dx, 1.80, upperZ + 0.176]}>
                       <planeGeometry args={[dw - 0.005, 0.68]} />
                       <meshStandardMaterial map={dt} roughness={0.45} />
                     </mesh>
@@ -703,7 +812,7 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
               const urLen = Math.abs(urEndZ - urStartZ)
               return (
               <>
-                <mesh position={[kitRight - 0.175, 1.75, (urStartZ + urEndZ) / 2]}>
+                <mesh position={[kitRight - 0.175, 1.80, (urStartZ + urEndZ) / 2]}>
                   <boxGeometry args={[0.35, 0.7, urLen]} />
                   <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
                 </mesh>
@@ -714,7 +823,7 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
                   dt.wrapS = THREE.RepeatWrapping; dt.wrapT = THREE.RepeatWrapping
                   dt.repeat.set(1, 1); dt.colorSpace = THREE.SRGBColorSpace
                   return (
-                    <mesh key={`uc-r-${di}`} position={[kitRight - 0.175 - 0.176, 1.75, dz]} rotation={[0, -Math.PI / 2, 0]}>
+                    <mesh key={`uc-r-${di}`} position={[kitRight - 0.175 - 0.176, 1.80, dz]} rotation={[0, -Math.PI / 2, 0]}>
                       <planeGeometry args={[dw - 0.005, 0.68]} />
                       <meshStandardMaterial map={dt} roughness={0.45} />
                     </mesh>
@@ -918,11 +1027,20 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
                     )
                   })()}
                   {/* 상부장 */}
-                  <mesh position={[extUpperCenterX, 1.75, extCenterZ]}><boxGeometry args={[0.35, 0.7, extLen]} /><meshStandardMaterial color="#3d2b1a" roughness={0.7} /></mesh>
+                  <mesh position={[extUpperCenterX, 1.80, extCenterZ]}><boxGeometry args={[0.35, 0.7, extLen]} /><meshStandardMaterial color="#3d2b1a" roughness={0.7} /></mesh>
                   {[0.25, 0.75].map((t, di) => {
                     const dt2 = closetDoorTex.clone(); dt2.wrapS = THREE.RepeatWrapping; dt2.wrapT = THREE.RepeatWrapping; dt2.repeat.set(1, 1); dt2.colorSpace = THREE.SRGBColorSpace
-                    return (<mesh key={`ext-uc-${di}`} position={[extUpperCenterX - 0.176, 1.75, extStartZ + extLen * t]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[extLen / 2 - 0.005, 0.68]} /><meshStandardMaterial map={dt2} roughness={0.45} /></mesh>)
+                    return (<mesh key={`ext-uc-${di}`} position={[extUpperCenterX - 0.176, 1.80, extStartZ + extLen * t]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[extLen / 2 - 0.005, 0.68]} /><meshStandardMaterial map={dt2} roughness={0.45} /></mesh>)
                   })}
+                  {/* === Cuckoo 정수기 (260×527×506mm) — ㄱ자 코너 안쪽 깊숙이, 동·북쪽 벽에 모두 밀착 === */}
+                  {(() => {
+                    const purifierD = 0.506   // local Z 깊이 → 회전 후 world X
+                    const purifierW = 0.260   // local X 폭 → 회전 후 world Z
+                    const pX = extWallInner - purifierD / 2          // 동쪽 벽에 등 부착
+                    const pY = 0.88
+                    const pZ = (cabinetZ - 0.3) + purifierW / 2      // 북쪽 벽 (메인 카운터 뒤) 밀착
+                    return <CuckooWaterPurifier position={[pX, pY, pZ]} rotation={-Math.PI / 2} />
+                  })()}
                 </>
               )
             })()}
@@ -968,12 +1086,12 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
                     <meshStandardMaterial color="#222" roughness={0.5} />
                   </mesh>
 
-                  {/* === 2번째 냉장고 (810x790x1800, 프렌치도어+서랍2단) === */}
+                  {/* === 2번째 냉장고 (810x790x1800, 프렌치도어+서랍2단) — 남쪽으로 50mm 추가 이동 === */}
                   {(() => {
                     const f2W = 0.810
                     const f2D = 0.790
                     const f2H = 1.800
-                    const f2Z = fridgeZ + fridgeW / 2 + f2W / 2 + 0.03  // 냉장고에서 30mm
+                    const f2Z = fridgeZ + fridgeW / 2 + f2W / 2 + 0.03 + 0.050  // 냉장고에서 80mm
                     const frontFace = fridgeX - fridgeD / 2  // 기존 냉장고 전면
                     const f2X = frontFace + f2D / 2  // 전면 정렬
                     const topH = f2H * 0.55   // 상단 프렌치도어
@@ -1024,6 +1142,94 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
                       </group>
                     )
                   })()}
+
+                  {/* === 냉장고 & 김치냉장고 빌트인 상부장 + 측면 벽 === */}
+                  {(() => {
+                    const f2W = 0.810
+                    const f2D = 0.790
+                    const f2Z = fridgeZ + fridgeW / 2 + f2W / 2 + 0.03 + 0.050
+                    const sideT = 0.030                                       // 30mm 측면 벽 두께
+
+                    // 냉장고 블록 Z 범위
+                    const groupZStart = fridgeZ - fridgeW / 2                 // 북쪽 끝
+                    const groupZEnd = f2Z + f2W / 2                           // 남쪽 끝
+                    const groupLen = groupZEnd - groupZStart
+
+                    // 장 외곽 Z (측면 벽 포함)
+                    const outerZStart = groupZStart - sideT
+                    const outerZEnd = groupZEnd + sideT
+                    const outerLen = outerZEnd - outerZStart
+                    const outerCenterZ = (outerZStart + outerZEnd) / 2
+
+                    const cabDepth = fridgeD                                  // 0.920
+                    const cabX = kitRight - cabDepth / 2
+
+                    // 상부 장 — 위아래 30mm씩 확장
+                    const cabBottomY = 1.800 - 0.030                          // 1.770 (30mm 아래로)
+                    const cabTopY = WALL_HEIGHT + 0.030                       // 2.430 (30mm 위로)
+                    const cabH = cabTopY - cabBottomY
+                    const cabCenterY = (cabBottomY + cabTopY) / 2
+
+                    const doorCount = Math.max(2, Math.round(groupLen / 0.6))
+                    const doorLen = groupLen / doorCount
+                    const doorGap = 0.003
+
+                    return (
+                      <group>
+                        {/* 상부장 본체 — 측면 벽 포함한 외곽 Z 전체 */}
+                        <mesh position={[cabX, cabCenterY, outerCenterZ]} castShadow receiveShadow>
+                          <boxGeometry args={[cabDepth, cabH, outerLen]} />
+                          <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                        </mesh>
+
+                        {/* 문짝들 (전면, -X 면) — 냉장고 구간에만 */}
+                        {Array.from({ length: doorCount }).map((_, di) => {
+                          const dz = groupZStart + doorLen * (di + 0.5)
+                          const dt = closetDoorTex.clone()
+                          dt.wrapS = THREE.RepeatWrapping
+                          dt.wrapT = THREE.RepeatWrapping
+                          dt.repeat.set(1, 1)
+                          dt.colorSpace = THREE.SRGBColorSpace
+                          return (
+                            <mesh
+                              key={`fridge-uc-${di}`}
+                              position={[cabX - cabDepth / 2 - 0.002, cabCenterY, dz]}
+                              rotation={[0, -Math.PI / 2, 0]}
+                            >
+                              <planeGeometry args={[doorLen - doorGap, cabH - 0.010]} />
+                              <meshStandardMaterial map={dt} roughness={0.45} />
+                            </mesh>
+                          )
+                        })}
+
+                        {/* 북쪽 30mm 측면 벽 — 상부장 아래 ~ 바닥까지 */}
+                        <mesh position={[cabX, cabBottomY / 2, outerZStart + sideT / 2]} castShadow receiveShadow>
+                          <boxGeometry args={[cabDepth, cabBottomY, sideT]} />
+                          <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                        </mesh>
+
+                        {/* 남쪽 30mm 측면 벽 — 상부장 아래 ~ 바닥까지 */}
+                        <mesh position={[cabX, cabBottomY / 2, outerZEnd - sideT / 2]} castShadow receiveShadow>
+                          <boxGeometry args={[cabDepth, cabBottomY, sideT]} />
+                          <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                        </mesh>
+
+                        {/* 김치냉장고 후면 필러 (김치냉장고 뒤 ~ 벽 사이, 깊이 130mm) */}
+                        {(() => {
+                          const fillerD = fridgeD - f2D                     // 0.130
+                          const fillerX = kitRight - fillerD / 2
+                          const kimchiZStart = f2Z - f2W / 2
+                          const kimchiZEnd = f2Z + f2W / 2
+                          return (
+                            <mesh position={[fillerX, 1.800 / 2, (kimchiZStart + kimchiZEnd) / 2]} castShadow receiveShadow>
+                              <boxGeometry args={[fillerD, 1.800, f2W]} />
+                              <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                            </mesh>
+                          )
+                        })()}
+                      </group>
+                    )
+                  })()}
                 </group>
               )
             })()}
@@ -1039,7 +1245,7 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
               const kitchenRight2 = kitchenLeft2 + 2.5 - WALL_THICKNESS
               const kitchenTopInner2 = wall2300Z + T2
               const kitchenBottom2 = -T2 - 1.591 + T2
-              const kitchenActive = (!playerPos ? allLightsOn : false) || (playerPos && (
+              const kitchenActive = allLightsOn || (playerPos && (
                 playerPos[0] >= kitchenLeft2 - 0.1 && playerPos[0] <= kitchenRight2 + 0.1 &&
                 playerPos[1] >= kitchenTopInner2 - 0.1 && playerPos[1] <= kitchenBottom2 + 0.1
               ))
@@ -1157,6 +1363,300 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
                     </group>)
                   })}
                   <mesh position={[leftCabX, 0.86, leftCenterZ]}><boxGeometry args={[leftCabDepth + 0.02, 0.04, leftLen + 0.02]} /><meshStandardMaterial color="#e8e0d0" roughness={0.3} metalness={0.05} /></mesh>
+                  {/* === 삼성 광파오븐 (523×330×515mm, 좌측 하부장 카운터 위 — 제일 왼쪽 padding 10mm, 동쪽 정면) === */}
+                  {(() => {
+                    const ovD = 0.515
+                    const ovW = 0.523
+                    const ovH = 0.330
+                    const ovX = leftWallInner + ovD / 2  // back against west wall
+                    const ovY = 0.88 + ovH / 2          // 카운터탑 위
+                    const ovZ = leftStartZ - 0.01 - ovW / 2 // 남쪽(=facing west 기준 좌측) 끝에서 10mm padding
+                    // 밥솥 — 오븐 북쪽 옆 (5mm 갭), 같은 카운터, 같은 정면 방향
+                    const rcZ = (ovZ - ovW / 2) - 0.005 - 0.428 / 2
+                    const rcX = leftWallInner + 0.428 / 2 // back against west wall
+                    return (
+                      <Suspense fallback={null}>
+                        <LightWaveOven position={[ovX, ovY, ovZ]} rotation={Math.PI / 2} />
+                        <RiceCooker position={[rcX, 0.88 + 0.0165, rcZ]} rotation={Math.PI / 2} />
+                      </Suspense>
+                    )
+                  })()}
+                </>
+              )
+            })()}
+
+            {/* === 주방 좌측 하부장 위 월넛 선반 (벽 길이의 80%, 2줄) === */}
+            {(() => {
+              const wallInnerX = babyRightWallX + T2  // 주방 좌측 벽 내측면
+              const cabBottomZ = babyBottomZ - 0.22 - 0.9
+              const cabTopZ = babyTop - T2 - 0.1095
+              const cabLen = Math.abs(cabTopZ - cabBottomZ)
+              const cabCenterZ = (cabBottomZ + cabTopZ) / 2
+              const shelfLen = cabLen * 0.8
+              const shelfDepth = 0.25
+              const shelfThick = 0.030
+              const shelfX = wallInnerX + shelfDepth / 2
+              const shelfY1 = 1.28
+              const shelfY2 = 1.68
+              const shelfTex = closetDoorTex.clone()
+              shelfTex.wrapS = THREE.RepeatWrapping
+              shelfTex.wrapT = THREE.RepeatWrapping
+              shelfTex.repeat.set(1, 1)
+              shelfTex.colorSpace = THREE.SRGBColorSpace
+              return (
+                <>
+                  {[shelfY1, shelfY2].map((y, i) => (
+                    <mesh key={`kit-shelf-${i}`} position={[shelfX, y, cabCenterZ]}>
+                      <boxGeometry args={[shelfDepth, shelfThick, shelfLen]} />
+                      <meshStandardMaterial map={shelfTex} color="#3d2b1a" roughness={0.55} metalness={0.05} />
+                    </mesh>
+                  ))}
+                </>
+              )
+            })()}
+          </group>
+        )
+      })()}
+
+      {/* 현관 신발장 — 거실/현관 경계벽, 깊이 400mm, 4칸 (우측 1칸 전신거울), 하단 100mm 띄움 */}
+      {(() => {
+        const totalW = 1.470
+        const depth = 0.400
+        const floorClear = 0.100
+        const cabH = 2.000
+        const topY = floorClear + cabH
+        const lowerH = 0.850
+        const openH = 0.250
+        const upperH = 0.900
+        const colW = totalW / 4
+        const zBack = -T2 - T2
+        const zFront = zBack - depth
+        const zCenter = (zBack + zFront) / 2
+        const xLeft = LR_W - 1.481 + 0.005      // 복도/거실 800벽 끝 기준 살짝 여유
+        const xCenter = xLeft + totalW / 2
+        const lowerCenterY = floorClear + lowerH / 2
+        const openCenterY = floorClear + lowerH + openH / 2
+        const upperCenterY = floorClear + lowerH + openH + upperH / 2
+        const bodyColor = '#f5f3f0'
+        const doorColor = '#fafaf8'
+        const walnutColor = '#6b4423'
+        const t = 0.018
+
+        return (
+          <group>
+            <mesh position={[xCenter, floorClear + cabH / 2, zBack - t / 2]} castShadow receiveShadow>
+              <boxGeometry args={[totalW, cabH, t]} />
+              <meshStandardMaterial color={bodyColor} roughness={0.5} />
+            </mesh>
+            {/* 좌측 측판 — 바닥까지 */}
+            <mesh position={[xLeft - t / 2, topY / 2, zCenter]} castShadow receiveShadow>
+              <boxGeometry args={[t, topY, depth]} />
+              <meshStandardMaterial color={bodyColor} roughness={0.5} />
+            </mesh>
+            {/* 우측 측판 — 바닥까지 */}
+            <mesh position={[xLeft + totalW + t / 2, topY / 2, zCenter]} castShadow receiveShadow>
+              <boxGeometry args={[t, topY, depth]} />
+              <meshStandardMaterial color={bodyColor} roughness={0.5} />
+            </mesh>
+            <mesh position={[xCenter, topY + t / 2, zCenter]} castShadow receiveShadow>
+              <boxGeometry args={[totalW + t * 2, t, depth]} />
+              <meshStandardMaterial color={bodyColor} roughness={0.5} />
+            </mesh>
+            <mesh position={[xCenter, floorClear - t / 2, zCenter]} castShadow receiveShadow>
+              <boxGeometry args={[totalW + t * 2, t, depth]} />
+              <meshStandardMaterial color={bodyColor} roughness={0.5} />
+            </mesh>
+            {/* 칸막이 (문짝 질감) — col 0|1, 1|2 는 오픈 선반 구간을 비우고 상/하로 분할, col 2|3 (거울 경계)는 풀 높이 */}
+            {[1, 2].map((i) => (
+              <group key={`shoe-div-${i}`}>
+                {/* 하부 구간 */}
+                <mesh position={[xLeft + colW * i, floorClear + lowerH / 2, zCenter]} castShadow receiveShadow>
+                  <boxGeometry args={[t, lowerH, depth - 0.01]} />
+                  <meshPhysicalMaterial color={doorColor} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
+                </mesh>
+                {/* 상부 구간 */}
+                <mesh position={[xLeft + colW * i, floorClear + lowerH + openH + upperH / 2, zCenter]} castShadow receiveShadow>
+                  <boxGeometry args={[t, upperH, depth - 0.01]} />
+                  <meshPhysicalMaterial color={doorColor} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
+                </mesh>
+              </group>
+            ))}
+            {/* 거울 경계 칸막이 (풀 높이) */}
+            <mesh position={[xLeft + colW * 3, floorClear + cabH / 2, zCenter]} castShadow receiveShadow>
+              <boxGeometry args={[t, cabH, depth - 0.01]} />
+              <meshPhysicalMaterial color={doorColor} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
+            </mesh>
+            {/* 오픈 선반 상/하 수평판 (몸체 자체) */}
+            <mesh position={[xLeft + colW * 1.5, floorClear + lowerH + t / 2, zCenter]} castShadow receiveShadow>
+              <boxGeometry args={[colW * 3 - t, t, depth - 0.005]} />
+              <meshStandardMaterial color={bodyColor} roughness={0.5} />
+            </mesh>
+            <mesh position={[xLeft + colW * 1.5, floorClear + lowerH + openH - t / 2, zCenter]} castShadow receiveShadow>
+              <boxGeometry args={[colW * 3 - t, t, depth - 0.005]} />
+              <meshStandardMaterial color={bodyColor} roughness={0.5} />
+            </mesh>
+            {/* === 오픈 선반 내측 월넛 라이너 5면 (뒤/상/하/좌/우) === */}
+            {(() => {
+              const interiorLeft = xLeft + t / 2                  // 좌측 측판 내측
+              const interiorRight = xLeft + colW * 3 - t / 2      // col 2|3 칸막이 내측
+              const interiorBottom = floorClear + lowerH + t      // 아래 수평판 상면
+              const interiorTop = floorClear + lowerH + openH - t // 위 수평판 하면
+              const interiorWidth = interiorRight - interiorLeft
+              const interiorHeight = interiorTop - interiorBottom
+              const interiorDepth = depth - 0.01
+              const interiorCx = (interiorLeft + interiorRight) / 2
+              const interiorCy = (interiorBottom + interiorTop) / 2
+              const linerT = 0.004
+
+              return (
+                <>
+                  {/* 뒤 — 캐비닛 백패널 전면(Z = zBack - t) 보다 2mm 앞쪽 */}
+                  <mesh position={[interiorCx, interiorCy, zBack - t - 0.002]} rotation={[0, Math.PI, 0]}>
+                    <planeGeometry args={[interiorWidth, interiorHeight]} />
+                    <meshStandardMaterial map={walnutLinerTex2x1} roughness={0.6} side={THREE.DoubleSide} />
+                  </mesh>
+                  {/* 상 */}
+                  <mesh position={[interiorCx, interiorTop - linerT / 2, zCenter]} rotation={[Math.PI / 2, 0, 0]}>
+                    <planeGeometry args={[interiorWidth, interiorDepth]} />
+                    <meshStandardMaterial map={walnutLinerTex2x1} roughness={0.6} side={THREE.DoubleSide} />
+                  </mesh>
+                  {/* 하 */}
+                  <mesh position={[interiorCx, interiorBottom + linerT / 2, zCenter]} rotation={[-Math.PI / 2, 0, 0]}>
+                    <planeGeometry args={[interiorWidth, interiorDepth]} />
+                    <meshStandardMaterial map={walnutLinerTex2x1} roughness={0.6} side={THREE.DoubleSide} />
+                  </mesh>
+                  {/* 좌 */}
+                  <mesh position={[interiorLeft + linerT / 2, interiorCy, zCenter]} rotation={[0, Math.PI / 2, 0]}>
+                    <planeGeometry args={[interiorDepth, interiorHeight]} />
+                    <meshStandardMaterial map={walnutLinerTex1x1} roughness={0.6} side={THREE.DoubleSide} />
+                  </mesh>
+                  {/* 우 */}
+                  <mesh position={[interiorRight - linerT / 2, interiorCy, zCenter]} rotation={[0, -Math.PI / 2, 0]}>
+                    <planeGeometry args={[interiorDepth, interiorHeight]} />
+                    <meshStandardMaterial map={walnutLinerTex1x1} roughness={0.6} side={THREE.DoubleSide} />
+                  </mesh>
+                </>
+              )
+            })()}
+
+            {/* 오픈 선반 상부 간접조명 (rect) — 백패널에서 현관쪽 10mm */}
+            {(() => {
+              const interiorLeft = xLeft + t / 2
+              const interiorRight = xLeft + colW * 3 - t / 2
+              const interiorTop = floorClear + lowerH + openH - t
+              const interiorCx = (interiorLeft + interiorRight) / 2
+              const interiorWidth = interiorRight - interiorLeft
+              const stripDepth = 0.010
+              // 백패널 전면(Z = zBack - t)에서 현관 방향(-Z)으로 10mm 지점에 strip 중심
+              const stripZ = zBack - t - stripDepth / 2 - 0.002
+              const stripY = interiorTop - 0.001
+              const isActive = !!allLightsOn || (playerPos ? (
+                playerPos[0] >= LR_W - 1.481 && playerPos[0] <= LR_W + T2 &&
+                playerPos[1] >= -T2 - 1.591 && playerPos[1] <= -T2
+              ) : false)
+              return (
+                <>
+                  <mesh position={[interiorCx, stripY, stripZ]} rotation={[Math.PI / 2, 0, 0]}>
+                    <planeGeometry args={[interiorWidth, stripDepth]} />
+                    <meshStandardMaterial
+                      color={isActive ? '#fff' : '#444'}
+                      emissive={isActive ? '#ffe0b0' : '#111'}
+                      emissiveIntensity={isActive ? 3.0 : 0.1}
+                    />
+                  </mesh>
+                  {isActive && (
+                    <rectAreaLight
+                      position={[interiorCx, stripY - 0.002, stripZ]}
+                      width={interiorWidth}
+                      height={stripDepth}
+                      intensity={60}
+                      color="#ffe0b0"
+                      rotation={[-Math.PI / 2, 0, 0]}
+                    />
+                  )}
+                </>
+              )
+            })()}
+
+            {[0, 1, 2].map((ci) => {
+              // 인접 문짝 사이 1mm 갭 (양쪽 0.5mm씩), 바깥쪽 가장자리는 flush
+              const halfG = 0.0005
+              const leftBound = xLeft + ci * colW + (ci > 0 ? halfG : 0)
+              const rightBound = xLeft + (ci + 1) * colW - (ci < 2 ? halfG : 0)
+              const cx = (leftBound + rightBound) / 2
+              const dW = rightBound - leftBound
+              return (
+                <group key={`shoe-col-${ci}`}>
+                  <mesh position={[cx, lowerCenterY, zFront - t / 2]} castShadow receiveShadow>
+                    <boxGeometry args={[dW, lowerH, t]} />
+                    <meshPhysicalMaterial color={doorColor} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
+                  </mesh>
+                  <mesh position={[cx, upperCenterY, zFront - t / 2]} castShadow receiveShadow>
+                    <boxGeometry args={[dW, upperH, t]} />
+                    <meshPhysicalMaterial color={doorColor} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
+                  </mesh>
+                </group>
+              )
+            })}
+            {(() => {
+              const cx = xLeft + colW * 3.5
+              return (
+                <group>
+                  <mesh position={[cx, floorClear + cabH / 2, zFront - 0.004]} castShadow receiveShadow>
+                    <boxGeometry args={[colW - 0.006, cabH - 0.006, 0.008]} />
+                    <meshStandardMaterial color="#e8e8e8" roughness={0.3} />
+                  </mesh>
+                  <mesh position={[cx, floorClear + cabH / 2, zFront - 0.0085]}>
+                    <planeGeometry args={[colW - 0.03, cabH - 0.03]} />
+                    <meshStandardMaterial color="#dfe5ea" roughness={0.02} metalness={1.0} />
+                  </mesh>
+                </group>
+              )
+            })()}
+
+            {/* 신발장 밑면 다운라이트 4개 */}
+            {(() => {
+              const dlY = floorClear - t - 0.002
+              const isActive = !!allLightsOn || (playerPos ? (
+                playerPos[0] >= LR_W - 1.481 && playerPos[0] <= LR_W + T2 &&
+                playerPos[1] >= -T2 - 1.591 && playerPos[1] <= -T2
+              ) : false)
+              return (
+                <>
+                  {[0, 1, 2, 3].map((ci) => {
+                    const cx = xLeft + colW * (ci + 0.5)
+                    return (
+                      <group key={`shoe-dl-${ci}`}>
+                        {/* 발광면 */}
+                        <mesh position={[cx, dlY, zCenter]} rotation={[Math.PI / 2, 0, 0]}>
+                          <circleGeometry args={[0.03, 16]} />
+                          <meshStandardMaterial
+                            color={isActive ? '#fff' : '#888'}
+                            emissive={isActive ? '#ffe0b0' : '#222'}
+                            emissiveIntensity={isActive ? 1.0 : 0.1}
+                          />
+                        </mesh>
+                        {/* 크롬 링 */}
+                        <mesh position={[cx, dlY + 0.001, zCenter]} rotation={[Math.PI / 2, 0, 0]}>
+                          <ringGeometry args={[0.03, 0.038, 16]} />
+                          <meshStandardMaterial color="#ccc" metalness={0.6} roughness={0.3} />
+                        </mesh>
+                        {/* 스포트라이트 */}
+                        {isActive && (
+                          <spotLight
+                            position={[cx, dlY - 0.005, zCenter]}
+                            target-position={[cx, 0, zCenter]}
+                            angle={Math.PI / 3}
+                            penumbra={0.6}
+                            intensity={1.5}
+                            distance={1.5}
+                            decay={2}
+                            color="#ffe0b0"
+                          />
+                        )}
+                      </group>
+                    )
+                  })}
                 </>
               )
             })()}
@@ -1191,7 +1691,7 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
         const wallLen = wallEndX - wallStartX  // 800mm
         const wallCenterX = (wallStartX + wallEndX) / 2
 
-        const isActive = playerPos ? (
+        const isActive = !!allLightsOn || (playerPos ? (
           // 복도
           (playerPos[0] >= -1.2 && playerPos[0] <= LR_W - 1.481 &&
             playerPos[1] >= Math.min(-WALL_THICKNESS, -T2 - 1.591 + T2) && playerPos[1] <= Math.max(-WALL_THICKNESS, -T2 - 1.591 + T2)) ||
@@ -1200,7 +1700,7 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
             playerPos[1] >= Math.min(-WALL_THICKNESS, -T2 - 1.591 + T2) && playerPos[1] <= Math.max(-WALL_THICKNESS, -T2 - 1.591 + T2)) ||
           // 거실
           (playerPos[0] >= 0 && playerPos[0] <= LR_W && playerPos[1] >= 0 && playerPos[1] <= LR_D)
-        ) : allLightsOn
+        ) : false)
 
         return (
           <>
@@ -1302,16 +1802,33 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
         )
       })()}
 
-      {/* 안방 가벽 (창문 좌측~2600mm, 두께 50mm) */}
-      <mesh position={[mbLeft + 1.340, WALL_HEIGHT / 2, LR_D + T2 - 1.3]}>
-        <boxGeometry args={[0.05, WALL_HEIGHT, 2.6]} />
-        <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
-      </mesh>
+      {/* 안방 가벽 (안방욕실 문쪽~2600mm, 두께 50mm, 창문쪽 1066mm 개구부) — 실크벽지 일괄 적용 */}
+      {(() => {
+        const partLen = 2.6
+        const silk = silkTex.clone()
+        silk.wrapS = THREE.RepeatWrapping
+        silk.wrapT = THREE.ClampToEdgeWrapping
+        silk.repeat.set(partLen / 2, 1)
+        silk.colorSpace = THREE.SRGBColorSpace
+        return (
+          <mesh position={[mbLeft + 1.476, WALL_HEIGHT / 2, -T2 + 1.3]} castShadow receiveShadow>
+            <boxGeometry args={[0.05, WALL_HEIGHT, partLen]} />
+            <meshPhysicalMaterial
+              map={silk}
+              roughness={0.55}
+              metalness={0}
+              sheen={1}
+              sheenColor={'#ffffff'}
+              sheenRoughness={0.3}
+            />
+          </mesh>
+        )
+      })()}
 
-      {/* 안방 화장대 (붙박이장 마지막 자리) */}
+      {/* 안방 화장대 (붙박이장 첫 자리 — 화장실 인접) */}
       {(() => {
         const vanityX = mbLeft + 0.275
-        const vanityZ = LR_D - 0.3
+        const vanityZ = 0.3
         const vanityW = 0.55
         return (
           <group>
@@ -1357,6 +1874,492 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
         )
       })()}
 
+      {/* 안방 출입문 — 안방↔복도 (히든 프레임 + 9mm 문선) */}
+      {/* 평면도: 경첩=좌측끝(-X), -Z(복도쪽)으로 열림 */}
+      <FlushDoor
+        position={[-WALL_THICKNESS - 0.45 - 0.009, -T2]}
+        axis="x"
+        width={0.9}
+        height={2.1}
+        hinge="left"
+        swing="out"
+        tex={walnutDoorTex}
+        playerPos={rawPlayerPos}
+      />
+
+      {/* 안방욕실 문 — 안방↔안방욕실 (경첩=좌측 mbDoorHinge, -Z 욕실쪽 열림) */}
+      <FlushDoor
+        position={[(mbDoorHinge + mbDoorEnd) / 2, -T2]}
+        axis="x"
+        width={0.9}
+        height={2.1}
+        hinge="left"
+        swing="out"
+        tex={walnutDoorTex}
+        playerPos={rawPlayerPos}
+      />
+
+      {/* 메인욕실 문 — 메인욕실↔복도 (경첩=상단, +X 복도쪽 열림) */}
+      <FlushDoor
+        position={[bath2RightWallX, -WALL_THICKNESS - 0.1 - 0.45]}
+        axis="z"
+        width={0.9}
+        height={2.1}
+        hinge="right"
+        swing="in"
+        tex={walnutDoorTex}
+        playerPos={rawPlayerPos}
+      />
+
+      {/* 아기방 문 — 아기방↔복도 (경첩=상단, +X 복도쪽 열림) */}
+      <FlushDoor
+        position={[bath2RightWallX, babyBottom - 0.22 - 0.45]}
+        axis="z"
+        width={0.9}
+        height={2.1}
+        hinge="right"
+        swing="in"
+        tex={walnutDoorTex}
+        playerPos={rawPlayerPos}
+      />
+
+      {/* 아기방 침대 — 범퍼 포함 총 1115×2065mm, 배면=창문(상단벽)쪽, 우측=우측벽 flush */}
+      <ToddlerBed
+        position={[
+          babyRight - 2.065 / 2,                             // 우측 범퍼 외측이 babyRight
+          babyTop + 1.115 / 2,                               // 배면 범퍼 외측이 babyTop
+        ]}
+        rotationY={0}
+      />
+
+      {/* 세탁실 문 — (경첩=상단, +X 열림) */}
+      <FlushDoor
+        position={[babyRightWallX, babyTopWallZ - 0.5595]}
+        axis="z"
+        width={0.9}
+        height={2.1}
+        hinge="right"
+        swing="in"
+        tex={walnutDoorTex}
+        playerPos={rawPlayerPos}
+      />
+
+      {/* 작업실 문 — 복도↔작업실 (경첩=좌측, -Z 작업실쪽 열림) */}
+      <FlushDoor
+        position={[babyRightWallX + 2.555 - 0.1 + 0.250 + 0.45, -T2 - 1.591]}
+        axis="x"
+        width={0.9}
+        height={2.1}
+        hinge="left"
+        swing="out"
+        tex={walnutDoorTex}
+        playerPos={rawPlayerPos}
+      />
+
+      {/* 작업실 책상 2개 — 우측벽 기준, 긴 변 Z축, 창문쪽=1200, 안쪽=1800 */}
+      {(() => {
+        const workTopZ = right1Z - 0.770 + 0.795 + 1.418 + 0.1   // 북쪽 내측 (창문쪽)
+        const wallGap = 0.020                                     // 벽에서 20mm 띄움
+        const deskDepth = 0.720
+        const gapBetween = 0.100
+        const cx = LR_W - deskDepth / 2 - wallGap                // 우측벽에서 20mm 띄움
+        // 창문쪽(북) 1200 — 북쪽 벽에서 20mm 띄우고 배치
+        const w1 = 1.200
+        const z1 = workTopZ + wallGap + w1 / 2
+        // 1200 테이블은 북쪽 벽 꺾임(돌출부)과 겹치지 않도록 140mm 왼쪽(-X)으로 이동
+        const cx1 = cx - 0.140
+        // 안쪽(남) 1800 — 1200 바로 아래 + gap
+        const w2 = 1.800
+        const z2 = z1 + w1 / 2 + gapBetween + w2 / 2
+        return (
+          <>
+            <TrestleDesk position={[cx1, z1]} rotationY={Math.PI / 2} width={w1} />
+            <TrestleDesk position={[cx, z2]} rotationY={Math.PI / 2} width={w2} />
+          </>
+        )
+      })()}
+
+      {/* === 현관/복도 중문 — 스윙도어(복도쪽 열림) + 신발장쪽 고정 패널, 모루유리 === */}
+      {(() => {
+        const jungX = LR_W - 1.481
+        // 현관 내측 Z 범위: 남쪽/북쪽 벽의 내측면 사이
+        const zSouth = -T2 - T2                       // 남쪽(거실 경계벽) 현관 내측면
+        const zNorth = -T2 - 1.591 + T2                // 북쪽(상단벽) 현관 내측면
+        const totalW = zSouth - zNorth                 // = 1.551
+        const swingW = 0.900                           // 현관쪽 스윙도어 (900)
+        const fixedW = totalW - swingW                 // 신발장쪽 고정 패널 (≈0.651)
+        const doorH = 2.000
+        const doorT = 0.040
+        const borderR = 0.100
+        const topBottomFrame = 0.120
+        const fixedFrameT = 0.025                      // 고정 패널 얇은 테두리
+        const panelColor = '#fafaf8'
+        const glassColor = '#e6ebef'
+
+        // 배치: 북쪽(복도 상단벽, -Z)이 "현관쪽"(=front-door 쪽) → 여기에 900 스윙도어
+        // 남쪽(거실 경계벽, +Z)이 "신발장쪽" → 여기에 작은 고정 패널
+        const swingHingeZ = zNorth + swingW            // 힌지는 고정 패널과 맞닿는 쪽
+        const swingFreeEndZ = zNorth                    // 자유단 (북쪽 끝)
+        const fixedCenterZ = zSouth - fixedW / 2       // 남쪽 패널 중심
+
+        return (
+          <group>
+            {/* 상단 솔리드 헤더 (도어 위 ~ 천장) */}
+            <mesh position={[jungX, (doorH + WALL_HEIGHT) / 2, (zNorth + zSouth) / 2]} castShadow receiveShadow>
+              <boxGeometry args={[doorT, WALL_HEIGHT - doorH, totalW]} />
+              <meshPhysicalMaterial color={panelColor} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
+            </mesh>
+
+            {/* 고정 모루유리 패널 — 신발장쪽 (스윙도어와 동일 컨셉: 80% 라운드 유리) */}
+            <JungmunFixedPanel
+              centerWorld={[jungX, fixedCenterZ]}
+              width={fixedW}
+              height={doorH}
+              thickness={doorT}
+              borderR={borderR}
+              topBottomFrame={topBottomFrame}
+              color={panelColor}
+              glassColor="#eef1f3"
+            />
+
+            {/* 스윙도어 — 현관쪽 900, 복도(-X)쪽 열림, 80% 라운드 유리 */}
+            <JungmunSwingDoor
+              hingeWorld={[jungX, swingHingeZ]}
+              freeEndZ={swingFreeEndZ}
+              width={swingW}
+              height={doorH}
+              thickness={doorT}
+              borderR={borderR}
+              topBottomFrame={topBottomFrame}
+              color={panelColor}
+              glassColor={glassColor}
+              playerPos={rawPlayerPos}
+            />
+          </group>
+        )
+      })()}
+
+      {/* === 메인욕실 인테리어 (벽 타일 + 변기 + 세면대 + 샤워부스 + 니치) === */}
+      {(() => {
+        const bL = mbDoorEnd + 0.1 + T2          // 좌측벽 내측면
+        const bR = bL + 1.413                     // 우측벽 내측면
+        const bT = -WALL_THICKNESS                // -0.2 (안방쪽 끝)
+        const bB = bT - 2.173                     // -2.373 (먼쪽 끝)
+        const cX = (bL + bR) / 2
+        const innerW = bR - bL                    // 1.413
+        const innerD = Math.abs(bB - bT)          // 2.173
+        // 화장실 메인 조명 활성 (워크스루 야간 + 플레이어 in-room)
+        const bathActive = !!playerPos && playerPos[0] >= bL && playerPos[0] <= bR && playerPos[1] >= bB && playerPos[1] <= bT
+        const tileW = 0.6
+        const tileH = 1.2
+        const makeTileTex = (uRep: number, vRep: number) => {
+          const t = porcelainTex.clone()
+          t.wrapS = THREE.RepeatWrapping
+          t.wrapT = THREE.RepeatWrapping
+          t.repeat.set(uRep, vRep)
+          t.colorSpace = THREE.SRGBColorSpace
+          return t
+        }
+
+        // 샤워부스 영역 (먼쪽, Z=bB ~ bB+0.95, 전체 폭)
+        const showerDepth = 0.95
+        const showerZend = bB + showerDepth      // 샤워부스 끝 (유리벽 위치)
+        const glassZ = showerZend - 0.2                 // 유리벽 Z
+
+        // 세면대 (좌측벽, 600mm 폭)
+        const vanW = 0.6
+
+        const oriVanZ = showerZend + 0.15 + vanW / 2
+        const vanZ = showerZend + 0 + vanW / 2  // 샤워벽에서 150mm 띄움
+
+        // 변기 (좌측벽, 세면대와 도어 사이)
+        const toiletL = 0.68  // Z방향 길이
+        const toiletZ = oriVanZ + vanW / 2 - 0.2 + toiletL / 2
+
+        return (
+          <group>
+            {/* === 벽 타일 (4면, 600×1200 포세린) === */}
+            {/* 좌측벽 (X=bL, +X 면) */}
+            <mesh position={[bL + 0.001, WALL_HEIGHT / 2, (bT + bB) / 2]} rotation={[0, Math.PI / 2, 0]}>
+              <planeGeometry args={[innerD, WALL_HEIGHT]} />
+              <meshStandardMaterial map={makeTileTex(innerD / tileW, WALL_HEIGHT / tileH)} roughness={0.15} metalness={0.05} />
+            </mesh>
+            {/* 우측벽 (문이 있는 벽) — 타일 없음 */}
+            {/* 안방쪽 벽 (Z=bT, -Z 면) */}
+            <mesh position={[cX, WALL_HEIGHT / 2, bT - 0.001]} rotation={[0, Math.PI, 0]}>
+              <planeGeometry args={[innerW, WALL_HEIGHT]} />
+              <meshStandardMaterial map={makeTileTex(innerW / tileW, WALL_HEIGHT / tileH)} roughness={0.15} metalness={0.05} />
+            </mesh>
+            {/* 먼쪽 벽 (Z=bB, +Z 면) */}
+            <mesh position={[cX, WALL_HEIGHT / 2, bB + 0.001]}>
+              <planeGeometry args={[innerW, WALL_HEIGHT]} />
+              <meshStandardMaterial map={makeTileTex(innerW / tileW, WALL_HEIGHT / tileH)} roughness={0.15} metalness={0.05} />
+            </mesh>
+
+            {/* === 변기 (GLB) === */}
+            <Suspense fallback={null}>
+              <Toilet position={[bL + 0.30, 0, toiletZ]} rotation={Math.PI / 2} scale={0.4} />
+            </Suspense>
+            {/* 변기 위 상부장 (주방 상부장과 동일 스타일 — 좌측벽 부착, +X 정면) */}
+            {(() => {
+              const ucD = 0.30           // 깊이 (X)
+              const ucH = 0.70           // 높이 (Y)
+              const ucW = toiletL        // 폭 (Z, 변기 길이)
+              const ucCY = 1.75          // 중심 Y
+              const doorCount = Math.max(1, Math.round(ucW / 0.4))
+              const doorW = ucW / doorCount
+              return (
+                <group>
+                  {/* 본체 */}
+                  <mesh position={[bL + ucD / 2, ucCY, toiletZ]}>
+                    <boxGeometry args={[ucD, ucH, ucW]} />
+                    <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                  </mesh>
+                  {/* 문들 + 손잡이 */}
+                  {Array.from({ length: doorCount }).map((_, di) => {
+                    const dt = closetDoorTex.clone()
+                    dt.wrapS = THREE.RepeatWrapping
+                    dt.wrapT = THREE.RepeatWrapping
+                    dt.repeat.set(1, 1)
+                    dt.colorSpace = THREE.SRGBColorSpace
+                    const dz = (toiletZ - ucW / 2) + doorW / 2 + di * doorW
+                    return (
+                      <group key={`mb2-uc-${di}`}>
+                        {/* 도어 패널 */}
+                        <mesh position={[bL + ucD + 0.001, ucCY, dz]} rotation={[0, Math.PI / 2, 0]}>
+                          <planeGeometry args={[doorW - 0.005, ucH - 0.01]} />
+                          <meshStandardMaterial map={dt} roughness={0.45} />
+                        </mesh>
+                        {/* 손잡이 */}
+                        <mesh position={[bL + ucD + 0.01, ucCY - ucH / 2 + 0.08, dz]}>
+                          <boxGeometry args={[0.015, 0.06, 0.01]} />
+                          <meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} />
+                        </mesh>
+                      </group>
+                    )
+                  })}
+                </group>
+              )
+            })()}
+
+            {/* === 세면대 (GLB) + 거울 === */}
+            <Suspense fallback={null}>
+              <Sink position={[bL + 0.40, 0.61, vanZ+0.15]} rotation={Math.PI / 2 * 3} scale={1.5} />
+            </Suspense>
+            {/* 원형 거울 (좌측벽 부착, 세면대 위) + 후면 간접조명 (메인조명 연동) */}
+            {(() => {
+              const mR = 0.30           // 거울 반경 300mm
+              const mY = 1.45
+              const mZ = vanZ - 0.1
+              return (
+                <group>
+                  {/* 거울 본체 (원형) */}
+                  <mesh position={[bL + 0.012, mY, mZ]} rotation={[0, Math.PI / 2, 0]}>
+                    <circleGeometry args={[mR, 64]} />
+                    <meshStandardMaterial color="#cfdde8" metalness={0.95} roughness={0.03} />
+                  </mesh>
+                  {/* 후면 백라이트 링 — 메인조명 ON 일 때만 발광 */}
+                  <mesh position={[bL + 0.006, mY, mZ]} rotation={[0, Math.PI / 2, 0]}>
+                    <ringGeometry args={[mR + 0.005, mR + 0.05, 64]} />
+                    <meshStandardMaterial
+                      color={bathActive ? '#fff5e6' : '#444'}
+                      emissive={bathActive ? '#fff5e6' : '#111'}
+                      emissiveIntensity={bathActive ? 2.5 : 0.05}
+                      side={THREE.DoubleSide}
+                    />
+                  </mesh>
+                  {bathActive && (
+                    <pointLight position={[bL + 0.10, mY, mZ]} intensity={0.6} distance={1.5} decay={2} color="#fff5e6" />
+                  )}
+                </group>
+              )
+            })()}
+
+            {/* === 샤워부스 (먼쪽, 전체 폭, 유리벽 + 유리문) === */}
+            {(() => {
+              const sZmid = (bB + showerZend) / 2
+              const glassH = 2.0
+              return (
+                <group>
+                  {/* 유리벽 — 좌측 (도어 옆) */}
+                  <mesh position={[bL + (innerW * 0.3) / 2 + 0.01, glassH / 2 + 0.02, glassZ]}>
+                    <boxGeometry args={[innerW * 0.3, glassH, 0.008]} />
+                    <meshStandardMaterial color="#cfe8f0" transparent opacity={0.22} roughness={0.05} metalness={0.1} />
+                  </mesh>
+                  {/* 유리벽 — 우측 (도어 옆) */}
+                  <mesh position={[bR - (innerW * 0.3) / 2 - 0.01, glassH / 2 + 0.02, glassZ]}>
+                    <boxGeometry args={[innerW * 0.3, glassH, 0.008]} />
+                    <meshStandardMaterial color="#cfe8f0" transparent opacity={0.22} roughness={0.05} metalness={0.1} />
+                  </mesh>
+                  {/* 유리 도어 (가운데, 안쪽으로 살짝 옵셋) */}
+                  <mesh position={[cX, glassH / 2 + 0.02, glassZ - 0.001]}>
+                    <boxGeometry args={[innerW * 0.4, glassH - 0.05, 0.008]} />
+                    <meshStandardMaterial color="#cfe8f0" transparent opacity={0.22} roughness={0.05} metalness={0.1} />
+                  </mesh>
+                  {/* 도어 손잡이 */}
+                  <mesh position={[cX + 0.18, 1.05, glassZ - 0.05]}>
+                    <boxGeometry args={[0.02, 0.18, 0.02]} />
+                    <meshStandardMaterial color="#c8c8c8" metalness={0.85} roughness={0.2} />
+                  </mesh>
+                  {/* 유리 상단 프레임 */}
+                  <mesh position={[cX, glassH + 0.02, glassZ]}>
+                    <boxGeometry args={[innerW - 0.02, 0.025, 0.025]} />
+                    <meshStandardMaterial color="#c8c8c8" metalness={0.85} roughness={0.25} />
+                  </mesh>
+                </group>
+              )
+            })()}
+          </group>
+        )
+      })()}
+
+      {/* === 안방욕실 (변기 + 세면대 — 메인욕실 세트를 90° CW 회전한 버전) === */}
+      {(() => {
+        const bL2 = mbBathLeft       // 좌측벽 X
+        const bR2 = mbBathRight      // 우측벽 X
+        const bT2 = mbBathTop        // 안방쪽 Z (-0.2)
+        const bB2 = mbBathBottom     // 먼쪽 Z (-1.807)
+        const toiletL2 = 0.68        // 변기 모델 X-extent (회전 후)
+        // 안방욕실 메인 조명 활성
+        const mbBathActive = !!playerPos && playerPos[0] >= bL2 && playerPos[0] <= bR2 && playerPos[1] >= bB2 && playerPos[1] <= bT2
+
+        // 변기/세면대 — 북쪽 벽 (Z = bB2) 부착, 변기 서쪽, 세면대 동쪽
+        const toilet2X = bL2 + 0.40
+        const toilet2Z = bB2 + 0.30
+        const sink2X = bL2 + 1.00
+        const sink2Z = bB2 + 0.30
+        return (
+          <group>
+            {/* 변기 (rotation = π/2 - π/2 = 0) */}
+            <Suspense fallback={null}>
+              <Toilet position={[toilet2X, 0, toilet2Z]} rotation={0} scale={0.4} />
+            </Suspense>
+            {/* 변기 위 상부장 (주방 상부장 스타일 — 북쪽 벽 부착, +Z 정면) */}
+            {(() => {
+              const ucD = 0.30           // 깊이 (Z, 벽에서 안쪽)
+              const ucH = 0.70           // 높이 (Y)
+              const ucW = toiletL2       // 폭 (X)
+              const ucCY = 1.75          // 중심 Y
+              const doorCount = Math.max(1, Math.round(ucW / 0.4))
+              const doorW = ucW / doorCount
+              return (
+                <group>
+                  {/* 본체 */}
+                  <mesh position={[toilet2X, ucCY, bB2 + ucD / 2]}>
+                    <boxGeometry args={[ucW, ucH, ucD]} />
+                    <meshStandardMaterial color="#3d2b1a" roughness={0.7} />
+                  </mesh>
+                  {/* 문들 + 손잡이 */}
+                  {Array.from({ length: doorCount }).map((_, di) => {
+                    const dt = closetDoorTex.clone()
+                    dt.wrapS = THREE.RepeatWrapping
+                    dt.wrapT = THREE.RepeatWrapping
+                    dt.repeat.set(1, 1)
+                    dt.colorSpace = THREE.SRGBColorSpace
+                    const dx = (toilet2X - ucW / 2) + doorW / 2 + di * doorW
+                    return (
+                      <group key={`mb1-uc-${di}`}>
+                        {/* 도어 패널 */}
+                        <mesh position={[dx, ucCY, bB2 + ucD + 0.001]}>
+                          <planeGeometry args={[doorW - 0.005, ucH - 0.01]} />
+                          <meshStandardMaterial map={dt} roughness={0.45} />
+                        </mesh>
+                        {/* 손잡이 */}
+                        <mesh position={[dx, ucCY - ucH / 2 + 0.08, bB2 + ucD + 0.01]}>
+                          <boxGeometry args={[0.015, 0.06, 0.01]} />
+                          <meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} />
+                        </mesh>
+                      </group>
+                    )
+                  })}
+                </group>
+              )
+            })()}
+
+            {/* 세면대 (rotation = 3π/2 - π/2 = π) */}
+            <Suspense fallback={null}>
+              <Sink position={[sink2X-0.2, 0.61, sink2Z+0.12]} rotation={Math.PI} scale={1.5} />
+            </Suspense>
+            {/* 원형 거울 (북쪽 벽 부착, 세면대 위) + 후면 간접조명 (메인조명 연동) */}
+            {(() => {
+              const mR = 0.30
+              const mX = sink2X + 0.07
+              const mY = 1.45
+              return (
+                <group>
+                  {/* 거울 본체 (원형) */}
+                  <mesh position={[mX, mY, bB2 + 0.012]}>
+                    <circleGeometry args={[mR, 64]} />
+                    <meshStandardMaterial color="#cfdde8" metalness={0.95} roughness={0.03} />
+                  </mesh>
+                  {/* 후면 백라이트 링 — 메인조명 ON 일 때만 발광 */}
+                  <mesh position={[mX, mY, bB2 + 0.006]}>
+                    <ringGeometry args={[mR + 0.005, mR + 0.05, 64]} />
+                    <meshStandardMaterial
+                      color={mbBathActive ? '#fff5e6' : '#444'}
+                      emissive={mbBathActive ? '#fff5e6' : '#111'}
+                      emissiveIntensity={mbBathActive ? 2.5 : 0.05}
+                      side={THREE.DoubleSide}
+                    />
+                  </mesh>
+                  {mbBathActive && (
+                    <pointLight position={[mX, mY, bB2 + 0.10]} intensity={0.6} distance={1.5} decay={2} color="#fff5e6" />
+                  )}
+                </group>
+              )
+            })()}
+          </group>
+        )
+      })()}
+
+      {/* 실외기실 문 — 메인베란다↔실외기실 (50mm 가벽, 900mm 도어, 베란다쪽 열림, 베이지 페인트) */}
+      <FlushDoor
+        position={[0.870 + 2.000, LR_D + WALL_THICKNESS + 1.308 / 2]}
+        axis="z"
+        width={0.9}
+        height={2.1}
+        hinge="right"
+        swing="out"
+        wallThickness={0.05}
+        color="#e8dcc4"
+        playerPos={rawPlayerPos}
+      />
+
+      {/* 새장 문 — 새장↔메인베란다 (50mm 가벽, 900mm 환기 루버 도어, 베란다쪽 +X 열림) */}
+      <FlushDoor
+        position={[mbLeft + 1.340, LR_D + WALL_THICKNESS + 1.308 / 2]}
+        axis="z"
+        width={0.9}
+        height={2.1}
+        hinge="right"
+        swing="in"
+        wallThickness={0.05}
+        color="#e8dcc4"
+        style="louvered"
+        playerPos={rawPlayerPos}
+      />
+
+      {/* 세탁실 LG WashTower — 제일 안쪽(서쪽 끝) 벽 부착, 동쪽(문) 방향 정면 */}
+      {(() => {
+        const D = 0.80
+        const wtX = stair2X + T2 + D / 2  // 서쪽 벽 + 깊이/2
+        const wtZ = (Math.min(stair3Z + T2, laundryBotZ - T2) + Math.max(stair3Z + T2, laundryBotZ - T2)) / 2
+        return <WashTower position={[wtX, 0, wtZ]} rotation={Math.PI / 2} />
+      })()}
+
+      {/* 현관문 — 외부 ↔ 현관 (베이지 페인트 + 디지털 도어락) */}
+      <FlushDoor
+        position={[LR_W + T2, -T2 - T2 - 0.410 - 0.450]}
+        axis="z"
+        width={0.9}
+        height={2.1}
+        hinge="right"
+        swing="out"
+        color="#e8dcc4"
+        handleStyle="smartlock"
+        playerPos={rawPlayerPos}
+      />
+
       {/* 안방 침대 */}
       <Suspense fallback={null}>
         <Bed />
@@ -1378,6 +2381,645 @@ export function ApartmentModel({ showCeiling = true, playerPos, allLightsOn = fa
           <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} side={THREE.BackSide} />
         </mesh>
       ))}
+    </group>
+  )
+}
+
+function RiceCooker({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
+  const { scene } = useGLTF('/models/kitchen/rice_cooker.gltf')
+  const cloned = useMemo(() => scene.clone(), [scene])
+  return <primitive object={cloned} position={position} rotation={[0, rotation, 0]} />
+}
+
+function CuckooWaterPurifier({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
+  const W = 0.260
+  const H = 0.527
+  const D = 0.506
+  const bodyColor = '#fafafa'
+  const silverColor = '#c8c8c8'
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      <mesh position={[0, H / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[W, H, D]} />
+        <meshStandardMaterial color={bodyColor} roughness={0.3} metalness={0.05} />
+      </mesh>
+      <mesh position={[0, H * 0.78, D / 2 + 0.0005]}>
+        <boxGeometry args={[W * 0.75, H * 0.40, 0.005]} />
+        <meshStandardMaterial color={silverColor} metalness={0.7} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, H * 0.92, D / 2 + 0.004]}>
+        <planeGeometry args={[0.060, 0.012]} />
+        <meshStandardMaterial color="#222" />
+      </mesh>
+      <mesh position={[W * 0.20, H * 0.66, D / 2 + 0.004]}>
+        <planeGeometry args={[0.040, 0.008]} />
+        <meshStandardMaterial color="#1a8ec0" emissive="#0a5078" emissiveIntensity={0.3} />
+      </mesh>
+      {Array.from({ length: 6 }).map((_, i) => {
+        const r = Math.floor(i / 3)
+        const c = i % 3
+        return (
+          <mesh
+            key={`tc-${i}`}
+            position={[W * 0.10 + c * 0.020, H * 0.86 - r * 0.020, D / 2 + 0.004]}
+          >
+            <circleGeometry args={[0.005, 16]} />
+            <meshStandardMaterial color="#888" />
+          </mesh>
+        )
+      })}
+      <mesh position={[W * 0.30, H * 0.55, D / 2 + 0.008]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.028, 0.028, 0.012, 32]} />
+        <meshStandardMaterial color={silverColor} metalness={0.75} roughness={0.3} />
+      </mesh>
+      <mesh position={[W * 0.30, H * 0.55, D / 2 + 0.015]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.018, 0.018, 0.004, 32]} />
+        <meshStandardMaterial color="#1ab8ff" emissive="#0a8ec0" emissiveIntensity={0.6} />
+      </mesh>
+      {[0, 1, 2].map((i) => (
+        <mesh
+          key={`opt-${i}`}
+          position={[-W * 0.20, H * 0.62 - i * 0.026, D / 2 + 0.003]}
+        >
+          <planeGeometry args={[0.022, 0.014]} />
+          <meshStandardMaterial color="#aaa" />
+        </mesh>
+      ))}
+      <mesh position={[0, H * 0.30, D / 2 - 0.045]}>
+        <boxGeometry args={[W * 0.75, H * 0.28, 0.092]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.7} />
+      </mesh>
+      <mesh position={[0, H * 0.40, D / 2 - 0.020]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.008, 0.010, 0.040, 16]} />
+        <meshStandardMaterial color={silverColor} metalness={0.85} roughness={0.25} />
+      </mesh>
+      <mesh position={[0, H * 0.10, D / 2 + 0.030]}>
+        <boxGeometry args={[W * 0.90, 0.018, 0.080]} />
+        <meshStandardMaterial color="#dadada" roughness={0.5} metalness={0.1} />
+      </mesh>
+      <mesh position={[0, H * 0.10 + 0.0095, D / 2 + 0.030]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[W * 0.85, 0.072]} />
+        <meshStandardMaterial color="#9a9a9a" roughness={0.7} />
+      </mesh>
+    </group>
+  )
+}
+
+function LightWaveOven({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
+  const W = 0.523              // 가로 (X)
+  const H = 0.330              // 높이 (Y)
+  const D = 0.515              // 깊이 (Z)
+  const bodyColor = '#e8dfc8'
+  const sideColor = '#2a2a2a'
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      <mesh position={[0, 0, 0]} castShadow receiveShadow>
+        <boxGeometry args={[W, H, D]} />
+        <meshStandardMaterial color={sideColor} roughness={0.45} metalness={0.25} />
+      </mesh>
+      <mesh position={[0, 0, D / 2 - 0.001]}>
+        <boxGeometry args={[W - 0.012, H - 0.008, 0.012]} />
+        <meshStandardMaterial color={bodyColor} roughness={0.35} metalness={0.15} />
+      </mesh>
+      {/* 컨트롤 패널 */}
+      <mesh position={[0, H / 2 - 0.045, D / 2 + 0.006]}>
+        <boxGeometry args={[W - 0.04, 0.060, 0.003]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.3} metalness={0.4} />
+      </mesh>
+      {/* 디스플레이 */}
+      <mesh position={[-W * 0.20, H / 2 - 0.045, D / 2 + 0.0085]}>
+        <planeGeometry args={[0.13, 0.034]} />
+        <meshStandardMaterial color="#0a0a12" emissive="#1a3050" emissiveIntensity={0.5} />
+      </mesh>
+      {/* 다이얼 */}
+      <mesh position={[W * 0.30, H / 2 - 0.045, D / 2 + 0.012]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.022, 0.022, 0.012, 24]} />
+        <meshStandardMaterial color="#888" metalness={0.85} roughness={0.3} />
+      </mesh>
+      {/* 도어 핸들 */}
+      <mesh position={[0, H / 2 - 0.092, D / 2 + 0.015]}>
+        <boxGeometry args={[W - 0.06, 0.020, 0.020]} />
+        <meshStandardMaterial color="#3a3a3a" metalness={0.7} roughness={0.35} />
+      </mesh>
+      {/* 도어 베젤 */}
+      <mesh position={[0, -0.030, D / 2 + 0.007]}>
+        <boxGeometry args={[W - 0.020, H - 0.150, 0.005]} />
+        <meshStandardMaterial color={bodyColor} roughness={0.35} metalness={0.15} />
+      </mesh>
+      {/* 글래스 윈도우 */}
+      <mesh position={[0, -0.035, D / 2 + 0.010]}>
+        <planeGeometry args={[W - 0.080, H - 0.190]} />
+        <meshStandardMaterial color="#0a0a0a" roughness={0.15} metalness={0.5} />
+      </mesh>
+      {/* 글래스 반사 */}
+      <mesh position={[0, -0.035, D / 2 + 0.0105]}>
+        <planeGeometry args={[W - 0.085, H - 0.195]} />
+        <meshStandardMaterial color="#1a1a22" transparent opacity={0.4} roughness={0.1} metalness={0.6} />
+      </mesh>
+      {/* SAMSUNG 로고 자리 */}
+      <mesh position={[0, -H / 2 + 0.025, D / 2 + 0.011]}>
+        <planeGeometry args={[0.10, 0.012]} />
+        <meshStandardMaterial color="#ffffff" emissive="#444" emissiveIntensity={0.2} />
+      </mesh>
+      {/* 좌측 통풍구 슬릿 */}
+      {Array.from({ length: 4 }).map((_, i) => (
+        <mesh key={`vent-${i}`} position={[-W / 2 + 0.030, H / 2 - 0.090 - i * 0.030, D / 2 - 0.001]}>
+          <boxGeometry args={[0.025, 0.004, 0.005]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.5} />
+        </mesh>
+      ))}
+      {/* 다리 4개 */}
+      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz], i) => (
+        <mesh key={`foot-${i}`} position={[sx * (W / 2 - 0.030), -H / 2 - 0.012, sz * (D / 2 - 0.030)]}>
+          <cylinderGeometry args={[0.010, 0.012, 0.024, 12]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.7} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+function WashTower({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
+  const W = 0.72              // 폭
+  const H = 1.70              // 높이
+  const D = 0.80              // 깊이
+  const sideThick = 0.025
+  const bodyColor = '#f0e8d8' // 크림/베이지
+  const sideColor = '#3a3a3a' // 다크 그레이
+  const portColor = '#0a0a0a'
+  const trimColor = '#1a1a1a'
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      {/* 본체 (베이지) */}
+      <mesh position={[0, H / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[W, H, D]} />
+        <meshStandardMaterial color={bodyColor} roughness={0.4} metalness={0.1} />
+      </mesh>
+      {/* 양측 다크 그레이 패널 */}
+      <mesh position={[-W / 2 - sideThick / 2 + 0.001, H / 2, 0]}>
+        <boxGeometry args={[sideThick, H, D + 0.005]} />
+        <meshStandardMaterial color={sideColor} roughness={0.5} metalness={0.2} />
+      </mesh>
+      <mesh position={[W / 2 + sideThick / 2 - 0.001, H / 2, 0]}>
+        <boxGeometry args={[sideThick, H, D + 0.005]} />
+        <meshStandardMaterial color={sideColor} roughness={0.5} metalness={0.2} />
+      </mesh>
+
+      {/* === 상단 (건조기) 포트홀 === */}
+      <mesh position={[0, H * 0.72 + 0.05, D / 2 + 0.001]}>
+        <circleGeometry args={[0.235, 64]} />
+        <meshStandardMaterial color={portColor} roughness={0.3} metalness={0.6} />
+      </mesh>
+      <mesh position={[0, H * 0.72 + 0.05, D / 2 + 0.0015]}>
+        <ringGeometry args={[0.235, 0.260, 64]} />
+        <meshStandardMaterial color={trimColor} roughness={0.25} metalness={0.7} />
+      </mesh>
+      {/* 포트홀 깊이감 (안쪽 어두운 디스크) */}
+      <mesh position={[0, H * 0.72 + 0.05, D / 2 - 0.005]}>
+        <circleGeometry args={[0.220, 64]} />
+        <meshStandardMaterial color="#050505" roughness={0.9} />
+      </mesh>
+
+      {/* === 컨트롤 패널 (가운데 가로 띠 — 본체 폭 + 좌우 50mm, 위로 30mm 확장) === */}
+      <mesh position={[0, H * 0.495 + 0.015, D / 2 + 0.0015]}>
+        <boxGeometry args={[W + 0.06, 0.105, 0.004]} />
+        <meshStandardMaterial color="#0a0a0a" roughness={0.3} metalness={0.4} />
+      </mesh>
+      {/* 디스플레이 (가운데 작은 직사각형) */}
+      <mesh position={[0, H * 0.495, D / 2 + 0.004]}>
+        <planeGeometry args={[0.10, 0.04]} />
+        <meshStandardMaterial color="#08080f" emissive="#1a3050" emissiveIntensity={0.4} />
+      </mesh>
+      {/* 컨트롤 패널 양쪽 작은 버튼 점들 */}
+      {Array.from({ length: 5 }).map((_, i) => (
+        <mesh
+          key={`btn-l-${i}`}
+          position={[-W * 0.32 + i * 0.025, H * 0.495, D / 2 + 0.004]}
+        >
+          <circleGeometry args={[0.005, 12]} />
+          <meshStandardMaterial color="#888" />
+        </mesh>
+      ))}
+      {Array.from({ length: 5 }).map((_, i) => (
+        <mesh
+          key={`btn-r-${i}`}
+          position={[W * 0.10 + i * 0.025, H * 0.495, D / 2 + 0.004]}
+        >
+          <circleGeometry args={[0.005, 12]} />
+          <meshStandardMaterial color="#888" />
+        </mesh>
+      ))}
+
+      {/* 세제 트레이 (컨트롤 패널 아래 작은 가로 사각형) */}
+      <mesh position={[-W * 0.30, H * 0.43, D / 2 + 0.002]}>
+        <boxGeometry args={[0.10, 0.025, 0.005]} />
+        <meshStandardMaterial color="#d8d0bc" roughness={0.4} metalness={0.05} />
+      </mesh>
+
+      {/* === 하단 (세탁기) 포트홀 === */}
+      <mesh position={[0, H * 0.27, D / 2 + 0.001]}>
+        <circleGeometry args={[0.255, 64]} />
+        <meshStandardMaterial color={portColor} roughness={0.3} metalness={0.6} />
+      </mesh>
+      <mesh position={[0, H * 0.27, D / 2 + 0.0015]}>
+        <ringGeometry args={[0.255, 0.280, 64]} />
+        <meshStandardMaterial color={trimColor} roughness={0.25} metalness={0.7} />
+      </mesh>
+      <mesh position={[0, H * 0.27, D / 2 - 0.005]}>
+        <circleGeometry args={[0.240, 64]} />
+        <meshStandardMaterial color="#050505" roughness={0.9} />
+      </mesh>
+
+      {/* 하단 작은 도어/필터 (바닥 가까이) */}
+      <mesh position={[0, H * 0.05, D / 2 + 0.002]}>
+        <boxGeometry args={[0.08, 0.05, 0.005]} />
+        <meshStandardMaterial color="#d8d0bc" roughness={0.4} metalness={0.05} />
+      </mesh>
+    </group>
+  )
+}
+
+function Toilet({ position, rotation = 0, scale = 1 }: { position: [number, number, number]; rotation?: number; scale?: number }) {
+  const { scene } = useGLTF('/models/bathroom/toilet.glb')
+  const cloned = useMemo(() => {
+    const s = scene.clone()
+    s.traverse((child: any) => {
+      if (child.isMesh && child.material) {
+        const mat = child.material.clone()
+        mat.color = new THREE.Color('#ffffff')
+        mat.roughness = 0.15
+        mat.metalness = 0.05
+        if (mat.map) mat.map = null
+        child.material = mat
+      }
+    })
+    return s
+  }, [scene])
+  return <primitive object={cloned} position={position} rotation={[0, rotation, 0]} scale={[scale, scale, scale]} />
+}
+
+function Sink({ position, rotation = 0, scale = 1 }: { position: [number, number, number]; rotation?: number; scale?: number }) {
+  const { scene } = useGLTF('/models/bathroom/sink.glb')
+  const cloned = useMemo(() => scene.clone(), [scene])
+  return <primitive object={cloned} position={position} rotation={[0, rotation, 0]} scale={[scale, scale, scale]} />
+}
+
+function FlushDoor({
+  position,
+  axis,
+  width = 0.9,
+  height = 2.1,
+  hinge = 'left',
+  swing = 'in',
+  maxOpenAngle = 95,
+  wallThickness = WALL_THICKNESS,
+  tex,
+  color = '#3a2618',
+  style = 'flush',
+  handleStyle = 'lever',
+  playerPos,
+}: {
+  position: [number, number]
+  axis: 'x' | 'z'
+  width?: number
+  height?: number
+  hinge?: 'left' | 'right'
+  swing?: 'in' | 'out'
+  maxOpenAngle?: number
+  wallThickness?: number
+  tex?: THREE.Texture                    // 옵션: 우드 텍스처 (없으면 단색)
+  color?: string                         // 베이스 색상 (texture와 곱해짐)
+  style?: 'flush' | 'louvered'           // 'louvered' = 환기용 루버 도어
+  handleStyle?: 'lever' | 'smartlock'    // 'smartlock' = 디지털 도어락 (현관문)
+  playerPos?: [number, number]
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const panelGroupRef = useRef<THREE.Group>(null)
+  const angleRef = useRef(0)
+  const { invalidate } = useThree()
+
+  // 플레이어 거리 (워크스루에서만 playerPos 전달됨)
+  const dist = playerPos
+    ? Math.hypot(playerPos[0] - position[0], playerPos[1] - position[1])
+    : Infinity
+  const inRange = dist < 1.5
+
+  // 'g' 키 토글 — 범위 안일 때만
+  useEffect(() => {
+    if (!inRange) return
+    const handler = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase()
+      if (k === 'f' || k === 'ㄹ') {
+        e.preventDefault()
+        setIsOpen((o) => !o)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [inRange])
+
+  const panelTex = useMemo(() => {
+    if (!tex) return undefined
+    const t = tex.clone()
+    t.wrapS = THREE.ClampToEdgeWrapping
+    t.wrapT = THREE.ClampToEdgeWrapping
+    t.colorSpace = THREE.SRGBColorSpace
+    t.needsUpdate = true
+    return t
+  }, [tex])
+
+  const casingTex = useMemo(() => {
+    if (!tex) return undefined
+    const t = tex.clone()
+    t.wrapS = THREE.RepeatWrapping
+    t.wrapT = THREE.RepeatWrapping
+    t.repeat.set(1, 0.05)
+    t.colorSpace = THREE.SRGBColorSpace
+    t.needsUpdate = true
+    return t
+  }, [tex])
+
+  const panelT = 0.040
+  const casing = 0.009
+  const wallHalf = wallThickness / 2
+
+  // 그룹 회전 (axis='x' → 벽이 X축, 도어 폭이 X 방향 / axis='z' → 벽이 Z축)
+  const groupRotY = axis === 'x' ? 0 : Math.PI / 2
+
+  // 힌지 위치 (그룹 로컬 X 기준)
+  const hingeSign = hinge === 'left' ? -1 : 1
+  const hingeX = hingeSign * (width / 2)
+
+  // 열림 회전 부호 — 힌지/스윙에 따라
+  const swingSign = swing === 'in' ? 1 : -1
+  const targetAngle = (maxOpenAngle * Math.PI / 180) * swingSign * (hinge === 'left' ? -1 : 1)
+
+  // 열림 애니메이션 (부드러운 보간) — 완료 전까지 매 프레임 invalidate
+  useFrame((_, delta) => {
+    const target = isOpen ? targetAngle : 0
+    const diff = target - angleRef.current
+    if (Math.abs(diff) < 0.0005) return
+    const speed = Math.min(1, delta * 6)
+    angleRef.current += diff * speed
+    if (panelGroupRef.current) panelGroupRef.current.rotation.y = angleRef.current
+    invalidate()
+  })
+
+  return (
+    <group position={[position[0], 0, position[1]]} rotation={[0, groupRotY, 0]}>
+      {/* 도어 개구부 내부 마감 (벽 두께 면) — 도어 무늬와 동일 */}
+      {/* 좌측 측면 (jamb) */}
+      <mesh position={[-width / 2 + 0.003, height / 2, 0]}>
+        <boxGeometry args={[0.006, height, wallThickness]} />
+        <meshStandardMaterial map={casingTex} color={color} roughness={0.55} metalness={0.05} />
+      </mesh>
+      {/* 우측 측면 (jamb) */}
+      <mesh position={[width / 2 - 0.003, height / 2, 0]}>
+        <boxGeometry args={[0.006, height, wallThickness]} />
+        <meshStandardMaterial map={casingTex} color={color} roughness={0.55} metalness={0.05} />
+      </mesh>
+      {/* 상인방 하부 (head jamb) */}
+      <mesh position={[0, height - 0.003, 0]}>
+        <boxGeometry args={[width, 0.006, wallThickness]} />
+        <meshStandardMaterial map={casingTex} color={color} roughness={0.55} metalness={0.05} />
+      </mesh>
+
+      {/* 9mm 문선 — 벽 양면 (앞/뒤) 3면씩 */}
+      {[-1, 1].map((side) => (
+        <group key={`casing-${side}`} position={[0, 0, side * (wallHalf + casing / 2)]}>
+          {/* 좌측 세로 */}
+          <mesh position={[-width / 2 - casing / 2, height / 2, 0]}>
+            <boxGeometry args={[casing, height + casing, casing]} />
+            <meshStandardMaterial map={casingTex} color={color} roughness={0.55} metalness={0.05} />
+          </mesh>
+          {/* 우측 세로 */}
+          <mesh position={[width / 2 + casing / 2, height / 2, 0]}>
+            <boxGeometry args={[casing, height + casing, casing]} />
+            <meshStandardMaterial map={casingTex} color={color} roughness={0.55} metalness={0.05} />
+          </mesh>
+          {/* 상단 가로 */}
+          <mesh position={[0, height + casing / 2, 0]}>
+            <boxGeometry args={[width + casing * 2, casing, casing]} />
+            <meshStandardMaterial map={casingTex} color={color} roughness={0.55} metalness={0.05} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* 도어 패널 — 힌지 피벗 회전 */}
+      <group ref={panelGroupRef} position={[hingeX, 0, 0]}>
+        {style === 'flush' ? (
+          /* 플러시 도어 패널 본체 */
+          <mesh position={[-hingeSign * (width / 2) - 0.001 * hingeSign, height / 2 + 0.005, 0]}>
+            <boxGeometry args={[width - 0.005, height - 0.010, panelT]} />
+            <meshStandardMaterial map={panelTex} color={color} roughness={0.55} metalness={0.05} />
+          </mesh>
+        ) : (
+          /* 루버 도어 — 프레임 + 환기 슬랫 */
+          <group position={[-hingeSign * (width / 2) - 0.001 * hingeSign, height / 2 + 0.005, 0]}>
+            {(() => {
+              const panelW = width - 0.005
+              const panelH = height - 0.010
+              const railTop = 0.080      // 상단 레일 80mm
+              const railBot = 0.130      // 하단 레일 130mm
+              const stile = 0.060        // 좌/우 stile 60mm
+              const louverTop = panelH / 2 - railTop
+              const louverBot = -panelH / 2 + railBot
+              const louverH = louverTop - louverBot
+              const louverCenterY = (louverTop + louverBot) / 2
+              const louverW = panelW - stile * 2
+              // 슬랫 파라미터
+              const slatPitch = 0.028          // 슬랫 간격 28mm
+              const slatThick = 0.006          // 슬랫 두께 6mm
+              const slatTilt = -25 * Math.PI / 180   // 25° 기울임
+              // 슬랫 폭 (피치보다 살짝 크게 → 위에서 봤을 때 갭 가림)
+              const slatHeight = 0.024
+              const slatCount = Math.floor(louverH / slatPitch) - 1
+              const slatStartY = louverCenterY + (slatCount - 1) * slatPitch / 2
+              return (
+                <>
+                  {/* 상단 레일 */}
+                  <mesh position={[0, panelH / 2 - railTop / 2, 0]}>
+                    <boxGeometry args={[panelW, railTop, panelT]} />
+                    <meshStandardMaterial color={color} roughness={0.55} metalness={0.05} />
+                  </mesh>
+                  {/* 하단 레일 */}
+                  <mesh position={[0, -panelH / 2 + railBot / 2, 0]}>
+                    <boxGeometry args={[panelW, railBot, panelT]} />
+                    <meshStandardMaterial color={color} roughness={0.55} metalness={0.05} />
+                  </mesh>
+                  {/* 좌측 stile */}
+                  <mesh position={[-panelW / 2 + stile / 2, louverCenterY, 0]}>
+                    <boxGeometry args={[stile, louverH, panelT]} />
+                    <meshStandardMaterial color={color} roughness={0.55} metalness={0.05} />
+                  </mesh>
+                  {/* 우측 stile */}
+                  <mesh position={[panelW / 2 - stile / 2, louverCenterY, 0]}>
+                    <boxGeometry args={[stile, louverH, panelT]} />
+                    <meshStandardMaterial color={color} roughness={0.55} metalness={0.05} />
+                  </mesh>
+                  {/* 루버 영역 안쪽 어두운 배경 (슬랫 사이로 살짝 보임) */}
+                  <mesh position={[0, louverCenterY, 0]}>
+                    <boxGeometry args={[louverW, louverH, panelT * 0.2]} />
+                    <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
+                  </mesh>
+                  {/* 슬랫들 */}
+                  {Array.from({ length: slatCount }).map((_, i) => (
+                    <mesh
+                      key={`slat-${i}`}
+                      position={[0, slatStartY - i * slatPitch, 0]}
+                      rotation={[slatTilt, 0, 0]}
+                    >
+                      <boxGeometry args={[louverW, slatHeight, slatThick]} />
+                      <meshStandardMaterial color={color} roughness={0.6} metalness={0.05} />
+                    </mesh>
+                  ))}
+                </>
+              )
+            })()}
+          </group>
+        )}
+
+        {handleStyle === 'lever' ? (
+          /* 손잡이 — 양면 레버 (latch 측에서 70mm) */
+          (() => {
+            // 패널 latch 엣지 (panel-group local x — 힌지 피벗에서 도어 폭만큼 떨어진 지점)
+            const latchEdgeX = -hingeSign * width
+            // 로제트(베이스) 중심: latch 엣지에서 hinge 방향으로 70mm 안쪽
+            const rosetteX = latchEdgeX + hingeSign * 0.07
+            // 레버 중심: 로제트에서 hinge 방향으로 60mm 더 — 레버가 hinge 쪽으로 뻗음
+            const leverCenterX = rosetteX + hingeSign * 0.06
+            return (
+              <>
+                {[-1, 1].map((side) => (
+                  <group key={`handle-${side}`}>
+                    {/* 로제트 (원형 베이스) */}
+                    <mesh
+                      position={[rosetteX, 1.02, side * (panelT / 2 + 0.006)]}
+                      rotation={[Math.PI / 2, 0, 0]}
+                    >
+                      <cylinderGeometry args={[0.028, 0.028, 0.008, 24]} />
+                      <meshStandardMaterial color="#b8b8b8" metalness={0.85} roughness={0.45} />
+                    </mesh>
+                    {/* 레버 — 도어 폭 방향으로 뻗는 가로 막대 */}
+                    <mesh position={[leverCenterX, 1.02, side * (panelT / 2 + 0.022)]}>
+                      <boxGeometry args={[0.13, 0.022, 0.022]} />
+                      <meshStandardMaterial color="#b8b8b8" metalness={0.85} roughness={0.45} />
+                    </mesh>
+                    {/* 레버 ↔ 로제트 연결 목 */}
+                    <mesh
+                      position={[rosetteX, 1.02, side * (panelT / 2 + 0.014)]}
+                      rotation={[Math.PI / 2, 0, 0]}
+                    >
+                      <cylinderGeometry args={[0.012, 0.012, 0.018, 16]} />
+                      <meshStandardMaterial color="#b8b8b8" metalness={0.85} roughness={0.45} />
+                    </mesh>
+                  </group>
+                ))}
+              </>
+            )
+          })()
+        ) : (
+          /* 디지털 도어락 (현관용) — 양면 키패드 + 그립 */
+          (() => {
+            const latchEdgeX = -hingeSign * width
+            const lockX = latchEdgeX + hingeSign * 0.05  // latch에서 50mm 안쪽
+            const lockW = 0.085   // 85mm wide (door width 방향)
+            const lockH = 0.320   // 320mm tall
+            const lockT = 0.025   // 25mm 돌출
+            const lockCY = 1.05
+            return (
+              <>
+                {[-1, 1].map((side) => {
+                  const sideOffset = side * (panelT / 2 + lockT / 2)
+                  const frontFaceZ = side * (panelT / 2 + lockT + 0.001)
+                  return (
+                    <group key={`smartlock-${side}`}>
+                      {/* 본체 패널 (다크 그레이 메탈) */}
+                      <mesh position={[lockX, lockCY, sideOffset]}>
+                        <boxGeometry args={[lockW, lockH, lockT]} />
+                        <meshStandardMaterial color="#2a2a2a" metalness={0.6} roughness={0.4} />
+                      </mesh>
+                      {/* 상단 디스플레이 영역 */}
+                      <mesh position={[lockX, lockCY + lockH / 2 - 0.045, frontFaceZ]}>
+                        <planeGeometry args={[lockW - 0.012, 0.062]} />
+                        <meshStandardMaterial color="#08080f" emissive="#1a3050" emissiveIntensity={0.4} />
+                      </mesh>
+                      {/* 키패드 (4행 × 3열) */}
+                      {Array.from({ length: 4 }).flatMap((_, r) =>
+                        Array.from({ length: 3 }).map((_, c) => {
+                          const kpX = lockX + (c - 1) * 0.022
+                          const kpY = lockCY + 0.030 - r * 0.030
+                          return (
+                            <mesh
+                              key={`kp-${side}-${r}-${c}`}
+                              position={[kpX, kpY, frontFaceZ]}
+                            >
+                              <circleGeometry args={[0.008, 16]} />
+                              <meshStandardMaterial color="#999" metalness={0.5} roughness={0.4} emissive="#1a1a22" emissiveIntensity={0.2} />
+                            </mesh>
+                          )
+                        })
+                      )}
+                      {/* 하단 그립 손잡이 — 패널 끝에서 살짝 더 돌출 */}
+                      <mesh position={[lockX, lockCY - lockH / 2 + 0.030, side * (panelT / 2 + 0.030)]}>
+                        <boxGeometry args={[lockW + 0.030, 0.025, 0.040]} />
+                        <meshStandardMaterial color="#888" metalness={0.8} roughness={0.3} />
+                      </mesh>
+                    </group>
+                  )
+                })}
+              </>
+            )
+          })()
+        )}
+
+        {/* 힌지 (3개) — 힌지측 모서리 */}
+        {[0.25, 1.05, 1.85].map((hy, i) => (
+          <mesh key={`hinge-${i}`} position={[0, hy, 0]}>
+            <boxGeometry args={[0.012, 0.07, panelT + 0.004]} />
+            <meshStandardMaterial color="#1a1a1a" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* 인터랙션 툴팁 — 워크스루에서 가까이 있을 때만 */}
+      {playerPos && inRange && (
+        <Html position={[0, 1.6, 0]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'rgba(20, 20, 25, 0.85)',
+              color: '#fff5e6',
+              padding: '6px 10px',
+              borderRadius: 6,
+              fontSize: 13,
+              fontFamily: 'system-ui, sans-serif',
+              border: '1px solid rgba(255,255,255,0.2)',
+              whiteSpace: 'nowrap',
+              userSelect: 'none',
+              pointerEvents: 'none',
+            }}
+          >
+            <kbd
+              style={{
+                background: '#fff5e6',
+                color: '#1a1a1a',
+                padding: '2px 7px',
+                borderRadius: 4,
+                fontWeight: 700,
+                fontSize: 12,
+                border: '1px solid #888',
+                boxShadow: '0 1px 0 #555',
+              }}
+            >
+              F
+            </kbd>
+            <span>{isOpen ? '문 닫기' : '문 열기'}</span>
+          </div>
+        </Html>
+      )}
     </group>
   )
 }
@@ -1411,7 +3053,7 @@ function Bed() {
     <primitive
       object={cloned}
       scale={[scale, scale, scale]}
-      position={[mbLeft + 0.55 + 2.6, 0.45, LR_D - 1]}
+      position={[mbLeft + 0.55 + 2.6, 0.45, LR_D - 1.150]}
       rotation={[0, Math.PI / 2 * 3, 0]}
     />
   )
@@ -1425,7 +3067,7 @@ function Sofa() {
     s.traverse((child: any) => {
       if (child.isMesh && child.material) {
         const mat = child.material.clone()
-        mat.color = new THREE.Color('#faf0dc')
+        mat.color = new THREE.Color('#fbf8f0')
         mat.roughness = 0.8
         child.material = mat
       }
@@ -1483,5 +3125,399 @@ function DropCeilingLight({ x, z, ceilingY, active, color = '#ffe0b0' }: { x: nu
       decay={2}
       color={color}
     />
+  )
+}
+
+// 라운드드 사각형 Shape/Path 헬퍼
+function makeRoundedShape(w: number, h: number, r: number) {
+  const s = new THREE.Shape()
+  s.moveTo(-w / 2 + r, -h / 2)
+  s.lineTo(w / 2 - r, -h / 2)
+  s.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + r)
+  s.lineTo(w / 2, h / 2 - r)
+  s.quadraticCurveTo(w / 2, h / 2, w / 2 - r, h / 2)
+  s.lineTo(-w / 2 + r, h / 2)
+  s.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - r)
+  s.lineTo(-w / 2, -h / 2 + r)
+  s.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + r, -h / 2)
+  return s
+}
+function makeRoundedHole(w: number, h: number, r: number) {
+  const p = new THREE.Path()
+  p.moveTo(-w / 2 + r, -h / 2)
+  p.lineTo(w / 2 - r, -h / 2)
+  p.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + r)
+  p.lineTo(w / 2, h / 2 - r)
+  p.quadraticCurveTo(w / 2, h / 2, w / 2 - r, h / 2)
+  p.lineTo(-w / 2 + r, h / 2)
+  p.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - r)
+  p.lineTo(-w / 2, -h / 2 + r)
+  p.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + r, -h / 2)
+  return p
+}
+function makeGlassDoorFrameShape(w: number, h: number, gw: number, gh: number, r: number) {
+  const outer = new THREE.Shape()
+  outer.moveTo(-w / 2, -h / 2)
+  outer.lineTo(w / 2, -h / 2)
+  outer.lineTo(w / 2, h / 2)
+  outer.lineTo(-w / 2, h / 2)
+  outer.closePath()
+  outer.holes.push(makeRoundedHole(gw, gh, r))
+  return outer
+}
+
+function JungmunSwingDoor({
+  hingeWorld,
+  freeEndZ,
+  width,
+  height,
+  thickness,
+  borderR,
+  topBottomFrame,
+  color,
+  glassColor,
+  playerPos,
+}: {
+  hingeWorld: [number, number]
+  freeEndZ: number
+  width: number
+  height: number
+  thickness: number
+  borderR: number
+  topBottomFrame: number
+  color: string
+  glassColor: string
+  playerPos?: [number, number]
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const pivotRef = useRef<THREE.Group>(null)
+  const angleRef = useRef(0)
+  const { invalidate } = useThree()
+
+  const doorCenterWorldZ = (hingeWorld[1] + freeEndZ) / 2
+  const dist = playerPos
+    ? Math.hypot(playerPos[0] - hingeWorld[0], playerPos[1] - doorCenterWorldZ)
+    : Infinity
+  const inRange = dist < 1.8
+
+  useEffect(() => {
+    if (!inRange) return
+    const handler = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase()
+      if (k === 'f' || k === 'ㄹ') {
+        e.preventDefault()
+        setIsOpen((o) => !o)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [inRange])
+
+  const sign = freeEndZ > hingeWorld[1] ? 1 : -1
+  const maxOpenAngle = -sign * (95 * Math.PI / 180)
+
+  useFrame((_, delta) => {
+    const target = isOpen ? maxOpenAngle : 0
+    const diff = target - angleRef.current
+    if (Math.abs(diff) < 0.0005) return
+    const speed = Math.min(1, delta * 5)
+    angleRef.current += diff * speed
+    if (pivotRef.current) pivotRef.current.rotation.y = angleRef.current
+    invalidate()
+  })
+
+  const frameShape = useMemo(
+    () => makeGlassDoorFrameShape(width, height, width * 0.8, height - topBottomFrame * 2, borderR),
+    [width, height, topBottomFrame, borderR]
+  )
+  const glassShape = useMemo(
+    () => makeRoundedShape(width * 0.8, height - topBottomFrame * 2, borderR),
+    [width, height, topBottomFrame, borderR]
+  )
+
+  const localDoorCenterZ = sign * (width / 2)
+
+  return (
+    <group position={[hingeWorld[0], 0, hingeWorld[1]]}>
+      <group ref={pivotRef}>
+        <group position={[0, height / 2, localDoorCenterZ]} rotation={[0, sign * Math.PI / 2, 0]}>
+          <mesh position={[0, 0, -thickness / 2]} castShadow receiveShadow>
+            <extrudeGeometry args={[frameShape, { depth: thickness, bevelEnabled: false }]} />
+            <meshPhysicalMaterial color={color} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
+          </mesh>
+          <mesh>
+            <shapeGeometry args={[glassShape]} />
+            <meshStandardMaterial color={glassColor} transparent opacity={0.5} roughness={0.9} side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+      </group>
+      {/* 인터랙션 툴팁 — 피벗 밖 (회전 영향 없음) */}
+      {playerPos && inRange && (
+        <Html position={[0, 1.6, localDoorCenterZ]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'rgba(20, 20, 25, 0.85)',
+              color: '#fff5e6',
+              padding: '6px 10px',
+              borderRadius: 6,
+              fontSize: 13,
+              fontFamily: 'system-ui, sans-serif',
+              border: '1px solid rgba(255,255,255,0.2)',
+              whiteSpace: 'nowrap',
+              userSelect: 'none',
+              pointerEvents: 'none',
+            }}
+          >
+            <kbd
+              style={{
+                background: '#fff5e6',
+                color: '#1a1a1a',
+                padding: '2px 7px',
+                borderRadius: 4,
+                fontWeight: 700,
+                fontSize: 12,
+                border: '1px solid #888',
+                boxShadow: '0 1px 0 #555',
+              }}
+            >
+              F
+            </kbd>
+            <span>{isOpen ? '중문 닫기' : '중문 열기'}</span>
+          </div>
+        </Html>
+      )}
+    </group>
+  )
+}
+
+function JungmunFixedPanel({
+  centerWorld,
+  width,
+  height,
+  thickness,
+  borderR,
+  topBottomFrame,
+  color,
+  glassColor,
+}: {
+  centerWorld: [number, number]
+  width: number
+  height: number
+  thickness: number
+  borderR: number
+  topBottomFrame: number
+  color: string
+  glassColor: string
+}) {
+  const frameShape = useMemo(
+    () => makeGlassDoorFrameShape(width, height, width * 0.8, height - topBottomFrame * 2, borderR),
+    [width, height, topBottomFrame, borderR]
+  )
+  const glassShape = useMemo(
+    () => makeRoundedShape(width * 0.8, height - topBottomFrame * 2, borderR),
+    [width, height, topBottomFrame, borderR]
+  )
+
+  return (
+    <group position={[centerWorld[0], height / 2, centerWorld[1]]} rotation={[0, Math.PI / 2, 0]}>
+      <mesh position={[0, 0, -thickness / 2]} castShadow receiveShadow>
+        <extrudeGeometry args={[frameShape, { depth: thickness, bevelEnabled: false }]} />
+        <meshPhysicalMaterial color={color} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
+      </mesh>
+      <mesh>
+        <shapeGeometry args={[glassShape]} />
+        <meshStandardMaterial color={glassColor} transparent opacity={0.92} roughness={1.0} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  )
+}
+
+// 아기 침대 — 1115×2065mm, 4면 모두 범퍼 (동일 높이, 회색)
+function ToddlerBed({
+  position,
+  rotationY = 0,
+  length = 1.905,          // 베이스 길이 (총 외곽 2065 - 범퍼 80×2)
+  width = 0.955,           // 베이스 폭  (총 외곽 1115 - 범퍼 80×2)
+  baseH = 0.150,
+  mattH = 0.120,
+  bumperT = 0.080,
+  bumperH = 0.600,
+  cornerR = 0.040,
+  frontCutRight = 0.500,       // 전면 범퍼 +X 쪽 절단 (통행 공간)
+  bumperColor = '#a3a3a3',
+  mattColor = '#ffffff',
+  frameColor = '#f3efe9',
+}: {
+  position: [number, number]
+  rotationY?: number
+  length?: number
+  width?: number
+  baseH?: number
+  mattH?: number
+  bumperT?: number
+  bumperH?: number
+  cornerR?: number
+  frontCutRight?: number
+  bumperColor?: string
+  mattColor?: string
+  frameColor?: string
+}) {
+  // 전면 범퍼: 좌측(-X)끝은 헤드 범퍼와 맞닿고, 우측(+X)끝은 frontCutRight 만큼 짧게
+  const frontFullLen = length + bumperT * 2
+  const frontLen = frontFullLen - frontCutRight
+  const frontCx = -frontCutRight / 2   // 중심이 -X 쪽으로 이동
+
+  return (
+    <group position={[position[0], 0, position[1]]} rotation={[0, rotationY, 0]}>
+      {/* 베이스 프레임 */}
+      <mesh position={[0, baseH / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[length, baseH, width]} />
+        <meshStandardMaterial color={frameColor} roughness={0.7} />
+      </mesh>
+
+      {/* 매트리스 */}
+      <mesh position={[0, baseH + mattH / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[length - 0.04, mattH, width - 0.04]} />
+        <meshStandardMaterial color={mattColor} roughness={0.85} />
+      </mesh>
+
+      {/* 배면 범퍼 (긴 변, -Z 쪽 — 벽에 닿음) */}
+      <RoundedBox
+        args={[length + bumperT * 2, bumperH, bumperT]}
+        radius={cornerR}
+        smoothness={4}
+        position={[0, bumperH / 2, -width / 2 - bumperT / 2]}
+        castShadow
+        receiveShadow
+      >
+        <meshStandardMaterial color={bumperColor} roughness={0.6} />
+      </RoundedBox>
+
+      {/* 전면 범퍼 (긴 변, +Z 쪽 — 방 입구쪽, 우측 통행 공간만큼 짧음) */}
+      <RoundedBox
+        args={[frontLen, bumperH, bumperT]}
+        radius={cornerR}
+        smoothness={4}
+        position={[frontCx, bumperH / 2, width / 2 + bumperT / 2]}
+        castShadow
+        receiveShadow
+      >
+        <meshStandardMaterial color={bumperColor} roughness={0.6} />
+      </RoundedBox>
+
+      {/* 헤드 범퍼 (짧은 변, -X 쪽) */}
+      <RoundedBox
+        args={[bumperT, bumperH, width]}
+        radius={cornerR}
+        smoothness={4}
+        position={[-length / 2 - bumperT / 2, bumperH / 2, 0]}
+        castShadow
+        receiveShadow
+      >
+        <meshStandardMaterial color={bumperColor} roughness={0.6} />
+      </RoundedBox>
+
+      {/* 발치 범퍼 (짧은 변, +X 쪽) */}
+      <RoundedBox
+        args={[bumperT, bumperH, width]}
+        radius={cornerR}
+        smoothness={4}
+        position={[length / 2 + bumperT / 2, bumperH / 2, 0]}
+        castShadow
+        receiveShadow
+      >
+        <meshStandardMaterial color={bumperColor} roughness={0.6} />
+      </RoundedBox>
+    </group>
+  )
+}
+
+// 책상 — IKEA IDÅSEN 스타일 트레슬 레그 + 블랙 상판
+// position: 상판 중심 월드 좌표 [x, z]
+// rotationY: 상판 긴 변 방향 (0 = X축, π/2 = Z축)
+function TrestleDesk({
+  position,
+  rotationY = 0,
+  width = 1.800,         // 긴 변
+  depth = 0.720,         // 짧은 변
+  height = 0.730,        // 상판 윗면 높이
+  topT = 0.025,          // 상판 두께
+  topColor = '#121212',
+  legColor = '#3a3a3d',
+}: {
+  position: [number, number]
+  rotationY?: number
+  width?: number
+  depth?: number
+  height?: number
+  topT?: number
+  topColor?: string
+  legColor?: string
+}) {
+  // 양쪽 다리는 상판 양 끝에서 150mm 안쪽
+  const legInset = 0.150
+  const postT = 0.050     // 세로 기둥 두께
+  const braceT = 0.030    // 사선 브레이스 두께
+  const footLen = depth - 0.10
+  const postH = height - topT   // 기둥 총 높이 (상판 바닥까지)
+  const topSurfaceY = height    // 상판 윗면
+  const topCenterY = topSurfaceY - topT / 2
+
+  const legXs = [-width / 2 + legInset, width / 2 - legInset]
+
+  return (
+    <group position={[position[0], 0, position[1]]} rotation={[0, rotationY, 0]}>
+      {/* 상판 */}
+      <mesh position={[0, topCenterY, 0]} castShadow receiveShadow>
+        <boxGeometry args={[width, topT, depth]} />
+        <meshStandardMaterial color={topColor} roughness={0.35} metalness={0.1} />
+      </mesh>
+
+      {/* 다리 (트레슬) — 좌우 2세트 */}
+      {legXs.map((lx, i) => {
+        const pivotY = postH / 2
+        return (
+          <group key={`leg-${i}`} position={[lx, 0, 0]}>
+            {/* 세로 기둥 */}
+            <mesh position={[0, pivotY, 0]} castShadow receiveShadow>
+              <boxGeometry args={[postT, postH, postT]} />
+              <meshStandardMaterial color={legColor} roughness={0.45} metalness={0.5} />
+            </mesh>
+            {/* 바닥 가로 풋 (depth 방향) */}
+            <mesh position={[0, 0.020, 0]} castShadow receiveShadow>
+              <boxGeometry args={[postT, 0.030, footLen]} />
+              <meshStandardMaterial color={legColor} roughness={0.45} metalness={0.5} />
+            </mesh>
+
+            {/* 사선 브레이스 — 기둥 상단부터 발 끝 2곳까지 (V자) */}
+            {[-1, 1].map((dir) => {
+              const dz = dir * (footLen / 2)
+              const bx = 0
+              const by = postH - 0.050   // 기둥 상단 근처
+              const cy = 0.02             // 발 바닥
+              const midY = (by + cy) / 2
+              const midZ = dz / 2
+              const len = Math.hypot(by - cy, dz)
+              const angle = Math.atan2(dz, by - cy)
+              return (
+                <mesh
+                  key={`br-${dir}`}
+                  position={[bx, midY, midZ]}
+                  rotation={[angle, 0, 0]}
+                  castShadow
+                  receiveShadow
+                >
+                  <boxGeometry args={[braceT, len, braceT]} />
+                  <meshStandardMaterial color={legColor} roughness={0.45} metalness={0.5} />
+                </mesh>
+              )
+            })}
+          </group>
+        )
+      })}
+    </group>
   )
 }
