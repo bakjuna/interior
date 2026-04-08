@@ -1,17 +1,65 @@
 /**
- * 식탁 — 1500×800mm 대리석 상판 + 가운데 나무 다리 + 펜던트 조명.
+ * 식탁 — 1800×800mm 대리석 상판 + 가운데 나무 다리 + 펜던트 조명.
  * 펜던트 LED는 active prop에 따라 발광/RectAreaLight/PointLight 활성.
  */
 
+import { useMemo } from 'react'
+import * as THREE from 'three'
+import { useLoader } from '@react-three/fiber'
+import { TextureLoader } from 'three'
 import { WALL_HEIGHT } from '../../data/apartment'
+
+/** XZ 평면 모서리만 둥글린 직사각형 → Y축으로 extrude한 thin slab geometry.
+ *  top/side UV가 [0,1]로 정규화되어 텍스처가 한 번에 매핑됨. */
+function makeRoundedSlab(w: number, d: number, h: number, r: number) {
+  const radius = Math.min(r, w / 2, d / 2)
+  const shape = new THREE.Shape()
+  const x = -w / 2, z = -d / 2
+  shape.moveTo(x + radius, z)
+  shape.lineTo(x + w - radius, z)
+  shape.quadraticCurveTo(x + w, z, x + w, z + radius)
+  shape.lineTo(x + w, z + d - radius)
+  shape.quadraticCurveTo(x + w, z + d, x + w - radius, z + d)
+  shape.lineTo(x + radius, z + d)
+  shape.quadraticCurveTo(x, z + d, x, z + d - radius)
+  shape.lineTo(x, z + radius)
+  shape.quadraticCurveTo(x, z, x + radius, z)
+
+  // 커스텀 UVGenerator: top은 shape XY를 [0,1]로 정규화, side는 둘레의 x좌표 ↔ depth(z) 매핑
+  const uvGenerator = {
+    generateTopUV(_g: THREE.ExtrudeGeometry, vertices: number[], iA: number, iB: number, iC: number) {
+      return [iA, iB, iC].map((i) => new THREE.Vector2(
+        (vertices[i * 3] + w / 2) / w,
+        (vertices[i * 3 + 1] + d / 2) / d,
+      ))
+    },
+    generateSideWallUV(_g: THREE.ExtrudeGeometry, vertices: number[], iA: number, iB: number, iC: number, iD: number) {
+      return [iA, iB, iC, iD].map((i) => new THREE.Vector2(
+        (vertices[i * 3] + w / 2) / w,
+        vertices[i * 3 + 2] / h,
+      ))
+    },
+  }
+
+  const geom = new THREE.ExtrudeGeometry(shape, {
+    depth: h,
+    bevelEnabled: false,
+    curveSegments: 16,
+    UVGenerator: uvGenerator,
+  })
+  // extrude는 +Z 방향으로 두께가 생기므로 X축 -90°로 회전 → 두께가 +Y가 됨
+  geom.rotateX(-Math.PI / 2)
+  geom.translate(0, -h / 2, 0)
+  return geom
+}
 
 interface DiningTableProps {
   position: [number, number]  // [centerX, centerZ]
   active: boolean              // 펜던트 LED 활성
 }
 
-const TABLE_W = 1.5
-const TABLE_D = 0.8
+const TABLE_W = 1.8
+const TABLE_D = 0.9
 const TABLE_H = 0.75
 
 export function DiningTable({ position, active }: DiningTableProps) {
@@ -19,16 +67,20 @@ export function DiningTable({ position, active }: DiningTableProps) {
   const pendantY = WALL_HEIGHT - 0.6
   const barLen = 1.2
 
+  const topGeom = useMemo(() => makeRoundedSlab(TABLE_W, TABLE_D, 0.03, 0.1), [])
+  const marbleTex = useLoader(TextureLoader, '/textures/marble-table.png')
+  const marbleMap = useMemo(() => {
+    const t = marbleTex.clone()
+    t.colorSpace = THREE.SRGBColorSpace
+    t.needsUpdate = true
+    return t
+  }, [marbleTex])
+
   return (
     <group>
-      {/* 상판 (대리석) */}
-      <mesh position={[tableX, TABLE_H, tableZ]}>
-        <boxGeometry args={[TABLE_W, 0.03, TABLE_D]} />
-        <meshStandardMaterial color="#f0ece4" roughness={0.15} metalness={0.05} />
-      </mesh>
-      <mesh position={[tableX, TABLE_H - 0.015, tableZ]}>
-        <boxGeometry args={[TABLE_W - 0.01, 0.03, TABLE_D - 0.01]} />
-        <meshStandardMaterial color="#e8e2d8" roughness={0.2} metalness={0.05} />
+      {/* 상판 (대리석) — XZ 모서리만 100mm 라운딩, 두께 30mm 유지, marble 텍스처 */}
+      <mesh geometry={topGeom} position={[tableX, TABLE_H, tableZ]}>
+        <meshStandardMaterial map={marbleMap} roughness={0.15} metalness={0.05} />
       </mesh>
       {/* 가운데 기둥 */}
       <mesh position={[tableX, TABLE_H / 2 - 0.02, tableZ]}>

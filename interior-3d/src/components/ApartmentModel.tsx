@@ -102,6 +102,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
     () => computeVisibleSectors(rawPlayerPos, doorOpenStates ?? new Map()),
     [rawPlayerPos, doorOpenStates]
   )
+
   const floorTex = useLoader(TextureLoader, '/textures/walnut-floor.png')
   const porcelainTex = useLoader(TextureLoader, '/textures/porcelain-tile.png')
   const entranceTex = useLoader(TextureLoader, '/textures/entrance-tile.png')
@@ -318,7 +319,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
       <LivingRoom visible={visibleSectors.has('lr')} />
       <MasterBedroom visible={visibleSectors.has('mb')} />
       <Entrance visible={visibleSectors.has('entrance')} playerPos={playerPos} allLightsOn={allLightsOn} />
-      <Kitchen visible={visibleSectors.has('kitchen')} playerPos={playerPos} allLightsOn={allLightsOn} />
+      <Kitchen visible={visibleSectors.has('kitchen')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
 
 
       {/* 도어는 shell/Doors.tsx 가 일괄 렌더 (Phase 2) */}

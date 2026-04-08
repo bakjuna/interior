@@ -72,6 +72,20 @@ export type DoorId =
   | 'cage-mainVeranda'
   | 'outdoor-mainVeranda'
   | 'entrance'  // 외부 출입문 — visibility/collision 대상 아님, F 인터랙션만
+  | 'kitchen-drawer'  // 주방 정수기 하단 밥솥 drawer — F 로 슬라이드 인/아웃
+  | 'kitchen-drawer-south'  // 주방 ㄱ자 ext 남쪽 끝 drawer — F 로 슬라이드 인/아웃
+  | 'kitchen-tiny'  // 주방 짜투리 thin pull-out drawer — F 로 슬라이드 인/아웃
+  | 'kitchen-pet-pass-n'  // 냉장고장↔키큰장 사이 펫 통로 스윙도어 (북쪽: 키큰장 경첩)
+  | 'kitchen-pet-pass-s'  // 냉장고장↔키큰장 사이 펫 통로 스윙도어 (남쪽: 냉장고장 경첩)
+  | 'kitchen-tall-drawer'        // 키큰장 상단 (유리장 뒷쪽 30cm) drawer — +Z 50cm 슬라이드
+  | 'kitchen-tall-drawer-mid'    // 키큰장 중단 (오븐 뒷쪽 30cm) drawer
+  | 'kitchen-tall-drawer-bot'    // 키큰장 하단 (하부장 뒷쪽 30cm) drawer
+  | 'kitchen-uc-purifier'        // 주방 동측 상부장 — 정수기 위 (50cm, 내부 수직 3분할)
+  | 'kitchen-uc-0'               // 주방 동측 상부장 — 후드 남쪽 #0 (40cm, 4분할)
+  | 'kitchen-uc-1'
+  | 'kitchen-uc-2'
+  | 'kitchen-uc-3'
+  | 'kitchen-uc-4'
 
 export interface SectorAABB {
   sector: SectorId
@@ -118,6 +132,9 @@ export interface Portal {
   doorId?: DoorId   // 없으면 always-open (창/오픈 통로)
   visualOnly?: boolean  // true 면 시각/렌더에는 통과하지만 라이트(litSectors)는 전파 안 함
                         // (베란다 창문처럼 보이긴 해도 'G 전체 불'에는 포함 안 됨)
+  seeThroughClosed?: boolean  // true: 도어가 닫혀있어도 시각적으로는 통과 (유리 도어 — 중문).
+                              // 이때는 닫힌 상태에서도 visualOnly hop 1회로 취급되어
+                              // 라이트는 전파 안 됨, 메쉬만 렌더.
 }
 
 export const portals: Portal[] = [
@@ -136,7 +153,7 @@ export const portals: Portal[] = [
   { a: 'baby', b: 'hall', doorId: 'baby-hall' },
   { a: 'laundry', b: 'kitchen', doorId: 'laundry-kitchen' },
   { a: 'work', b: 'hall', doorId: 'work-hall' },
-  { a: 'entrance', b: 'hall', doorId: 'jungmun' },
+  { a: 'entrance', b: 'hall', doorId: 'jungmun', seeThroughClosed: true },
   { a: 'cage', b: 'mainVeranda', doorId: 'cage-mainVeranda' },
   { a: 'outdoor', b: 'mainVeranda', doorId: 'outdoor-mainVeranda' },
 ]

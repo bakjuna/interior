@@ -639,12 +639,19 @@ export const downlightGroups: DownlightGroup[] = [
   { bounds: { leftX: babyRightWallX + T2, rightX: LR_W - 1.481, topZ: -WALL_THICKNESS, bottomZ: -T2 - 1.591 + T2 },
     lights: [[babyRightWallX + T2 + 0.45, -WALL_THICKNESS - 0.1 - 0.45], [babyRightWallX + T2 + 0.45 + 0.3, -WALL_THICKNESS - 0.1 - 0.45],
       [(babyRightWallX + 2.555 - 0.1 + 0.250 + (babyRightWallX + 2.555 - 0.1 + 0.250 + 0.900)) / 2, (-WALL_THICKNESS + (-T2 - 1.591 + T2)) / 2]] },
-  // 현관 — 정가운데 다운라이트 1개
+  // 현관 — 신발장 전면(-WALL_THICKNESS - 0.400)과 맞은편 벽(-T2-1.591) 정확히 중앙
+  // X 는 신발장 xCenter (= LR_W - 1.476 + 1.470/2 = LR_W - 0.741)
   { bounds: { leftX: LR_W - 1.481, rightX: LR_W + T2, topZ: -WALL_THICKNESS, bottomZ: -T2 - 1.591 + T2 },
-    lights: [[(LR_W - 1.481 + LR_W + T2) / 2, -T2 - 1.591 / 2]] },
-  // 주방 — ㄱ자 조명으로 대체 (외부 라이트 억제용 빈 그룹)
+    lights: [[
+      LR_W - 1.476 + 1.470 / 2,
+      (-WALL_THICKNESS - 0.400 + (-T2 - 1.591)) / 2,
+    ]] },
+  // 주방 — ㄱ자 조명으로 대체 (세탁실/아기방 도어 앞 300mm 다운라이트 2개)
   { bounds: { leftX: babyRightWallX + T2, rightX: babyRightWallX + 2.500 - T2, topZ: babyTopWallZ - 1.119 - 0.770 + T2, bottomZ: -T2 - 1.591 + T2 },
-    lights: [] },
+    lights: [
+      [babyRightWallX + T2 + 0.3, babyTopWallZ - 0.5595],   // 세탁실 도어 앞 300mm
+      [babyRightWallX + T2 + 0.3, babyBottom - 0.22 - 0.45], // 아기방 도어 앞 300mm
+    ] },
   // 안방욕실 — 가운데 다운라이트 1개
   { bounds: { leftX: mbLeft, rightX: mbDoorEnd + 0.1 - T2, topZ: -WALL_THICKNESS - MB_BATH_INNER_D, bottomZ: -WALL_THICKNESS },
     lights: [[(mbLeft + mbDoorEnd + 0.1 - T2) / 2, (-WALL_THICKNESS + (-WALL_THICKNESS - MB_BATH_INNER_D)) / 2]] },

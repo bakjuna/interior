@@ -1,14 +1,10 @@
 /**
  * 4도어 냉장고 — 920×1800×915mm (D×H×W).
- * 본체 호두 마감 + 4문 베이지 + 상하 분할선. -X 방향 정면.
+ * 본체 새까만색 + 4문 베이지 + 상하 분할선. -X 방향 정면.
+ * (호두 마감은 둘러싼 캐비닛 전용 — 냉장고 본체에는 들어가지 않음)
  *
  * position: [centerX, 0, centerZ] (바닥 기준)
  */
-
-import { useMemo } from 'react'
-import { useLoader } from '@react-three/fiber'
-import { TextureLoader } from 'three'
-import * as THREE from 'three'
 
 interface RefrigeratorProps {
   position: [number, number]  // [centerX, centerZ]
@@ -19,25 +15,15 @@ const D = 0.920
 const H = 1.800
 
 export function Refrigerator({ position }: RefrigeratorProps) {
-  const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
-  const walnutBodyTex = useMemo(() => {
-    const t = closetDoorTex.clone()
-    t.wrapS = THREE.RepeatWrapping
-    t.wrapT = THREE.RepeatWrapping
-    t.repeat.set(1, 1)
-    t.colorSpace = THREE.SRGBColorSpace
-    return t
-  }, [closetDoorTex])
-
   const [cx, cz] = position
   const frontFace = cx - D / 2  // -X 정면
 
   return (
     <group>
-      {/* 본체 — 호두 마감 (도어 갭 사이로 보임) */}
+      {/* 본체 — 새까만색 (호두 마감은 둘러싼 캐비닛 전용). 도어 갭 사이로 검정이 보임. */}
       <mesh position={[cx, H / 2, cz]}>
         <boxGeometry args={[D, H, W]} />
-        <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+        <meshStandardMaterial color="#000" roughness={0.6} />
       </mesh>
       {/* 상단 좌문 */}
       <mesh position={[frontFace - 0.001, H * 0.75, cz - W / 4]} rotation={[0, -Math.PI / 2, 0]}>

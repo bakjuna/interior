@@ -13,9 +13,11 @@ interface DropCeilingLightProps {
   ceilingY: number
   active: boolean
   color?: string
+  intensity?: number
+  distance?: number       // 광원 도달 거리 (기본 = ceilingY, 바닥 직전 0이 되어 어두워짐)
 }
 
-export function DropCeilingLight({ x, z, ceilingY, active, color = '#ffe0b0' }: DropCeilingLightProps) {
+export function DropCeilingLight({ x, z, ceilingY, active, color = '#ffe0b0', intensity = 2.0, distance }: DropCeilingLightProps) {
   const lightRef = useRef<THREE.SpotLight>(null)
   const { scene } = useThree()
   const targetRef = useRef<THREE.Object3D | null>(null)
@@ -42,8 +44,8 @@ export function DropCeilingLight({ x, z, ceilingY, active, color = '#ffe0b0' }: 
       position={[x, ceilingY - 0.02, z]}
       angle={Math.PI / 2.5}
       penumbra={0.8}
-      intensity={2.0}
-      distance={ceilingY}
+      intensity={intensity}
+      distance={(distance ?? ceilingY) * 2}
       decay={2}
       color={color}
     />

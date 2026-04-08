@@ -75,6 +75,8 @@ export function JungmunSwingDoor({
   const [isOpen, setIsOpen] = useState(false)
   const pivotRef = useRef<THREE.Group>(null)
   const angleRef = useRef(0)
+  // 회전 시작 지연 — 목적지 방의 첫 컴파일 freeze 가 끝난 후 매끄럽게 시작
+  const openAtMsRef = useRef<number>(0)
   const { invalidate } = useThree()
 
   const doorCenterWorldZ = (hingeWorld[1] + freeEndZ) / 2
@@ -96,6 +98,7 @@ export function JungmunSwingDoor({
   const isActive = !!doorId && activeDoorId === doorId
 
   useEffect(() => {
+    openAtMsRef.current = isOpen ? performance.now() + 220 : 0
     invalidate()
   }, [isOpen, invalidate])
 
@@ -108,6 +111,10 @@ export function JungmunSwingDoor({
   const maxOpenAngle = -sign * (90 * Math.PI / 180)
 
   useFrame((_, delta) => {
+    if (isOpen && openAtMsRef.current && performance.now() < openAtMsRef.current) {
+      invalidate()
+      return
+    }
     const target = isOpen ? maxOpenAngle : 0
     const diff = target - angleRef.current
     if (Math.abs(diff) < 0.0005) return

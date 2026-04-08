@@ -1,8 +1,8 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ApartmentModel } from './ApartmentModel'
-import { LR_W, LR_D, MB_W, WALL_THICKNESS, WALL_HEIGHT, babyTop } from '../data/apartment'
+import { LR_W, LR_D, MB_W, WALL_THICKNESS, WALL_HEIGHT, babyTop, downlightGroups } from '../data/apartment'
 import { moveWithCollision } from '../systems/collision'
 import type { DoorId } from '../data/sectors'
 import { doorRegistry, pickActiveDoor } from '../systems/doorRegistry'
@@ -49,6 +49,87 @@ const _scratchRight = new THREE.Vector3()
 const _scratchUp = new THREE.Vector3(0, 1, 0)
 const _scratchNewPos = new THREE.Vector3()
 const _scratchFwd = new THREE.Vector3()
+
+/**
+ * Prewarm — 시작 시 모든 sector 가 보이고 allLightsOn 의 두 상태를 거치며
+ * gl.compile 로 shader program 을 미리 컴파일. three.js 는 program key 가
+ * (NUM_DIR/POINT/SPOT/RECT_AREA + define 조합)으로 캐시되므로 한 번 컴파일 한
+ * 상태는 이후 동일 조합 재현 시 instant. G 토글 시 발생하던 100~200ms freeze 가
+ * 사라진다.
+ *
+ * Stage 0: allOn  → 다음 프레임에 gl.compile → stage 1
+ * Stage 1: allOff → 다음 프레임에 gl.compile → onDone
+ *
+ * Canvas 안에서만 mount 가능 (useThree 사용).
+ */
+/**
+ * Splash 오버레이 — Prewarm 진행 중에 화면을 가려서 라이트 깜빡임/freeze 가
+ * 사용자에게 보이지 않게 함. 단계 표시 + 부드러운 진행 바.
+ */
+function SplashScreen({ label, progress }: { label: string; progress: number }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'radial-gradient(ellipse at center, #16213e 0%, #0a0e1f 100%)',
+        color: '#fff5e6',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        zIndex: 9999,
+        userSelect: 'none',
+      }}
+    >
+      <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: 0.5, marginBottom: 28 }}>
+        마이하우스 워크스루!
+      </div>
+      <div
+        style={{
+          width: 280,
+          height: 4,
+          borderRadius: 4,
+          background: 'rgba(255,245,230,0.12)',
+          overflow: 'hidden',
+          marginBottom: 14,
+        }}
+      >
+        <div
+          style={{
+            width: `${progress}%`,
+            height: '100%',
+            background: 'linear-gradient(90deg, #ffe0b0, #ffb070)',
+            transition: 'width 280ms ease-out',
+            boxShadow: '0 0 12px rgba(255,224,176,0.6)',
+          }}
+        />
+      </div>
+      <div style={{ fontSize: 12, opacity: 0.7 }}>{label}</div>
+    </div>
+  )
+}
+
+function Prewarm({ index, active, onAdvance }: { index: number; active: boolean; onAdvance: () => void }) {
+  const { gl, scene, camera, invalidate } = useThree()
+  useEffect(() => {
+    if (!active) return
+    // 1) 현재 React 트리 mount 가 끝난 후 → next rAF 에서 compile
+    // 2) compile 결과가 GPU 에 올라간 다음 프레임에서 stage 전환
+    let rafA = 0, rafB = 0
+    invalidate()
+    rafA = requestAnimationFrame(() => {
+      try { gl.compile(scene, camera) } catch { /* noop */ }
+      rafB = requestAnimationFrame(onAdvance)
+    })
+    return () => {
+      if (rafA) cancelAnimationFrame(rafA)
+      if (rafB) cancelAnimationFrame(rafB)
+    }
+  }, [index, active, gl, scene, camera, invalidate, onAdvance])
+  return null
+}
 
 function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, onHeightChange, onActiveDoorChange }: { bindings: KeyBindings; height: number; isMobile: boolean; doorOpenStatesRef: React.MutableRefObject<Map<DoorId, boolean>>; onMove?: (x: number, z: number) => void; onHeightChange?: (h: number) => void; onActiveDoorChange?: (id: DoorId | null) => void }) {
   const { camera, gl, invalidate } = useThree()
@@ -235,7 +316,11 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
     // 변경 시에만 부모에 알림 → 매 프레임 re-render 방지
     {
       camera.getWorldDirection(_scratchFwd)
-      const newActive = pickActiveDoor(camera.position.x, camera.position.z, _scratchFwd.x, _scratchFwd.z)
+      const newActive = pickActiveDoor(
+        camera.position.x, camera.position.z,
+        _scratchFwd.x, _scratchFwd.z,
+        camera.position.y, _scratchFwd.y,
+      )
       if (newActive !== lastActiveDoorIdRef.current) {
         lastActiveDoorIdRef.current = newActive
         onActiveDoorChange?.(newActive)
@@ -331,6 +416,39 @@ export function WalkthroughView() {
   const [isNight, setIsNight] = useState(true)
   const [allLightsOn, setAllLightsOn] = useState(false)
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 800)
+
+  // === Prewarm ===
+  // 시작 시 가능한 모든 라이트 조합을 미리 mount → gl.compile → shader program 캐시.
+  // 이후 toggle/방 입장 시 동일 조합 재현 시 컴파일 0ms.
+  // Stages:
+  //   0:        baseline allOff (no group active, all sectors visible)
+  //   1..N:     각 downlightGroup 의 중심에 player 배치 (해당 그룹만 활성)
+  //   N+1:     allLightsOn=true (모든 라이트 동시)
+  const PREWARM_STAGES = useMemo(() => {
+    const stages: Array<{ playerPos: [number, number] | undefined; allLightsOn: boolean; label: string }> = []
+    stages.push({ playerPos: undefined, allLightsOn: false, label: '베이스 컴파일 중…' })
+    downlightGroups.forEach((g, i) => {
+      const cx = (g.bounds.leftX + g.bounds.rightX) / 2
+      const cz = (g.bounds.topZ + g.bounds.bottomZ) / 2
+      stages.push({
+        playerPos: [cx, cz],
+        allLightsOn: false,
+        label: `방 조명 컴파일 (${i + 1}/${downlightGroups.length})`,
+      })
+    })
+    stages.push({ playerPos: undefined, allLightsOn: true, label: '전체 조명 컴파일 중…' })
+    return stages
+  }, [])
+
+  const [prewarmIndex, setPrewarmIndex] = useState(0)
+  const isPrewarming = prewarmIndex < PREWARM_STAGES.length
+  const advancePrewarm = useCallback(() => {
+    setPrewarmIndex((i) => i + 1)
+  }, [])
+  const currentStage = PREWARM_STAGES[Math.min(prewarmIndex, PREWARM_STAGES.length - 1)]
+  // Prewarm 중에는 stage 가 props 를 강제. 끝나면 실제 player/allLightsOn 사용.
+  const effectivePlayerPos = isPrewarming ? currentStage.playerPos : playerPos
+  const effectiveAllLightsOn = isPrewarming ? currentStage.allLightsOn : allLightsOn
 
   // 도어 상태:
   //  - 충돌은 ref(매 프레임 즉시 반영)
@@ -435,7 +553,14 @@ export function WalkthroughView() {
       <Canvas
         shadows={false}
         frameloop="demand"
-        dpr={allLightsOn ? 1 : [1, 1.5]}
+        // dpr 을 동적으로 바꾸면 캔버스 resize → context 재설정 비용. 정적 유지.
+        dpr={[1, 1.5]}
+        gl={{
+          antialias: true,
+          powerPreference: 'high-performance',
+          stencil: false,
+          depth: true,
+        }}
         camera={{
           fov: 75,
           near: 0.1,
@@ -445,9 +570,18 @@ export function WalkthroughView() {
       >
         <ambientLight intensity={isNight ? 0.08 : 0.6} />
         {!isNight && <directionalLight position={[5, 10, 5]} intensity={0.8} />}
-        <ApartmentModel showCeiling={true} playerPos={playerPos} isNight={isNight} allLightsOn={allLightsOn} doorOpenStates={doorOpenStates} activeDoorId={activeDoorId} onDoorOpenChange={handleDoorOpenChange} />
-        <FPSController bindings={bindings} height={height} isMobile={isMobile} doorOpenStatesRef={doorOpenStatesRef} onMove={handleMove} onHeightChange={setHeight} onActiveDoorChange={handleActiveDoorChange} />
+        <ApartmentModel showCeiling={true} playerPos={effectivePlayerPos} isNight={isNight} allLightsOn={effectiveAllLightsOn} doorOpenStates={doorOpenStates} activeDoorId={activeDoorId} onDoorOpenChange={handleDoorOpenChange} />
+        {!isPrewarming && (
+          <FPSController bindings={bindings} height={height} isMobile={isMobile} doorOpenStatesRef={doorOpenStatesRef} onMove={handleMove} onHeightChange={setHeight} onActiveDoorChange={handleActiveDoorChange} />
+        )}
+        <Prewarm index={prewarmIndex} active={isPrewarming} onAdvance={advancePrewarm} />
       </Canvas>
+      {isPrewarming && (
+        <SplashScreen
+          label={currentStage.label}
+          progress={Math.round((prewarmIndex / PREWARM_STAGES.length) * 100)}
+        />
+      )}
       <div className="crosshair" />
       {!isMobile && (
         <div className="overlay-info">

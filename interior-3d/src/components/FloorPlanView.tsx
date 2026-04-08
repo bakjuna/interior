@@ -1,7 +1,11 @@
 import { Canvas } from '@react-three/fiber'
 import { OrthographicCamera, Line, Text, MapControls } from '@react-three/drei'
 import { useMemo } from 'react'
-import { walls, rooms, doors, doorArcs, windows, LR_W, LR_D, MB_W, WALL_THICKNESS, mbBathLeft, mbBathRight, mbBathTop, mbBathBottom, mbBathInnerW, mbBathInnerD, verandaInnerD, BABY_INNER_W, BABY_INNER_D, babyLeft, babyRight, babyTop, babyBottomZ, laundryBotZ, stairLeftX, stair1Z, stair2X, stair3Z, stair4endX, rightWallX, right1Z, right2X } from '../data/apartment'
+import { rooms, doorArcs, LR_W, LR_D, MB_W, WALL_THICKNESS, mbBathLeft, mbBathRight, mbBathTop, mbBathBottom, mbBathInnerW, mbBathInnerD, verandaInnerD, BABY_INNER_W, BABY_INNER_D, babyLeft, babyRight, babyTop, babyBottomZ, laundryBotZ, stairLeftX, stair1Z, stair2X, stair3Z, stair4endX, rightWallX, right1Z, right2X, bath2RightWallX } from '../data/apartment'
+import { ApartmentModel } from './ApartmentModel'
+
+// 도면 오버레이가 가구/벽 위로 보이도록 띄우는 Y 높이 (벽 높이 2.4m + 여유)
+const OVERLAY_Y = 3.0
 
 const verandaWallEndZ = LR_D + WALL_THICKNESS + verandaInnerD + WALL_THICKNESS / 2
 
@@ -19,6 +23,111 @@ const bath2Left = mbDoorEnd + 0.1 + T2
 const bath2Right = bath2Left + 1.413
 const bath2Top = -WALL_THICKNESS
 const bath2Bottom = bath2Top - 2.173
+
+// === 주방 내측 좌표 (kitchen.tsx 재현) ===
+const wall2300Z = babyTop - T2 - 1.119 - 0.770
+const kitchenTopInner = wall2300Z + T2
+const kitLeft = babyRight + 0.2 + T2 + T2
+const kitRight = babyRight + 0.2 + T2 + 2.500 - WALL_THICKNESS
+const fridgeBottomZ = babyBottomZ - 0.22 - 0.9
+const fridgeFrontX = kitLeft + 0.92  // Refrigerator.D
+const extStartZ = wall2300Z + T2
+const extCabCenterX = kitRight - 0.3
+const extEndZ = (babyBottomZ - 0.22 - 0.9) + 0.42
+// 키큰장 (서벽 북단)
+const REFRIGERATOR_D = 0.92
+const tallX = kitLeft - 0.12 + REFRIGERATOR_D / 2  // CAB_BACK_OFFSET = 0.12
+const tallZCenter = ((wall2300Z + T2) + (babyTop - T2 - 1.119)) / 2
+
+// === 평면도용 가구/기물 라벨 === XZ 월드좌표.
+//   라벨은 초록 글씨, 방 이름(0.2)보다 약간 작게 (0.14).
+const ITEM_LABELS: { name: string; pos: [number, number] }[] = [
+  // === 안방 ===
+  { name: '침대', pos: [mbLeft + 1.6 + 1.5, LR_D - 1.15] },
+  { name: '화장대', pos: [mbLeft + 0.3, 1.0] },
+
+  // === 안방욕실 ===
+  { name: '변기', pos: [mbBathLeft + 0.4, mbBathBottom + 0.4] },
+  { name: '세면대', pos: [mbBathLeft + 1.1, mbBathBottom + 0.35] },
+
+  // === 메인욕실 ===
+  { name: '변기', pos: [bath2RightWallX - 0.4 - 0.3 - 0.5, -WALL_THICKNESS - 0.5 + 0.2] },
+  { name: '세면대', pos: [mbDoorEnd + 0.4, -WALL_THICKNESS - 0.6 - 0.3] },
+  { name: '샤워부스', pos: [mbDoorEnd + 0.4, -WALL_THICKNESS - 1.6 - 0.3] },
+
+  // === 아기방 ===
+  { name: '아기침대', pos: [babyRight - 0.55, babyTop + 0.55] },
+  { name: '옷장', pos: [babyLeft + 0.3, babyTop + 0.5] },
+
+  // === 주방 ===
+  { name: '김치냉장고', pos: [kitLeft + 0.46, fridgeBottomZ - 0.46] },
+  { name: '냉장고', pos: [kitLeft + 0.46, fridgeBottomZ - 0.46 - 0.91] },
+  // 인덕션: 후드 정중앙 아래(extStartZ + 0.949)로 이동된 실제 위치 반영
+  // 실제 layout: dish (북쪽, +1.6) | sink (남쪽, +2.319) — 이전과 자리 바뀜
+  { name: '인덕션', pos: [kitRight - 0.3, extStartZ + 0.949] },
+  { name: '식기세척기', pos: [extCabCenterX, extStartZ + 1.6] },
+  { name: '싱크', pos: [extCabCenterX, extStartZ + 2.319] },
+  { name: '식탁', pos: [(kitLeft + kitRight) / 2 - 0.25 + 1.0, extEndZ + 1.0] },
+  { name: '정수기/밥솥', pos: [extCabCenterX, extStartZ + 0.25] },
+  { name: '광파오븐', pos: [tallX, tallZCenter] },
+
+  // === 거실 ===
+  { name: 'TV', pos: [LR_W / 2, 0.2] },
+  { name: '소파', pos: [LR_W / 2, LR_D - 1.0] },
+
+  // === 작업실 ===
+  { name: '책상', pos: [LR_W - 0.5, right1Z - 0.770 + 0.795 + 1.418 + 0.7] },
+  { name: '책상', pos: [LR_W - 0.5, right1Z - 0.770 + 0.795 + 1.418 + 2.0] },
+
+  // === 세탁실 ===
+  { name: '세탁/건조기', pos: [stair2X + 0.5, (stair3Z + laundryBotZ) / 2] },
+
+  // === 현관 ===
+  { name: '신발장', pos: [LR_W - 0.74, -WALL_THICKNESS - 0.8 + 0.5] },
+]
+
+/** ITEM_LABELS 의 텍스트가 서로 겹치지 않도록 단순 push-apart.
+ *  Korean char ≈ 0.10m wide @ fontSize 0.14, height ≈ 0.16. Text 는 X축 정렬이므로 폭은 X, 높이는 Z. */
+const ITEM_FONT = 0.14
+const CHAR_W = 0.10
+const PAD = 0.02
+
+function resolveLabelOverlaps(labels: { name: string; pos: [number, number] }[]) {
+  const items = labels.map((l) => ({
+    name: l.name,
+    x: l.pos[0],
+    z: l.pos[1],
+    halfW: (l.name.length * CHAR_W) / 2 + PAD,
+    halfH: ITEM_FONT / 2 + PAD,
+  }))
+  for (let iter = 0; iter < 30; iter++) {
+    let moved = false
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i]
+        const b = items[j]
+        const dx = b.x - a.x
+        const dz = b.z - a.z
+        const minDx = a.halfW + b.halfW
+        const minDz = a.halfH + b.halfH
+        const overlapX = minDx - Math.abs(dx)
+        const overlapZ = minDz - Math.abs(dz)
+        if (overlapX > 0 && overlapZ > 0) {
+          // Z 축으로 밀어냄 (라벨 줄 단위 분리가 더 자연스러움)
+          const sign = dz === 0 ? (i % 2 === 0 ? 1 : -1) : Math.sign(dz)
+          const push = (overlapZ + 0.005) / 2
+          a.z -= sign * push
+          b.z += sign * push
+          moved = true
+        }
+      }
+    }
+    if (!moved) break
+  }
+  return items
+}
+
+const RESOLVED_ITEM_LABELS = resolveLabelOverlaps(ITEM_LABELS)
 
 function FloorPlanScene() {
   return (
@@ -40,19 +149,27 @@ function FloorPlanScene() {
         maxAzimuthAngle={0}
         minAzimuthAngle={0}
       />
-      <ambientLight intensity={1.0} />
+      <ambientLight intensity={1.1} />
+      <directionalLight position={[5, 15, 5]} intensity={0.9} />
 
-      {/* 방 바닥 */}
+      {/* === 풀 3D 모델 === 조감도/워크스루와 동일 컨텐츠.
+          평면도는 낮 모드 + 모든 인테리어 조명 OFF (천장/도시배경도 OFF). */}
+      <ApartmentModel showCeiling={false} allLightsOn={false} isNight={false} showCityBackground={false} />
+
+      {/* 방 바닥 (도면용 단색) — 모델 바닥 위에 살짝 띄워 덮음. 가구는 위에 있으므로 그대로 보임 */}
       {rooms.map((room) => (
         <mesh
-          key={room.name}
+          key={`floor-${room.name}`}
           rotation={[-Math.PI / 2, 0, 0]}
-          position={[room.center[0], 0, room.center[1]]}
+          position={[room.center[0], 0.02, room.center[1]]}
         >
           <planeGeometry args={room.size} />
           <meshBasicMaterial color={room.color} />
         </mesh>
       ))}
+
+      {/* === 도면 오버레이 === 라인/텍스트를 가구 위로 띄워서 표시 (Y = OVERLAY_Y 기준 상대 높이) */}
+      <group position={[0, OVERLAY_Y, 0]}>
 
       {/* 맹지 빗금 */}
       {rooms.filter((r: any) => r.hatched).map((room) => {
@@ -91,79 +208,23 @@ function FloorPlanScene() {
         </Text>
       ))}
 
-      {/* 벽체 */}
-      {walls.map((wall, i) => {
-        const dx = wall.end[0] - wall.start[0]
-        const dz = wall.end[1] - wall.start[1]
-        const isH = Math.abs(dz) < 0.001
-        const length = Math.sqrt(dx * dx + dz * dz)
-        return (
-          <mesh
-            key={`w-${i}`}
-            position={[wall.start[0] + dx / 2, 0.05, wall.start[1] + dz / 2]}
-            rotation={[-Math.PI / 2, 0, 0]}
-          >
-            <planeGeometry
-              args={[isH ? length : wall.thickness, isH ? wall.thickness : length]}
-            />
-            <meshBasicMaterial color="#555" />
-          </mesh>
-        )
-      })}
-
-      {/* 창문 표시 (도면 스타일: 이중선 + 벽 개구부) */}
-      {windows.map((w, i) => {
-        const cx = w.position[0]
-        const cz = w.position[1]
-        const ww = w.width
-        const t = WALL_THICKNESS
-        const isX = w.axis === 'x'
-
-        if (isX) {
-          // 수평벽 창문: X 방향으로 열림
-          return (
-            <group key={`win-${i}`}>
-              {/* 벽 개구부 배경 */}
-              <mesh position={[cx, 0.06, cz]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[ww, t + 0.04]} />
-                <meshBasicMaterial color="#aaddff" />
-              </mesh>
-              {/* 이중선 — 상 */}
-              <Line points={[[cx - ww / 2, 0.08, cz - t / 2 + 0.02], [cx + ww / 2, 0.08, cz - t / 2 + 0.02]]} color="#4488bb" lineWidth={1.5} />
-              <Line points={[[cx - ww / 2, 0.08, cz + t / 2 - 0.02], [cx + ww / 2, 0.08, cz + t / 2 - 0.02]]} color="#4488bb" lineWidth={1.5} />
-              {/* 중심선 */}
-              <Line points={[[cx - ww / 2, 0.08, cz], [cx + ww / 2, 0.08, cz]]} color="#4488bb" lineWidth={0.5} />
-            </group>
-          )
-        } else {
-          // 수직벽 창문: Z 방향으로 열림
-          return (
-            <group key={`win-${i}`}>
-              <mesh position={[cx, 0.06, cz]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[t + 0.04, ww]} />
-                <meshBasicMaterial color="#aaddff" />
-              </mesh>
-              <Line points={[[cx - t / 2 + 0.02, 0.08, cz - ww / 2], [cx - t / 2 + 0.02, 0.08, cz + ww / 2]]} color="#4488bb" lineWidth={1.5} />
-              <Line points={[[cx + t / 2 - 0.02, 0.08, cz - ww / 2], [cx + t / 2 - 0.02, 0.08, cz + ww / 2]]} color="#4488bb" lineWidth={1.5} />
-              <Line points={[[cx, 0.08, cz - ww / 2], [cx, 0.08, cz + ww / 2]]} color="#4488bb" lineWidth={0.5} />
-            </group>
-          )
-        }
-      })}
-
-      {/* 도어 표시 — 개구부 바닥색 + 호 */}
-      {doors.map((door, i) => (
-        <mesh
-          key={`door-${i}`}
-          position={[door.position[0], 0.06, door.position[1]]}
+      {/* 가구/기물 라벨 — 초록, 방 이름보다 약간 작게, 자동 오버랩 회피 */}
+      {RESOLVED_ITEM_LABELS.map((item, i) => (
+        <Text
+          key={`item-${i}-${item.name}`}
+          position={[item.x, 0.12, item.z]}
           rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={ITEM_FONT}
+          color="#1d8a3a"
+          anchorX="center"
+          anchorY="middle"
+          font={undefined}
         >
-          <planeGeometry
-            args={door.axis === 'x' ? [door.width, WALL_THICKNESS + 0.02] : [WALL_THICKNESS + 0.02, door.width]}
-          />
-          <meshBasicMaterial color="#f5e6d3" />
-        </mesh>
+          {item.name}
+        </Text>
       ))}
+
+      {/* 도어 호 (스윙 방향) — 라인만 */}
       {doorArcs.map((arc, i) => (
         <DoorArc key={`arc-${i}`} {...arc} />
       ))}
@@ -391,6 +452,7 @@ function FloorPlanScene() {
         label={`${(LR_W * 1000).toFixed(0)}`}
         labelBelow
       />
+      </group>{/* /도면 오버레이 */}
     </>
   )
 }

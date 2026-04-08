@@ -44,6 +44,10 @@ export function FlushDoor({
   const [isOpen, setIsOpen] = useState(false)
   const panelGroupRef = useRef<THREE.Group>(null)
   const angleRef = useRef(0)
+  // 열리기 전 대기: 도어가 닫혀있다 열릴 때, 목적지 방의 mesh/material 이 처음
+  // 한번에 컴파일되며 freeze 가 발생할 수 있다. 방 visibility 는 즉시 lift (onOpenChange)
+  // 하되 회전 모션은 짧게 지연 → freeze 가 끝난 후 매끄럽게 시작.
+  const openAtMsRef = useRef<number>(0)
   const { invalidate } = useThree()
 
   // 레지스트리 등록 — toggle 은 ref 통해 stale closure 방지
@@ -63,10 +67,13 @@ export function FlushDoor({
   const isActive = !!doorId && activeDoorId === doorId
 
   useEffect(() => {
+    // 열기 시작 시점 = 지금 + DELAY. 닫힐 때는 즉시 (delay = 0).
+    openAtMsRef.current = isOpen ? performance.now() + 220 : 0
     invalidate()
   }, [isOpen, invalidate])
 
   // Phase 2: 도어 상태 lift — 부모(WalkthroughView)에 변경 통지
+  // 즉시 lift 해서 목적지 방이 먼저 렌더되도록 함 (그 뒤 지연 후 회전 시작)
   useEffect(() => {
     onOpenChange?.(isOpen)
   }, [isOpen, onOpenChange])
@@ -105,6 +112,11 @@ export function FlushDoor({
   const targetAngle = (maxOpenAngle * Math.PI / 180) * swingSign * (hinge === 'left' ? -1 : 1)
 
   useFrame((_, delta) => {
+    // 열기 지연 — 목적지 방이 먼저 렌더/컴파일 될 시간을 벌어 freeze 후에 회전 시작
+    if (isOpen && openAtMsRef.current && performance.now() < openAtMsRef.current) {
+      invalidate()
+      return
+    }
     const target = isOpen ? targetAngle : 0
     const diff = target - angleRef.current
     if (Math.abs(diff) < 0.0005) return

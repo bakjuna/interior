@@ -46,13 +46,17 @@ export function computeVisibleSectors(
     const [cur, hops] = queue.shift()!
     for (const p of portals) {
       const isOpen = p.doorId === undefined || doorOpen.get(p.doorId) === true
-      if (!isOpen) continue
+      // 유리 도어(seeThroughClosed): 닫혀 있어도 시각적으로는 통과 가능 → visualOnly hop 으로 취급
+      const isSeeThroughClosed = !isOpen && p.seeThroughClosed === true
+      if (!isOpen && !isSeeThroughClosed) continue
       let next: SectorId | null = null
       if (p.a === cur) next = p.b
       else if (p.b === cur) next = p.a
       if (!next) continue
 
-      const newHops = hops + (p.visualOnly ? 1 : 0)
+      // visualOnly portal 또는 유리 도어 통과는 1 hop 소비
+      const isVisualHop = p.visualOnly === true || isSeeThroughClosed
+      const newHops = hops + (isVisualHop ? 1 : 0)
       if (newHops > maxVisualHops) continue
 
       const prev = minHops.get(next)
