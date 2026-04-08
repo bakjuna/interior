@@ -1,0 +1,141 @@
+/**
+ * 벽 충돌 시스템
+ *
+ * walls[] / doors[] / windows[] → 충돌 세그먼트로 변환.
+ * - 풀높이 벽: blocker
+ * - 린텔/창위 (bottomY > 0.5): skip
+ * - 단차벽 (bottomY < 0): skip (floor bump)
+ * - 낮은 spandrel (height < 0.5): skip (kerb, walkable)
+ * - 창 spandrel (sill ≥ 0.5 아래 부분, height ≥ 0.5): blocker (난간 역할)
+ * - passable 창문 (거실 풀창): 통과 — walls[]에 spandrel이 없으므로 자동
+ * - 도어 갭: 닫힘 시만 blocker
+ *
+ * 좌표계: 2D (X, Z). Y는 무시.
+ */
+
+import {
+  WALL_THICKNESS,
+  WALL_HEIGHT,
+  LR_W,
+  LR_D,
+  MB_W,
+  mbDoorHinge,
+  mbDoorEnd,
+  bath2RightWallX,
+  babyBottom,
+  babyRightWallX,
+  babyTopWallZ,
+  walls,
+} from '../data/apartment'
+import type { DoorId } from '../data/sectors'
+
+const T2 = WALL_THICKNESS / 2
+const mbLeft = -WALL_THICKNESS - MB_W
+
+interface Segment {
+  sx: number
+  sz: number
+  ex: number
+  ez: number
+}
+
+interface DoorBlocker extends Segment {
+  id: DoorId
+}
+
+// --- 정적 벽 blocker (한 번만 빌드) ---
+const staticBlockers: Segment[] = (() => {
+  const out: Segment[] = []
+  for (const w of walls) {
+    const bottomY = w.bottomY ?? 0
+    const height = w.height ?? WALL_HEIGHT
+    if (bottomY < 0) continue              // 단차벽 (floor bump)
+    if (bottomY > 0.5) continue            // 린텔/창 위
+    if (height < 0.5) continue             // 낮은 kerb
+    out.push({ sx: w.start[0], sz: w.start[1], ex: w.end[0], ez: w.end[1] })
+  }
+  return out
+})()
+
+// --- 도어 blocker (Phase 2에서 ApartmentModel ↔ doorOpen 동기화 후 사용) ---
+// 각 도어의 갭을 닫는 가상 세그먼트. 중심 위치 기반.
+function doorSeg(id: DoorId, cx: number, cz: number, axis: 'x' | 'z', width: number): DoorBlocker {
+  const half = width / 2
+  if (axis === 'x') {
+    return { id, sx: cx - half, sz: cz, ex: cx + half, ez: cz }
+  }
+  return { id, sx: cx, sz: cz - half, ex: cx, ez: cz + half }
+}
+
+const DOOR_W = 0.9
+export const doorBlockers: DoorBlocker[] = [
+  doorSeg('mb-mbBath',       (mbDoorHinge + mbDoorEnd) / 2,                       -T2,                       'x', DOOR_W),
+  doorSeg('mb-hall',         -WALL_THICKNESS - 0.45 - 0.009,                      -T2,                       'x', DOOR_W),
+  doorSeg('mainBath-hall',   bath2RightWallX,                                     -WALL_THICKNESS - 0.1 - 0.45, 'z', DOOR_W),
+  doorSeg('baby-hall',       bath2RightWallX,                                     babyBottom - 0.22 - 0.45,  'z', DOOR_W),
+  doorSeg('laundry-kitchen', babyRightWallX,                                      babyTopWallZ - 0.5595,     'z', DOOR_W),
+  doorSeg('work-hall',       babyRightWallX + 2.555 - 0.1 + 0.250 + 0.45,         -T2 - 1.591,               'x', DOOR_W),
+  doorSeg('jungmun',         LR_W - 1.481,                                        -T2 - 1.591 + T2 + DOOR_W / 2, 'z', DOOR_W),
+  doorSeg('cage-mainVeranda',     mbLeft + 1.340,                                 LR_D + WALL_THICKNESS + 1.308 / 2, 'z', DOOR_W),
+  doorSeg('outdoor-mainVeranda',  0.870 + 2.000,                                  LR_D + WALL_THICKNESS + 1.308 / 2, 'z', DOOR_W),
+]
+
+// --- segment vs circle ---
+function segCircleHit(seg: Segment, cx: number, cz: number, r: number): boolean {
+  const dx = seg.ex - seg.sx
+  const dz = seg.ez - seg.sz
+  const lenSq = dx * dx + dz * dz
+  if (lenSq < 1e-12) {
+    const ddx = cx - seg.sx
+    const ddz = cz - seg.sz
+    return ddx * ddx + ddz * ddz < r * r
+  }
+  let t = ((cx - seg.sx) * dx + (cz - seg.sz) * dz) / lenSq
+  if (t < 0) t = 0
+  else if (t > 1) t = 1
+  const px = seg.sx + t * dx
+  const pz = seg.sz + t * dz
+  const ddx = cx - px
+  const ddz = cz - pz
+  return ddx * ddx + ddz * ddz < r * r
+}
+
+function collides(
+  cx: number,
+  cz: number,
+  effectiveR: number,
+  doorOpen: Map<DoorId, boolean>,
+): boolean {
+  for (const s of staticBlockers) {
+    if (segCircleHit(s, cx, cz, effectiveR)) return true
+  }
+  for (const d of doorBlockers) {
+    if (doorOpen.get(d.id) === true) continue
+    if (segCircleHit(d, cx, cz, effectiveR)) return true
+  }
+  return false
+}
+
+/**
+ * 축 분리 슬라이드: X 시도 → Z 시도. 한 축이 막히면 다른 축만 적용.
+ * playerRadius: 플레이어 외곽 반지름 (벽 두께 보정은 내부에서 +T2)
+ */
+export function moveWithCollision(
+  old: [number, number],
+  desired: [number, number],
+  doorOpen: Map<DoorId, boolean>,
+  playerRadius = 0.25,
+): [number, number] {
+  const r = playerRadius + T2  // 벽 centerline과의 최소 거리
+  let [x, z] = old
+
+  // X axis
+  const tryX = desired[0]
+  if (!collides(tryX, z, r, doorOpen)) x = tryX
+
+  // Z axis
+  const tryZ = desired[1]
+  if (!collides(x, tryZ, r, doorOpen)) z = tryZ
+
+  return [x, z]
+}

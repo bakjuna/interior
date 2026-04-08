@@ -35,6 +35,7 @@ export interface Opening {
   sillHeight: number
   axis: 'x' | 'z'
   type: 'door' | 'window'
+  passable?: boolean   // 워크스루에서 통과 가능 (거실 풀창 등)
 }
 
 export interface Room {
@@ -481,6 +482,7 @@ export const windows: Opening[] = [
     sillHeight: 0,
     axis: 'x',
     type: 'window',
+    passable: true,
   },
   // 안방 하단 창문 (2000mm 폭, 750mm 높이, 바닥에서 1000mm)
   {
