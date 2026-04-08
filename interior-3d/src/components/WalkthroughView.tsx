@@ -6,22 +6,6 @@ import { LR_W, LR_D, MB_W, WALL_THICKNESS, WALL_HEIGHT, babyTop } from '../data/
 import { moveWithCollision } from '../systems/collision'
 import type { DoorId } from '../data/sectors'
 
-// Phase 1 dev flag: Phase 2에서 도어 상태 lift 끝나면 false로.
-// true 면 모든 도어를 열린 것으로 취급 → 도어 갭 통과 가능.
-const COLLISION_ALL_DOORS_OPEN = true
-
-const ALL_DOORS_OPEN_MAP: Map<DoorId, boolean> = new Map([
-  ['mb-hall', true],
-  ['mb-mbBath', true],
-  ['mainBath-hall', true],
-  ['baby-hall', true],
-  ['laundry-kitchen', true],
-  ['work-hall', true],
-  ['jungmun', true],
-  ['cage-mainVeranda', true],
-  ['outdoor-mainVeranda', true],
-])
-
 // 전체 이동 범위 — 외벽 바깥 0.5m 마진까지 (집 외부로 빠져나가지 못하게 제한)
 const totalMinX = -WALL_THICKNESS - MB_W - 0.5
 const totalMaxX = LR_W + 0.5
@@ -223,12 +207,11 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
       heightRef.current = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, heightRef.current + dir * HEIGHT_SPEED * delta))
     }
 
-    // 벽 충돌 (axis-slide). 도어 상태는 dev flag 또는 lift된 ref에서.
-    const doorOpen = COLLISION_ALL_DOORS_OPEN ? ALL_DOORS_OPEN_MAP : doorOpenStatesRef.current
+    // 벽 충돌 (axis-slide). 도어 상태는 lift된 ref에서 (Phase 2).
     const [resolvedX, resolvedZ] = moveWithCollision(
       [camera.position.x, camera.position.z],
       [newPos.x, newPos.z],
-      doorOpen,
+      doorOpenStatesRef.current,
     )
     newPos.x = resolvedX
     newPos.z = resolvedZ
@@ -330,8 +313,12 @@ export function WalkthroughView() {
   const [allLightsOn, setAllLightsOn] = useState(false)
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 800)
 
-  // Phase 1: 빈 Map (모든 도어 닫힘 취급). Phase 2에서 도어 컴포넌트 콜백으로 채워짐.
+  // 도어 상태: 충돌은 ref(즉시 반영), visibility 등 React-driven 사용처는 state(향후 Phase 6).
   const doorOpenStatesRef = useRef<Map<DoorId, boolean>>(new Map())
+
+  const handleDoorOpenChange = useCallback((id: DoorId, open: boolean) => {
+    doorOpenStatesRef.current.set(id, open)
+  }, [])
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= 800)
@@ -424,7 +411,7 @@ export function WalkthroughView() {
       >
         <ambientLight intensity={isNight ? 0.08 : 0.6} />
         {!isNight && <directionalLight position={[5, 10, 5]} intensity={0.8} />}
-        <ApartmentModel showCeiling={true} playerPos={playerPos} isNight={isNight} allLightsOn={allLightsOn} />
+        <ApartmentModel showCeiling={true} playerPos={playerPos} isNight={isNight} allLightsOn={allLightsOn} onDoorOpenChange={handleDoorOpenChange} />
         <FPSController bindings={bindings} height={height} isMobile={isMobile} doorOpenStatesRef={doorOpenStatesRef} onMove={handleMove} onHeightChange={setHeight} />
       </Canvas>
       <div className="crosshair" />

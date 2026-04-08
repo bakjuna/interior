@@ -412,19 +412,19 @@ interface FlushDoorProps {
 - [x] WalkthroughView에 `doorOpenStatesRef` 추가
 - [x] FPSController의 useFrame에 moveWithCollision 통합
 - [x] dev flag `COLLISION_ALL_DOORS_OPEN = true` 추가
-- [ ] 워크스루에서 모든 벽 막힘 + 거실 창 통과 가능 확인
+- [x] 워크스루에서 모든 벽 막힘 + 거실 창 통과 가능 확인
 - [x] 커밋: "Phase 1: 벽 충돌 시스템 도입"
 
 ## Phase 2 — 도어 분리 + 상태 lift
-- [ ] `models/FlushDoor.tsx` 생성 (cut from ApartmentModel)
-- [ ] `models/JungmunDoor.tsx` 생성
-- [ ] FlushDoor에 doorId/onOpenChange props 추가
-- [ ] `shell/Doors.tsx` 생성 + 9개 도어 인스턴스 + doorId 매핑
-- [ ] WalkthroughView에 doorOpenStates state + 콜백 안정화
-- [ ] doorOpenStatesRef 동기화
-- [ ] dev flag 제거
+- [x] `models/FlushDoor.tsx` 생성 (cut from ApartmentModel)
+- [x] `models/JungmunDoor.tsx` 생성
+- [x] FlushDoor에 doorId/onOpenChange props 추가
+- [x] `shell/Doors.tsx` 생성 + 9개 도어 인스턴스 + doorId 매핑
+- [x] WalkthroughView에 doorOpenStates state + 콜백 안정화
+- [x] doorOpenStatesRef 동기화
+- [x] dev flag 제거
 - [ ] 도어 토글 → 충돌 통과 변경 확인
-- [ ] 커밋: "Phase 2: 도어 컴포넌트 분리 + 상태 리프트"
+- [x] 커밋: "Phase 2: 도어 컴포넌트 분리 + 상태 리프트"
 
 ## Phase 3 — Shell 분리
 - [ ] `shell/Walls.tsx` 생성 (cut)
