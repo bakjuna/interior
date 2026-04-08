@@ -200,14 +200,16 @@ function BookshelfSpotlight({ ceilingY, spotX, spotZ, targetX, targetY, targetZ,
         <ringGeometry args={[0.035, 0.045, 16]} />
         <meshStandardMaterial color="#ccc" metalness={0.6} roughness={0.3} />
       </mesh>
-      {/* 책장 향해 비추는 spotLight — active 시에만 렌더 */}
+      {/* 책장 향해 비추는 spotLight — 자동 정렬 (target=책장 중앙).
+          half-angle ~25° → 거리 ~2.5m 에서 콘 직경 ≈ 2.3m, 책장 영역에 fit.
+          beam 방향은 수평 거리 ≈ 2.12m / 수직 ≈ 1.28m → 약 31° 아래쪽. */}
       {active && (
         <spotLight
           ref={lightRef}
           position={[spotX, ceilingY - 0.02, spotZ]}
-          angle={Math.PI / 4}
-          penumbra={0.4}
-          intensity={4.0}
+          angle={Math.PI / 7}
+          penumbra={0.5}
+          intensity={6.0}
           distance={6}
           decay={2}
           color="#ffe0b0"
