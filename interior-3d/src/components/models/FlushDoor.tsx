@@ -4,6 +4,7 @@ import { useThree, useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { WALL_THICKNESS } from '../../data/apartment'
 import type { DoorId } from '../../data/sectors'
+import { doorRegistry } from '../../systems/doorRegistry'
 
 interface FlushDoorProps {
   position: [number, number]
@@ -18,8 +19,8 @@ interface FlushDoorProps {
   color?: string
   style?: 'flush' | 'louvered'
   handleStyle?: 'lever' | 'smartlock'
-  playerPos?: [number, number]
   doorId?: DoorId
+  activeDoorId?: DoorId | null
   onOpenChange?: (open: boolean) => void
 }
 
@@ -30,13 +31,14 @@ export function FlushDoor({
   height = 2.1,
   hinge = 'left',
   swing = 'in',
-  maxOpenAngle = 95,
+  maxOpenAngle = 90,
   wallThickness = WALL_THICKNESS,
   tex,
   color = '#ffffff',
   style = 'flush',
   handleStyle = 'lever',
-  playerPos,
+  doorId,
+  activeDoorId,
   onOpenChange,
 }: FlushDoorProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -44,24 +46,21 @@ export function FlushDoor({
   const angleRef = useRef(0)
   const { invalidate } = useThree()
 
-  const dist = playerPos
-    ? Math.hypot(playerPos[0] - position[0], playerPos[1] - position[1])
-    : Infinity
-  const inRange = dist < 1.5
-
+  // 레지스트리 등록 — toggle 은 ref 통해 stale closure 방지
+  const toggleRef = useRef(() => setIsOpen((o) => !o))
+  toggleRef.current = () => setIsOpen((o) => !o)
   useEffect(() => {
-    const handler = (e: Event) => {
-      const ev = e as CustomEvent<{ best: { dist: number; toggle: () => void } | null; maxDist: number }>
-      const max = ev.detail.maxDist ?? 1.5
-      if (dist > max) return
-      const detail = ev.detail
-      if (!detail.best || dist < detail.best.dist) {
-        detail.best = { dist, toggle: () => setIsOpen((o) => !o) }
-      }
-    }
-    window.addEventListener('door-toggle-request', handler as EventListener)
-    return () => window.removeEventListener('door-toggle-request', handler as EventListener)
-  }, [dist])
+    if (!doorId) return
+    doorRegistry.register({
+      id: doorId,
+      position: [position[0], position[1]],
+      toggle: () => toggleRef.current(),
+    })
+    return () => doorRegistry.unregister(doorId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doorId])
+
+  const isActive = !!doorId && activeDoorId === doorId
 
   useEffect(() => {
     invalidate()
@@ -304,8 +303,8 @@ export function FlushDoor({
         ))}
       </group>
 
-      {/* 인터랙션 툴팁 */}
-      {playerPos && inRange && (
+      {/* 인터랙션 툴팁 — 카메라가 이 도어를 향할 때만 */}
+      {isActive && (
         <Html position={[0, 1.6, 0]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
           <div
             style={{

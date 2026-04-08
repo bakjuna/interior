@@ -68,6 +68,12 @@ function doorSeg(id: DoorId, cx: number, cz: number, axis: 'x' | 'z', width: num
 }
 
 const DOOR_W = 0.9
+
+// 열린 도어 통과 영역 — 도어 폭 좌우 30cm 추가, 벽 두께 통과 가능한 깊이.
+// 플레이어가 이 박스 안에 있으면 모든 wall blocker 무시 (열린 도어 한정).
+const PASSAGE_HALF_EXTEND = DOOR_W / 2 + 0.30
+const PASSAGE_HALF_DEPTH = 0.40
+
 export const doorBlockers: DoorBlocker[] = [
   doorSeg('mb-mbBath',       (mbDoorHinge + mbDoorEnd) / 2,                       -T2,                       'x', DOOR_W),
   doorSeg('mb-hall',         -WALL_THICKNESS - 0.45 - 0.009,                      -T2,                       'x', DOOR_W),
@@ -100,14 +106,41 @@ function segCircleHit(seg: Segment, cx: number, cz: number, r: number): boolean 
   return ddx * ddx + ddz * ddz < r * r
 }
 
+/**
+ * 플레이어가 열린 도어의 통과 영역(도어 폭 + 좌우 30cm, 벽 두께 ±40cm) 안에 있으면 true.
+ * 안에 있으면 wall collision 무시 → 도어 옆 벽 jambs 에 끼지 않고 통과 가능.
+ */
+function inDoorPassage(
+  cx: number,
+  cz: number,
+  doorOpen: Map<DoorId, boolean>,
+): boolean {
+  for (const d of doorBlockers) {
+    if (doorOpen.get(d.id) !== true) continue
+    const dcx = (d.sx + d.ex) / 2
+    const dcz = (d.sz + d.ez) / 2
+    const isAxisX = Math.abs(d.sz - d.ez) < 1e-6
+    if (isAxisX) {
+      if (Math.abs(cx - dcx) <= PASSAGE_HALF_EXTEND && Math.abs(cz - dcz) <= PASSAGE_HALF_DEPTH) return true
+    } else {
+      if (Math.abs(cx - dcx) <= PASSAGE_HALF_DEPTH && Math.abs(cz - dcz) <= PASSAGE_HALF_EXTEND) return true
+    }
+  }
+  return false
+}
+
 function collides(
   cx: number,
   cz: number,
   effectiveR: number,
   doorOpen: Map<DoorId, boolean>,
 ): boolean {
-  for (const s of staticBlockers) {
-    if (segCircleHit(s, cx, cz, effectiveR)) return true
+  // 열린 도어의 통과 영역 내부에서는 wall blocker 무시
+  const inPassage = inDoorPassage(cx, cz, doorOpen)
+  if (!inPassage) {
+    for (const s of staticBlockers) {
+      if (segCircleHit(s, cx, cz, effectiveR)) return true
+    }
   }
   for (const d of doorBlockers) {
     if (doorOpen.get(d.id) === true) continue

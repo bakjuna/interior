@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { useThree, useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import type { DoorId } from '../../data/sectors'
+import { doorRegistry } from '../../systems/doorRegistry'
 
 // --- Shape helpers (중문 유리 패널 전용) ---
 function makeRoundedShape(w: number, h: number, r: number) {
@@ -52,8 +53,8 @@ interface JungmunSwingDoorProps {
   topBottomFrame: number
   color: string
   glassColor: string
-  playerPos?: [number, number]
   doorId?: DoorId
+  activeDoorId?: DoorId | null
   onOpenChange?: (open: boolean) => void
 }
 
@@ -67,7 +68,8 @@ export function JungmunSwingDoor({
   topBottomFrame,
   color,
   glassColor,
-  playerPos,
+  doorId,
+  activeDoorId,
   onOpenChange,
 }: JungmunSwingDoorProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -76,24 +78,22 @@ export function JungmunSwingDoor({
   const { invalidate } = useThree()
 
   const doorCenterWorldZ = (hingeWorld[1] + freeEndZ) / 2
-  const dist = playerPos
-    ? Math.hypot(playerPos[0] - hingeWorld[0], playerPos[1] - doorCenterWorldZ)
-    : Infinity
-  const inRange = dist < 1.8
 
+  // 레지스트리 등록
+  const toggleRef = useRef(() => setIsOpen((o) => !o))
+  toggleRef.current = () => setIsOpen((o) => !o)
   useEffect(() => {
-    const handler = (e: Event) => {
-      const ev = e as CustomEvent<{ best: { dist: number; toggle: () => void } | null; maxDist: number }>
-      const max = ev.detail.maxDist ?? 1.8
-      if (dist > max) return
-      const detail = ev.detail
-      if (!detail.best || dist < detail.best.dist) {
-        detail.best = { dist, toggle: () => setIsOpen((o) => !o) }
-      }
-    }
-    window.addEventListener('door-toggle-request', handler as EventListener)
-    return () => window.removeEventListener('door-toggle-request', handler as EventListener)
-  }, [dist])
+    if (!doorId) return
+    doorRegistry.register({
+      id: doorId,
+      position: [hingeWorld[0], doorCenterWorldZ],
+      toggle: () => toggleRef.current(),
+    })
+    return () => doorRegistry.unregister(doorId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doorId])
+
+  const isActive = !!doorId && activeDoorId === doorId
 
   useEffect(() => {
     invalidate()
@@ -105,7 +105,7 @@ export function JungmunSwingDoor({
   }, [isOpen, onOpenChange])
 
   const sign = freeEndZ > hingeWorld[1] ? 1 : -1
-  const maxOpenAngle = -sign * (95 * Math.PI / 180)
+  const maxOpenAngle = -sign * (90 * Math.PI / 180)
 
   useFrame((_, delta) => {
     const target = isOpen ? maxOpenAngle : 0
@@ -142,7 +142,7 @@ export function JungmunSwingDoor({
           </mesh>
         </group>
       </group>
-      {playerPos && inRange && (
+      {isActive && (
         <Html position={[0, 1.6, localDoorCenterZ]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
           <div
             style={{

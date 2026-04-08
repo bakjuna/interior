@@ -5,6 +5,7 @@ import { ApartmentModel } from './ApartmentModel'
 import { LR_W, LR_D, MB_W, WALL_THICKNESS, WALL_HEIGHT, babyTop } from '../data/apartment'
 import { moveWithCollision } from '../systems/collision'
 import type { DoorId } from '../data/sectors'
+import { doorRegistry, pickActiveDoor } from '../systems/doorRegistry'
 
 // 전체 이동 범위 — 외벽 바깥 0.5m 마진까지 (집 외부로 빠져나가지 못하게 제한)
 const totalMinX = -WALL_THICKNESS - MB_W - 0.5
@@ -42,7 +43,7 @@ const MOVE_SPEED_MOBILE = 3.2
 const MOUSE_SENSITIVITY = 0.002
 const TOUCH_SENSITIVITY = 0.0035
 
-function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, onHeightChange }: { bindings: KeyBindings; height: number; isMobile: boolean; doorOpenStatesRef: React.MutableRefObject<Map<DoorId, boolean>>; onMove?: (x: number, z: number) => void; onHeightChange?: (h: number) => void }) {
+function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, onHeightChange, onActiveDoorChange }: { bindings: KeyBindings; height: number; isMobile: boolean; doorOpenStatesRef: React.MutableRefObject<Map<DoorId, boolean>>; onMove?: (x: number, z: number) => void; onHeightChange?: (h: number) => void; onActiveDoorChange?: (id: DoorId | null) => void }) {
   const { camera, gl, invalidate } = useThree()
   const keys = useRef<Set<string>>(new Set())
   const euler = useRef(new THREE.Euler(0, 0, 0, 'YXZ'))
@@ -167,6 +168,7 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
   const lastReportedAt = useRef<number>(0)
   const lastReportedPos = useRef<[number, number]>([Infinity, Infinity])
   const lastReportedHeight = useRef<number>(height)
+  const lastActiveDoorIdRef = useRef<DoorId | null>(null)
   const THROTTLE_MS = 250
   const HEIGHT_SPEED = 1.0  // m/s (Q/E 홀드 시 초당 1m)
   const MIN_HEIGHT = 0.3
@@ -223,6 +225,19 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
     newPos.y = heightRef.current
 
     camera.position.copy(newPos)
+
+    // 카메라가 향하는 도어 1개 선택 (각도 우선, 거리 보조)
+    // 변경 시에만 부모에 알림 → 매 프레임 re-render 방지
+    {
+      const fwd = new THREE.Vector3()
+      camera.getWorldDirection(fwd)
+      const newActive = pickActiveDoor(camera.position.x, camera.position.z, fwd.x, fwd.z)
+      if (newActive !== lastActiveDoorIdRef.current) {
+        lastActiveDoorIdRef.current = newActive
+        onActiveDoorChange?.(newActive)
+        invalidate()
+      }
+    }
 
     // 초당 최대 4회 (250ms 간격) + 의미 있는 움직임이 있을 때만
     const now = performance.now()
@@ -319,6 +334,14 @@ export function WalkthroughView() {
   const doorOpenStatesRef = useRef<Map<DoorId, boolean>>(new Map())
   const [doorOpenStates, setDoorOpenStates] = useState<Map<DoorId, boolean>>(() => new Map())
 
+  // 카메라 forward 가 향하는 도어 (툴팁 + F 키 토글 대상)
+  const activeDoorIdRef = useRef<DoorId | null>(null)
+  const [activeDoorId, setActiveDoorId] = useState<DoorId | null>(null)
+  const handleActiveDoorChange = useCallback((id: DoorId | null) => {
+    activeDoorIdRef.current = id
+    setActiveDoorId(id)
+  }, [])
+
   const handleDoorOpenChange = useCallback((id: DoorId, open: boolean) => {
     doorOpenStatesRef.current.set(id, open)
     setDoorOpenStates((prev) => {
@@ -384,10 +407,9 @@ export function WalkthroughView() {
         setAllLightsOn((v) => (isNight ? !v : false))
       } else if (k === 'f') {
         e.preventDefault()
-        // 가장 가까운 문 하나만 토글 (각 도어 컴포넌트가 자체 default maxDist 사용)
-        const detail: { best: { dist: number; toggle: () => void } | null; maxDist?: number } = { best: null }
-        window.dispatchEvent(new CustomEvent('door-toggle-request', { detail }))
-        detail.best?.toggle()
+        // 카메라가 향하는 도어 1개 토글
+        const id = activeDoorIdRef.current
+        if (id) doorRegistry.get(id)?.toggle()
       }
     }
     document.addEventListener('keydown', handler)
@@ -419,8 +441,8 @@ export function WalkthroughView() {
       >
         <ambientLight intensity={isNight ? 0.08 : 0.6} />
         {!isNight && <directionalLight position={[5, 10, 5]} intensity={0.8} />}
-        <ApartmentModel showCeiling={true} playerPos={playerPos} isNight={isNight} allLightsOn={allLightsOn} doorOpenStates={doorOpenStates} onDoorOpenChange={handleDoorOpenChange} />
-        <FPSController bindings={bindings} height={height} isMobile={isMobile} doorOpenStatesRef={doorOpenStatesRef} onMove={handleMove} onHeightChange={setHeight} />
+        <ApartmentModel showCeiling={true} playerPos={playerPos} isNight={isNight} allLightsOn={allLightsOn} doorOpenStates={doorOpenStates} activeDoorId={activeDoorId} onDoorOpenChange={handleDoorOpenChange} />
+        <FPSController bindings={bindings} height={height} isMobile={isMobile} doorOpenStatesRef={doorOpenStatesRef} onMove={handleMove} onHeightChange={setHeight} onActiveDoorChange={handleActiveDoorChange} />
       </Canvas>
       <div className="crosshair" />
       {!isMobile && (
@@ -495,10 +517,9 @@ export function WalkthroughView() {
           onToggleNight={() => setIsNight((n) => !n)}
           onToggleAllLights={() => setAllLightsOn((v) => (isNight ? !v : false))}
           onOpenDoor={() => {
-            // 모바일은 더 넉넉한 반경(3m) 사용 — 가장 가까운 문 하나만 토글
-            const detail: { best: { dist: number; toggle: () => void } | null; maxDist: number } = { best: null, maxDist: 3 }
-            window.dispatchEvent(new CustomEvent('door-toggle-request', { detail }))
-            detail.best?.toggle()
+            // 모바일도 카메라가 향하는 도어 토글
+            const id = activeDoorIdRef.current
+            if (id) doorRegistry.get(id)?.toggle()
           }}
           holdProps={holdProps}
         />

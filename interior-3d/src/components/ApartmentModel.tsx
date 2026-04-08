@@ -79,6 +79,7 @@ interface ApartmentModelProps {
   allLightsOn?: boolean         // 조감도용, 전체 조명 ON/OFF
   showCityBackground?: boolean  // 외부 도시 배경 이미지 표시 (조감도에서는 false)
   doorOpenStates?: Map<DoorId, boolean>  // visibility 용 (Phase 6)
+  activeDoorId?: DoorId | null            // 카메라 forward 가 향하는 도어 (툴팁 표시 / F 키 토글 대상)
   onDoorOpenChange?: (id: DoorId, open: boolean) => void  // 도어 상태 lift (워크스루 충돌/visibility용)
 }
 
@@ -89,7 +90,7 @@ const totalW = totalRight - totalLeft
 const centerX = (totalLeft + totalRight) / 2
 const centerZ = LR_D / 2
 
-export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, isNight = true, allLightsOn = false, showCityBackground = true, doorOpenStates, onDoorOpenChange }: ApartmentModelProps) {
+export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, isNight = true, allLightsOn = false, showCityBackground = true, doorOpenStates, activeDoorId, onDoorOpenChange }: ApartmentModelProps) {
   // 도어 인터랙션은 항상 raw 사용. 조명 로직은 야간일 때만 playerPos 사용.
   const playerPos = isNight ? rawPlayerPos : undefined
 
@@ -313,7 +314,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
 
 
       {/* 도어는 shell/Doors.tsx 가 일괄 렌더 (Phase 2) */}
-      <Doors playerPos={rawPlayerPos} onDoorOpenChange={onDoorOpenChange} />
+      <Doors activeDoorId={activeDoorId} onDoorOpenChange={onDoorOpenChange} />
 
     </group>
   )

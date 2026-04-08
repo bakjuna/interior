@@ -29,11 +29,11 @@ const T2 = WALL_THICKNESS / 2
 const mbLeft = -WALL_THICKNESS - MB_W
 
 interface DoorsProps {
-  playerPos?: [number, number]
+  activeDoorId?: DoorId | null
   onDoorOpenChange?: (id: DoorId, open: boolean) => void
 }
 
-export function Doors({ playerPos, onDoorOpenChange }: DoorsProps) {
+export function Doors({ activeDoorId, onDoorOpenChange }: DoorsProps) {
   const walnutDoorTex = useLoader(TextureLoader, '/textures/walnut_door.png')
 
   // 안정화된 콜백 맵 — 각 도어 인스턴스마다 고정된 callback 참조 보장
@@ -75,72 +75,72 @@ export function Doors({ playerPos, onDoorOpenChange }: DoorsProps) {
 
   return (
     <group>
-      {/* 안방 출입문 — 안방↔복도 */}
+      {/* 안방 출입문 — 안방↔복도, 경첩=동측, 안방 내측(+Z)으로 열림 */}
       <FlushDoor
         position={[-WALL_THICKNESS - 0.45 - 0.009, -T2]}
         axis="x"
         width={0.9}
         height={2.1}
-        hinge="left"
-        swing="out"
+        hinge="right"
+        swing="in"
         tex={walnutDoorTex}
-        playerPos={playerPos}
+        activeDoorId={activeDoorId}
         doorId="mb-hall"
         onOpenChange={handlers['mb-hall']}
       />
 
-      {/* 안방욕실 문 */}
+      {/* 안방욕실 문 — 경첩=동측, 욕실 내측(-Z)으로 열림 */}
       <FlushDoor
         position={[(mbDoorHinge + mbDoorEnd) / 2, -T2]}
         axis="x"
         width={0.9}
         height={2.1}
-        hinge="left"
+        hinge="right"
         swing="out"
         tex={walnutDoorTex}
-        playerPos={playerPos}
+        activeDoorId={activeDoorId}
         doorId="mb-mbBath"
         onOpenChange={handlers['mb-mbBath']}
       />
 
-      {/* 메인욕실 문 */}
+      {/* 메인욕실 문 — 경첩=상단(안방쪽), 욕실 내측(-X)으로 열림 */}
       <FlushDoor
         position={[bath2RightWallX, -WALL_THICKNESS - 0.1 - 0.45]}
         axis="z"
         width={0.9}
         height={2.1}
-        hinge="right"
-        swing="in"
+        hinge="left"
+        swing="out"
         tex={walnutDoorTex}
-        playerPos={playerPos}
+        activeDoorId={activeDoorId}
         doorId="mainBath-hall"
         onOpenChange={handlers['mainBath-hall']}
       />
 
-      {/* 아기방 문 */}
+      {/* 아기방 문 — 경첩=상단(안방쪽), 아기방 내측(-X)으로 열림 */}
       <FlushDoor
         position={[bath2RightWallX, babyBottom - 0.22 - 0.45]}
         axis="z"
         width={0.9}
         height={2.1}
-        hinge="right"
-        swing="in"
+        hinge="left"
+        swing="out"
         tex={walnutDoorTex}
-        playerPos={playerPos}
+        activeDoorId={activeDoorId}
         doorId="baby-hall"
         onOpenChange={handlers['baby-hall']}
       />
 
-      {/* 세탁실 문 */}
+      {/* 세탁실 문 — 경첩=하단(아기방 상단벽쪽), 세탁실 내측(-X)으로 열림 */}
       <FlushDoor
         position={[babyRightWallX, babyTopWallZ - 0.5595]}
         axis="z"
         width={0.9}
         height={2.1}
-        hinge="right"
-        swing="in"
+        hinge="left"
+        swing="out"
         tex={walnutDoorTex}
-        playerPos={playerPos}
+        activeDoorId={activeDoorId}
         doorId="laundry-kitchen"
         onOpenChange={handlers['laundry-kitchen']}
       />
@@ -154,7 +154,7 @@ export function Doors({ playerPos, onDoorOpenChange }: DoorsProps) {
         hinge="left"
         swing="out"
         tex={walnutDoorTex}
-        playerPos={playerPos}
+        activeDoorId={activeDoorId}
         doorId="work-hall"
         onOpenChange={handlers['work-hall']}
       />
@@ -169,7 +169,7 @@ export function Doors({ playerPos, onDoorOpenChange }: DoorsProps) {
         swing="out"
         wallThickness={0.05}
         color="#e8dcc4"
-        playerPos={playerPos}
+        activeDoorId={activeDoorId}
         doorId="outdoor-mainVeranda"
         onOpenChange={handlers['outdoor-mainVeranda']}
       />
@@ -185,12 +185,12 @@ export function Doors({ playerPos, onDoorOpenChange }: DoorsProps) {
         wallThickness={0.05}
         color="#e8dcc4"
         style="louvered"
-        playerPos={playerPos}
+        activeDoorId={activeDoorId}
         doorId="cage-mainVeranda"
         onOpenChange={handlers['cage-mainVeranda']}
       />
 
-      {/* 현관문 — 외부, doorId 없음 (portal 대상 아님) */}
+      {/* 현관문 — 외부, portal 대상은 아니지만 F 인터랙션을 위해 doorId 부여 */}
       <FlushDoor
         position={[LR_W + T2, -T2 - T2 - 0.410 - 0.450]}
         axis="z"
@@ -200,7 +200,8 @@ export function Doors({ playerPos, onDoorOpenChange }: DoorsProps) {
         swing="out"
         color="#e8dcc4"
         handleStyle="smartlock"
-        playerPos={playerPos}
+        activeDoorId={activeDoorId}
+        doorId="entrance"
       />
 
       {/* === 중문 (현관/복도 경계) === */}
@@ -232,7 +233,7 @@ export function Doors({ playerPos, onDoorOpenChange }: DoorsProps) {
           topBottomFrame={topBottomFrame}
           color={panelColor}
           glassColor={glassColor}
-          playerPos={playerPos}
+          activeDoorId={activeDoorId}
           doorId="jungmun"
           onOpenChange={handlers['jungmun']}
         />

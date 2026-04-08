@@ -71,6 +71,7 @@ export type DoorId =
   | 'jungmun'
   | 'cage-mainVeranda'
   | 'outdoor-mainVeranda'
+  | 'entrance'  // 외부 출입문 — visibility/collision 대상 아님, F 인터랙션만
 
 export interface SectorAABB {
   sector: SectorId

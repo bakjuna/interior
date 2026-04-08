@@ -401,6 +401,7 @@ function DoorArc({
   openDirection,
   wallAxis = 'x',
   mirrorZ = false,
+  mirrorX = false,
 }: {
   hinge: [number, number]
   radius: number
@@ -408,17 +409,20 @@ function DoorArc({
   hingeEnd: 'left' | 'right'
   wallAxis?: 'x' | 'z'
   mirrorZ?: boolean
+  mirrorX?: boolean
 }) {
   const points = useMemo(() => {
     const pts: [number, number, number][] = []
     const segments = 24
     if (wallAxis === 'x') {
       // 수평벽 도어: 호가 Z 방향으로 열림
+      // mirrorX=true → 힌지가 도어의 +X 끝, 도어는 -X 방향으로 뻗음
       const startAngle = openDirection < 0 ? -Math.PI / 2 : 0
       const endAngle = openDirection < 0 ? 0 : Math.PI / 2
+      const xSign = mirrorX ? -1 : 1
       for (let i = 0; i <= segments; i++) {
         const a = startAngle + (endAngle - startAngle) * (i / segments)
-        pts.push([hinge[0] + Math.cos(a) * radius, 0.08, hinge[1] + Math.sin(a) * radius])
+        pts.push([hinge[0] + xSign * Math.cos(a) * radius, 0.08, hinge[1] + Math.sin(a) * radius])
       }
     } else {
       // 수직벽 도어: 호가 X 방향으로 열림
@@ -431,7 +435,7 @@ function DoorArc({
       }
     }
     return pts
-  }, [hinge, radius, openDirection, wallAxis, mirrorZ])
+  }, [hinge, radius, openDirection, wallAxis, mirrorZ, mirrorX])
 
   let leafEnd: [number, number, number]
   if (wallAxis === 'x') {

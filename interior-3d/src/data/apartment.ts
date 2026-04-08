@@ -396,40 +396,46 @@ export const doors: Opening[] = [
 // 도어 시각화용 데이터
 export const doorArcs = [
   {
-    hinge: [mbDoorHinge, 0] as [number, number],
+    // 안방욕실 문 — 경첩=동측 (mbDoorEnd), 욕실(-Z)으로 열림
+    hinge: [mbDoorEnd, 0] as [number, number],
     radius: MB_DOOR_WIDTH,
-    openDirection: -1 as number,                        // Z 감소 (위)
-    hingeEnd: 'left' as 'left' | 'right',
+    openDirection: -1 as number,                        // -Z (욕실)
+    hingeEnd: 'right' as 'left' | 'right',
+    mirrorX: true,
   },
   {
-    hinge: [-WALL_THICKNESS - MB_DOOR_WIDTH, 0] as [number, number],   // 우측 도어 좌측 끝 (경첩)
+    // 안방 출입문 — 경첩=동측 (-WALL_THICKNESS), 안방 내측(+Z)으로 열림
+    hinge: [-WALL_THICKNESS, 0] as [number, number],
     radius: MB_DOOR_WIDTH,
-    openDirection: -1 as number,                        // Z 감소 (위)
-    hingeEnd: 'left' as 'left' | 'right',
+    openDirection: 1 as number,                         // +Z (안방)
+    hingeEnd: 'right' as 'left' | 'right',
+    mirrorX: true,
   },
   {
-    hinge: [babyRight, babyBottom - 0.22 - 0.9] as [number, number],   // 아기방 우측 도어, 경첩=상단
+    // 아기방 문 — 경첩=상단(안방쪽), 아기방 내측(-X)으로 열림
+    hinge: [babyRight, babyBottom - 0.22] as [number, number],
     radius: 0.9,
-    openDirection: 1 as number,                          // +X (바깥)
-    hingeEnd: 'left' as 'left' | 'right',
+    openDirection: -1 as number,                          // -X (아기방 내측)
+    hingeEnd: 'right' as 'left' | 'right',
     wallAxis: 'z' as 'x' | 'z',
-    mirrorZ: true,
+    mirrorZ: false,
   },
   {
-    hinge: [babyRight, babyTopWallZ - 1.0095] as [number, number],   // 세탁실 도어, 경첩=상단
+    // 세탁실 문 — 경첩=하단(아기방 상단벽쪽), 세탁실 내측(-X)으로 열림
+    hinge: [babyRight, babyTopWallZ - 0.1095] as [number, number],
     radius: 0.9,
-    openDirection: 1 as number,                          // +X (바깥)
-    hingeEnd: 'left' as 'left' | 'right',
+    openDirection: -1 as number,                          // -X (세탁실 내측)
+    hingeEnd: 'right' as 'left' | 'right',
     wallAxis: 'z' as 'x' | 'z',
-    mirrorZ: true,
+    mirrorZ: false,
   },
   {
-    hinge: [babyRight, -WALL_THICKNESS - 0.1 - 0.9] as [number, number],   // 메인욕실 도어, 경첩=하단, 복도(+X)로 열림
+    hinge: [babyRight, -WALL_THICKNESS - 0.1] as [number, number],   // 메인욕실 도어, 경첩=상단(안방쪽), 욕실(-X)로 열림
     radius: 0.9,
-    openDirection: 1 as number,                          // +X (복도쪽)
-    hingeEnd: 'left' as 'left' | 'right',
+    openDirection: -1 as number,                          // -X (욕실 내측)
+    hingeEnd: 'right' as 'left' | 'right',
     wallAxis: 'z' as 'x' | 'z',
-    mirrorZ: true,
+    mirrorZ: false,
   },
   {
     hinge: [babyRightWallX + 2.555 - 0.1 + 0.250, -T2 - 1.591] as [number, number],   // 복도 상단벽 도어, 경첩=좌측
