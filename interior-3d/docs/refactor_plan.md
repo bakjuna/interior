@@ -471,10 +471,10 @@ interface FlushDoorProps {
 - [ ] 커밋: "Phase 5: 가구/가전 모델 분리"
 
 ## Phase 6 — Portal culling 활성화
-- [ ] ApartmentModel에 computeVisibleSectors 통합
-- [ ] 각 방에 visible prop 전달
+- [x] ApartmentModel에 computeVisibleSectors 통합
+- [x] 각 방에 visible prop 전달
 - [ ] 검증 시나리오 4개 통과
-- [ ] 커밋: "Phase 6: portal culling 활성화"
+- [x] 커밋: "Phase 6: portal culling 활성화"
 
 ## Phase 7 — Geometry merging
 - [ ] 방별 정적 메시 mergeGeometries 적용

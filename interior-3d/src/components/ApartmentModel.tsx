@@ -45,6 +45,7 @@ import {
   babyTopWallZ,
 } from '../data/apartment'
 import type { DoorId } from '../data/sectors'
+import { computeVisibleSectors } from '../systems/visibility'
 import { Doors } from './shell/Doors'
 import { Walls } from './shell/Walls'
 import { Windows } from './shell/Windows'
@@ -76,6 +77,7 @@ interface ApartmentModelProps {
   isNight?: boolean             // 워크스루 야간 모드 (조명 ON 판정)
   allLightsOn?: boolean         // 조감도용, 전체 조명 ON/OFF
   showCityBackground?: boolean  // 외부 도시 배경 이미지 표시 (조감도에서는 false)
+  doorOpenStates?: Map<DoorId, boolean>  // visibility 용 (Phase 6)
   onDoorOpenChange?: (id: DoorId, open: boolean) => void  // 도어 상태 lift (워크스루 충돌/visibility용)
 }
 
@@ -86,9 +88,16 @@ const totalW = totalRight - totalLeft
 const centerX = (totalLeft + totalRight) / 2
 const centerZ = LR_D / 2
 
-export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, isNight = true, allLightsOn = false, showCityBackground = true, onDoorOpenChange }: ApartmentModelProps) {
+export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, isNight = true, allLightsOn = false, showCityBackground = true, doorOpenStates, onDoorOpenChange }: ApartmentModelProps) {
   // 도어 인터랙션은 항상 raw 사용. 조명 로직은 야간일 때만 playerPos 사용.
   const playerPos = isNight ? rawPlayerPos : undefined
+
+  // === Phase 6: portal culling ===
+  // playerPos 없으면(BirdsEye/FloorPlan) computeVisibleSectors가 모든 sector 반환.
+  const visibleSectors = useMemo(
+    () => computeVisibleSectors(rawPlayerPos, doorOpenStates ?? new Map()),
+    [rawPlayerPos, doorOpenStates]
+  )
   const floorTex = useLoader(TextureLoader, '/textures/walnut-floor.png')
   const porcelainTex = useLoader(TextureLoader, '/textures/porcelain-tile.png')
   const entranceTex = useLoader(TextureLoader, '/textures/entrance-tile.png')
@@ -348,21 +357,21 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
       <Ceilings showCeiling={showCeiling} playerPos={playerPos} allLightsOn={allLightsOn} />
 
 
-      {/* Phase 4: 방 컴포넌트 → rooms/* */}
-      <MainVeranda visible={true} />
-      <WorkVeranda visible={true} />
-      <Laundry visible={true} />
-      <OutdoorUnit visible={true} />
-      <Cage visible={true} />
-      <BabyRoom visible={true} />
-      <WorkRoom visible={true} />
-      <Hallway visible={true} playerPos={playerPos} allLightsOn={allLightsOn} />
-      <MainBath visible={true} playerPos={playerPos} />
-      <MasterBath visible={true} playerPos={playerPos} />
-      <LivingRoom visible={true} />
-      <MasterBedroom visible={true} />
-      <Entrance visible={true} playerPos={playerPos} allLightsOn={allLightsOn} />
-      <Kitchen visible={true} playerPos={playerPos} allLightsOn={allLightsOn} />
+      {/* Phase 6: visibleSectors 기반 portal culling */}
+      <MainVeranda visible={visibleSectors.has('mainVeranda')} />
+      <WorkVeranda visible={visibleSectors.has('workVeranda')} />
+      <Laundry visible={visibleSectors.has('laundry')} />
+      <OutdoorUnit visible={visibleSectors.has('outdoor')} />
+      <Cage visible={visibleSectors.has('cage')} />
+      <BabyRoom visible={visibleSectors.has('baby')} />
+      <WorkRoom visible={visibleSectors.has('work')} />
+      <Hallway visible={visibleSectors.has('hall')} playerPos={playerPos} allLightsOn={allLightsOn} />
+      <MainBath visible={visibleSectors.has('mainBath')} playerPos={playerPos} />
+      <MasterBath visible={visibleSectors.has('mbBath')} playerPos={playerPos} />
+      <LivingRoom visible={visibleSectors.has('lr')} />
+      <MasterBedroom visible={visibleSectors.has('mb')} />
+      <Entrance visible={visibleSectors.has('entrance')} playerPos={playerPos} allLightsOn={allLightsOn} />
+      <Kitchen visible={visibleSectors.has('kitchen')} playerPos={playerPos} allLightsOn={allLightsOn} />
 
 
       {/* 도어는 shell/Doors.tsx 가 일괄 렌더 (Phase 2) */}

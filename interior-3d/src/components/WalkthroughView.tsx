@@ -313,11 +313,19 @@ export function WalkthroughView() {
   const [allLightsOn, setAllLightsOn] = useState(false)
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 800)
 
-  // 도어 상태: 충돌은 ref(즉시 반영), visibility 등 React-driven 사용처는 state(향후 Phase 6).
+  // 도어 상태:
+  //  - 충돌은 ref(매 프레임 즉시 반영)
+  //  - visibility (Phase 6)는 state(React 렌더 트리거)
   const doorOpenStatesRef = useRef<Map<DoorId, boolean>>(new Map())
+  const [doorOpenStates, setDoorOpenStates] = useState<Map<DoorId, boolean>>(() => new Map())
 
   const handleDoorOpenChange = useCallback((id: DoorId, open: boolean) => {
     doorOpenStatesRef.current.set(id, open)
+    setDoorOpenStates((prev) => {
+      const next = new Map(prev)
+      next.set(id, open)
+      return next
+    })
   }, [])
 
   useEffect(() => {
@@ -411,7 +419,7 @@ export function WalkthroughView() {
       >
         <ambientLight intensity={isNight ? 0.08 : 0.6} />
         {!isNight && <directionalLight position={[5, 10, 5]} intensity={0.8} />}
-        <ApartmentModel showCeiling={true} playerPos={playerPos} isNight={isNight} allLightsOn={allLightsOn} onDoorOpenChange={handleDoorOpenChange} />
+        <ApartmentModel showCeiling={true} playerPos={playerPos} isNight={isNight} allLightsOn={allLightsOn} doorOpenStates={doorOpenStates} onDoorOpenChange={handleDoorOpenChange} />
         <FPSController bindings={bindings} height={height} isMobile={isMobile} doorOpenStatesRef={doorOpenStatesRef} onMove={handleMove} onHeightChange={setHeight} />
       </Canvas>
       <div className="crosshair" />
