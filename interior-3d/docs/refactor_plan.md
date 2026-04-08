@@ -453,22 +453,22 @@ interface FlushDoorProps {
 - [x] `rooms/LivingRoom.tsx` (+ models/Sofa)
 
 ## Phase 5 — 가구/가전 모델 분리
-- [ ] `models/Bed.tsx`
-- [ ] `models/ToddlerBed.tsx`
-- [ ] `models/Sofa.tsx`
-- [ ] `models/Toilet.tsx`
-- [ ] `models/Sink.tsx`
-- [ ] `models/WashTower.tsx`
-- [ ] `models/Refrigerator.tsx`
-- [ ] `models/KimchiFridge.tsx`
-- [ ] `models/RiceCooker.tsx`
-- [ ] `models/LightWaveOven.tsx`
-- [ ] `models/WaterPurifier.tsx`
-- [ ] `models/DiningTable.tsx`
-- [ ] `models/TrestleDesk.tsx`
-- [ ] `models/ShoeCabinet.tsx`
-- [ ] `models/Closet.tsx`
-- [ ] 커밋: "Phase 5: 가구/가전 모델 분리"
+- [x] `models/Bed.tsx`
+- [x] `models/ToddlerBed.tsx`
+- [x] `models/Sofa.tsx`
+- [x] `models/Toilet.tsx`
+- [x] `models/Sink.tsx`
+- [x] `models/WashTower.tsx`
+- [x] `models/Refrigerator.tsx`
+- [x] `models/KimchiFridge.tsx`
+- [x] `models/RiceCooker.tsx`
+- [x] `models/LightWaveOven.tsx`
+- [x] `models/WaterPurifier.tsx` (CuckooWaterPurifier)
+- [x] `models/DiningTable.tsx`
+- [x] `models/TrestleDesk.tsx`
+- [x] `models/ShoeCabinet.tsx`
+- [x] `shell/Closets.tsx` (closets[] 일괄 렌더, ApartmentModel에서 분리)
+- [x] 커밋: "Phase 5: 가구/가전 모델 분리"
 
 ## Phase 6 — Portal culling 활성화
 - [x] ApartmentModel에 computeVisibleSectors 통합

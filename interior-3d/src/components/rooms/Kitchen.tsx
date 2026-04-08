@@ -13,6 +13,9 @@ import * as THREE from 'three'
 import { CuckooWaterPurifier } from '../models/CuckooWaterPurifier'
 import { RiceCooker } from '../models/RiceCooker'
 import { LightWaveOven } from '../models/LightWaveOven'
+import { Refrigerator } from '../models/Refrigerator'
+import { KimchiFridge } from '../models/KimchiFridge'
+import { DiningTable } from '../models/DiningTable'
 import {
   WALL_THICKNESS,
   WALL_HEIGHT,
@@ -421,22 +424,15 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
 
       {/* === 4도어 냉장고 + 김치냉장고 + 빌트인 상부장 === */}
       {(() => {
-        const fridgeW = 0.915
-        const fridgeD = 0.920
-        const fridgeH = 1.800
+        const fridgeW = Refrigerator.W
+        const fridgeD = Refrigerator.D
         const extEndZ2 = right1Z - 0.770 + 0.795 + 1.418
         const fridgeZ = extEndZ2 + fridgeW / 2 + 0.03
         const fridgeX = kitRight - fridgeD / 2
 
-        const f2W = 0.810
-        const f2D = 0.790
-        const f2H = 1.800
+        const f2W = KimchiFridge.W
         const f2Z = fridgeZ + fridgeW / 2 + f2W / 2 + 0.03 + 0.050
         const frontFace = fridgeX - fridgeD / 2
-        const f2X = frontFace + f2D / 2
-        const topH = f2H * 0.55
-        const midH = f2H * 0.22
-        const botH = f2H * 0.22
 
         const sideT = 0.030
         const groupZStart = fridgeZ - fridgeW / 2
@@ -458,65 +454,8 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
 
         return (
           <group>
-            {/* 4도어 냉장고 */}
-            <mesh position={[fridgeX, fridgeH / 2, fridgeZ]}>
-              <boxGeometry args={[fridgeD, fridgeH, fridgeW]} />
-              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-            </mesh>
-            <mesh position={[fridgeX - fridgeD / 2 - 0.001, fridgeH * 0.75, fridgeZ - fridgeW / 4]} rotation={[0, -Math.PI / 2, 0]}>
-              <planeGeometry args={[fridgeW / 2 - 0.005, fridgeH / 2 - 0.02]} />
-              <meshStandardMaterial color="#e8dcc0" roughness={0.5} />
-            </mesh>
-            <mesh position={[fridgeX - fridgeD / 2 - 0.001, fridgeH * 0.75, fridgeZ + fridgeW / 4]} rotation={[0, -Math.PI / 2, 0]}>
-              <planeGeometry args={[fridgeW / 2 - 0.005, fridgeH / 2 - 0.02]} />
-              <meshStandardMaterial color="#e8dcc0" roughness={0.5} />
-            </mesh>
-            <mesh position={[fridgeX - fridgeD / 2 - 0.001, fridgeH * 0.25, fridgeZ - fridgeW / 4]} rotation={[0, -Math.PI / 2, 0]}>
-              <planeGeometry args={[fridgeW / 2 - 0.005, fridgeH / 2 - 0.02]} />
-              <meshStandardMaterial color="#e8dcc0" roughness={0.5} />
-            </mesh>
-            <mesh position={[fridgeX - fridgeD / 2 - 0.001, fridgeH * 0.25, fridgeZ + fridgeW / 4]} rotation={[0, -Math.PI / 2, 0]}>
-              <planeGeometry args={[fridgeW / 2 - 0.005, fridgeH / 2 - 0.02]} />
-              <meshStandardMaterial color="#e8dcc0" roughness={0.5} />
-            </mesh>
-            <mesh position={[fridgeX - fridgeD / 2 - 0.002, fridgeH * 0.5, fridgeZ]}>
-              <boxGeometry args={[0.005, 0.01, fridgeW]} />
-              <meshStandardMaterial color="#222" roughness={0.5} />
-            </mesh>
-
-            {/* 김치냉장고 */}
-            <mesh position={[f2X, f2H / 2, f2Z]}>
-              <boxGeometry args={[f2D, f2H, f2W]} />
-              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-            </mesh>
-            <mesh position={[frontFace - 0.001, f2H - topH / 2 - 0.01, f2Z - f2W / 4]} rotation={[0, -Math.PI / 2, 0]}>
-              <planeGeometry args={[f2W / 2 - 0.005, topH - 0.02]} />
-              <meshStandardMaterial color="#e8dcc0" roughness={0.5} />
-            </mesh>
-            <mesh position={[frontFace - 0.001, f2H - topH / 2 - 0.01, f2Z + f2W / 4]} rotation={[0, -Math.PI / 2, 0]}>
-              <planeGeometry args={[f2W / 2 - 0.005, topH - 0.02]} />
-              <meshStandardMaterial color="#e8dcc0" roughness={0.5} />
-            </mesh>
-            <mesh position={[frontFace - 0.001, f2H - topH - midH / 2 - 0.005, f2Z]} rotation={[0, -Math.PI / 2, 0]}>
-              <planeGeometry args={[f2W - 0.01, midH - 0.015]} />
-              <meshStandardMaterial color="#e8dcc0" roughness={0.5} />
-            </mesh>
-            <mesh position={[frontFace - 0.001, botH / 2 + 0.01, f2Z]} rotation={[0, -Math.PI / 2, 0]}>
-              <planeGeometry args={[f2W - 0.01, botH - 0.015]} />
-              <meshStandardMaterial color="#e8dcc0" roughness={0.5} />
-            </mesh>
-            <mesh position={[frontFace - 0.002, f2H - topH, f2Z]}>
-              <boxGeometry args={[0.005, 0.01, f2W]} />
-              <meshStandardMaterial color="#222" roughness={0.5} />
-            </mesh>
-            <mesh position={[frontFace - 0.002, f2H - topH - midH, f2Z]}>
-              <boxGeometry args={[0.005, 0.01, f2W]} />
-              <meshStandardMaterial color="#222" roughness={0.5} />
-            </mesh>
-            <mesh position={[frontFace - 0.002, f2H - topH / 2, f2Z]}>
-              <boxGeometry args={[0.005, topH - 0.02, 0.008]} />
-              <meshStandardMaterial color="#222" roughness={0.5} />
-            </mesh>
+            <Refrigerator position={[fridgeX, fridgeZ]} />
+            <KimchiFridge frontFaceX={frontFace} centerZ={f2Z} />
 
             {/* 빌트인 상부장 + 측면 벽 */}
             <mesh position={[cabX, cabCenterY, outerCenterZ]}>
@@ -550,7 +489,7 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
             {(() => {
-              const fillerD = fridgeD - f2D
+              const fillerD = fridgeD - KimchiFridge.D
               const fillerX = kitRight - fillerD / 2
               const kimchiZStart = f2Z - f2W / 2
               const kimchiZEnd = f2Z + f2W / 2
@@ -566,86 +505,10 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
       })()}
 
       {/* === 식탁 + 펜던트 조명 === */}
-      {(() => {
-        const tableW = 1.5
-        const tableD = 0.8
-        const tableH = 0.75
-        const tableX = 0.45
-        const tableZ = (cabinetZ + 4.2 + (-T2 - 1.591 + T2)) / 2
-
-        return (
-          <group>
-            <mesh position={[tableX, tableH, tableZ]}>
-              <boxGeometry args={[tableW, 0.03, tableD]} />
-              <meshStandardMaterial color="#f0ece4" roughness={0.15} metalness={0.05} />
-            </mesh>
-            <mesh position={[tableX, tableH - 0.015, tableZ]}>
-              <boxGeometry args={[tableW - 0.01, 0.03, tableD - 0.01]} />
-              <meshStandardMaterial color="#e8e2d8" roughness={0.2} metalness={0.05} />
-            </mesh>
-            <mesh position={[tableX, tableH / 2 - 0.02, tableZ]}>
-              <cylinderGeometry args={[0.04, 0.04, tableH - 0.06, 12]} />
-              <meshStandardMaterial color="#6b4226" roughness={0.7} />
-            </mesh>
-            <mesh position={[tableX, 0.015, tableZ]}>
-              <cylinderGeometry args={[0.3, 0.35, 0.03, 16]} />
-              <meshStandardMaterial color="#5a3620" roughness={0.7} />
-            </mesh>
-            <mesh position={[tableX, tableH - 0.05, tableZ]}>
-              <cylinderGeometry args={[0.15, 0.04, 0.06, 12]} />
-              <meshStandardMaterial color="#6b4226" roughness={0.7} />
-            </mesh>
-
-            {(() => {
-              const pendantY = WALL_HEIGHT - 0.6
-              const barLen = 1.2
-              return (
-                <>
-                  <mesh position={[tableX, WALL_HEIGHT - 0.01, tableZ]}>
-                    <boxGeometry args={[0.2, 0.02, 0.04]} />
-                    <meshStandardMaterial color="#222" metalness={0.5} roughness={0.3} />
-                  </mesh>
-                  <mesh position={[tableX - barLen / 2 + 0.05, (WALL_HEIGHT + pendantY) / 2, tableZ]}>
-                    <cylinderGeometry args={[0.001, 0.001, WALL_HEIGHT - pendantY - 0.02, 4]} />
-                    <meshStandardMaterial color="#888" metalness={0.8} roughness={0.2} />
-                  </mesh>
-                  <mesh position={[tableX + barLen / 2 - 0.05, (WALL_HEIGHT + pendantY) / 2, tableZ]}>
-                    <cylinderGeometry args={[0.001, 0.001, WALL_HEIGHT - pendantY - 0.02, 4]} />
-                    <meshStandardMaterial color="#888" metalness={0.8} roughness={0.2} />
-                  </mesh>
-                  <mesh position={[tableX, pendantY, tableZ]}>
-                    <boxGeometry args={[barLen, 0.04, 0.05]} />
-                    <meshStandardMaterial color="#1a1a1a" metalness={0.5} roughness={0.3} />
-                  </mesh>
-                  <mesh position={[tableX, pendantY - 0.021, tableZ]}>
-                    <boxGeometry args={[barLen - 0.02, 0.005, 0.04]} />
-                    <meshStandardMaterial color={kitchenActive ? '#fff' : '#444'} emissive={kitchenActive ? '#fff5e6' : '#111'} emissiveIntensity={kitchenActive ? 4.0 : 0.1} />
-                  </mesh>
-                </>
-              )
-            })()}
-            {kitchenActive && (
-              <rectAreaLight
-                position={[tableX, WALL_HEIGHT - 0.52, tableZ]}
-                width={1.15}
-                height={0.025}
-                intensity={15}
-                color="#ffe0b0"
-                rotation={[Math.PI / 2, 0, 0]}
-              />
-            )}
-            {kitchenActive && (
-              <pointLight
-                position={[tableX, WALL_HEIGHT - 0.55, tableZ]}
-                intensity={0.8}
-                distance={2.5}
-                decay={2}
-                color="#ffe0b0"
-              />
-            )}
-          </group>
-        )
-      })()}
+      <DiningTable
+        position={[0.45, (cabinetZ + 4.2 + (-T2 - 1.591 + T2)) / 2]}
+        active={kitchenActive}
+      />
 
       {/* === 좌측 하부장 (광파오븐 + 밥솥) === */}
       {(() => {

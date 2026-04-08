@@ -22,6 +22,7 @@ import {
   babyBottomZ,
   right1Z,
 } from '../../data/apartment'
+import type { SectorId } from '../../data/sectors'
 
 const T2 = WALL_THICKNESS / 2
 const mbLeft = -WALL_THICKNESS - MB_W
@@ -30,21 +31,28 @@ interface CeilingsProps {
   showCeiling: boolean
   playerPos?: [number, number]
   allLightsOn: boolean
+  visibleSectors: Set<SectorId>
 }
 
-export function Ceilings({ showCeiling, playerPos, allLightsOn }: CeilingsProps) {
+export function Ceilings({ showCeiling, playerPos, allLightsOn, visibleSectors }: CeilingsProps) {
   if (!showCeiling) return null
 
-  const mbActive = allLightsOn || (!!playerPos && playerPos[0] >= mbLeft && playerPos[0] <= -WALL_THICKNESS && playerPos[1] >= 0 && playerPos[1] <= LR_D)
-  const lrActive = allLightsOn || (!!playerPos && playerPos[0] >= 0 && playerPos[0] <= LR_W && playerPos[1] >= 0 && playerPos[1] <= LR_D)
-  const babyActive = allLightsOn || (!!playerPos && playerPos[0] >= babyLeft && playerPos[0] <= babyRight && playerPos[1] >= babyTop && playerPos[1] <= babyBottomZ)
+  // 코브 LED는 visibility 게이팅: allLightsOn 이어도 닫힌 방의 LED는 안 켜짐
+  // (RectAreaLight가 occluder 무시 → 벽 통과 누출 방지)
+  const mbInRoom = !!playerPos && playerPos[0] >= mbLeft && playerPos[0] <= -WALL_THICKNESS && playerPos[1] >= 0 && playerPos[1] <= LR_D
+  const lrInRoom = !!playerPos && playerPos[0] >= 0 && playerPos[0] <= LR_W && playerPos[1] >= 0 && playerPos[1] <= LR_D
+  const babyInRoom = !!playerPos && playerPos[0] >= babyLeft && playerPos[0] <= babyRight && playerPos[1] >= babyTop && playerPos[1] <= babyBottomZ
+  const mbActive = visibleSectors.has('mb') && (allLightsOn || mbInRoom)
+  const lrActive = visibleSectors.has('lr') && (allLightsOn || lrInRoom)
+  const babyActive = visibleSectors.has('baby') && (allLightsOn || babyInRoom)
 
   const workLeftX = babyRight + 2.555 + 0.1 + 0.1
   const workRightX = LR_W
   const workTopZ = right1Z - 0.770 + 0.795 + 1.418 + 0.1
   const workW = workRightX - workLeftX
   const workCenterX = (workLeftX + workRightX) / 2
-  const workActive = allLightsOn || (!!playerPos && playerPos[0] >= workLeftX - 0.2 && playerPos[0] <= workRightX + 0.1 && playerPos[1] <= -0.1 - 1.591 - 0.1 && playerPos[1] >= workTopZ - 0.2)
+  const workInRoom = !!playerPos && playerPos[0] >= workLeftX - 0.2 && playerPos[0] <= workRightX + 0.1 && playerPos[1] <= -0.1 - 1.591 - 0.1 && playerPos[1] >= workTopZ - 0.2
+  const workActive = visibleSectors.has('work') && (allLightsOn || workInRoom)
 
   // walls 변수 참조 — 향후 ceiling-wall trim 등에 사용 가능 (현재는 사용 안 함)
   void walls

@@ -52,6 +52,7 @@ import { Windows } from './shell/Windows'
 import { Floors } from './shell/Floors'
 import { Ceilings } from './shell/Ceilings'
 import { ExteriorBackground } from './shell/ExteriorBackground'
+import { Closets } from './shell/Closets'
 import { MainVeranda } from './rooms/MainVeranda'
 import { WorkVeranda } from './rooms/WorkVeranda'
 import { Laundry } from './rooms/Laundry'
@@ -213,76 +214,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
       <Walls />
       <Windows />
 
-      {/* 붙박이장/수납공간 */}
-      {closets.map((c, i) => {
-        const doorTex = closetDoorTex.clone()
-        // 문짝 방향: size[2](Z)가 길면 Z 방향 나열, size[0](X)가 길면 X 방향
-        const isZlong = c.size[2] > c.size[0]
-        const longSide = isZlong ? c.size[2] : c.size[0]
-        const doorWidth = 0.6  // 문짝 하나 폭 ~600mm
-        const doorCount = Math.max(2, Math.round(longSide / doorWidth))
-        const actualDoorW = longSide / doorCount
-        const gap = 0.003  // 문짝 사이 간격
-
-        return (
-          <group key={`closet-${i}`}>
-            {/* 본체 (뒤판) */}
-            <mesh position={c.position}>
-              <boxGeometry args={c.size} />
-              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-            </mesh>
-
-            {/* 문짝들 */}
-            {Array.from({ length: doorCount }).map((_, di) => {
-              const doorT = closetDoorTex.clone()
-              doorT.wrapS = THREE.RepeatWrapping
-              doorT.wrapT = THREE.RepeatWrapping
-              doorT.repeat.set(1, 1)
-              doorT.colorSpace = THREE.SRGBColorSpace
-
-              const offset = -longSide / 2 + actualDoorW / 2 + di * actualDoorW
-
-              // 문짝 위치: 긴 방향을 따라 나열, 앞면에 배치
-              const pos: [number, number, number] = isZlong
-                ? [c.position[0] + c.size[0] / 2 + 0.002, c.size[1] / 2, c.position[2] + offset]
-                : [c.position[0] + offset, c.size[1] / 2, c.position[2] + c.size[2] / 2 + 0.002]
-
-              const doorW = actualDoorW - gap
-              const doorH = c.size[1] - 0.02
-
-              return (
-                <group key={`door-${di}`}>
-                  {/* 문짝 판넬 */}
-                  <mesh position={pos} rotation={isZlong ? [0, Math.PI / 2, 0] : [0, 0, 0]}>
-                    <planeGeometry args={[doorW, doorH]} />
-                    <meshStandardMaterial map={doorT} roughness={0.45} />
-                  </mesh>
-                  {/* 손잡이 */}
-                  <mesh position={[
-                    pos[0] + (isZlong ? 0.012 : 0),
-                    pos[1],
-                    pos[2] + (isZlong ? 0 : 0.012),
-                  ]}>
-                    <boxGeometry args={[isZlong ? 0.015 : 0.01, 0.1, isZlong ? 0.01 : 0.015]} />
-                    <meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} />
-                  </mesh>
-                </group>
-              )
-            })}
-
-            {/* 상단 몰딩 */}
-            <mesh position={[c.position[0], c.size[1] - 0.01, c.position[2]]}>
-              <boxGeometry args={[c.size[0] + 0.005, 0.02, c.size[2] + 0.005]} />
-              <meshStandardMaterial color="#2d1f12" roughness={0.5} />
-            </mesh>
-            {/* 하단 받침 */}
-            <mesh position={[c.position[0], 0.04, c.position[2]]}>
-              <boxGeometry args={[c.size[0] + 0.005, 0.08, c.size[2] + 0.005]} />
-              <meshStandardMaterial color="#2d1f12" roughness={0.5} />
-            </mesh>
-          </group>
-        )
-      })}
+      <Closets />
 
       {/* 다운라이트 */}
       {(() => {
@@ -354,7 +286,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         )
       })()}
 
-      <Ceilings showCeiling={showCeiling} playerPos={playerPos} allLightsOn={allLightsOn} />
+      <Ceilings showCeiling={showCeiling} playerPos={playerPos} allLightsOn={allLightsOn} visibleSectors={visibleSectors} />
 
 
       {/* Phase 6: visibleSectors 기반 portal culling */}
