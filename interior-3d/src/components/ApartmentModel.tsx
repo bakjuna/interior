@@ -46,6 +46,11 @@ import {
 } from '../data/apartment'
 import type { DoorId } from '../data/sectors'
 import { Doors } from './shell/Doors'
+import { Walls } from './shell/Walls'
+import { Windows } from './shell/Windows'
+import { Floors } from './shell/Floors'
+import { Ceilings } from './shell/Ceilings'
+import { ExteriorBackground } from './shell/ExteriorBackground'
 
 const T2 = WALL_THICKNESS / 2
 const mbLeft = -WALL_THICKNESS - MB_W
@@ -179,176 +184,10 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
 
   return (
     <group>
-      {/* 외부 뷰 배경 (북쪽) — 주방/작업실 창문 방향 billboard plane */}
-      {showCityBackground && cityNorthTex && (
-        <mesh position={[LR_W / 2, 0, babyTop - 40]}>
-          <planeGeometry args={[140, 70]} />
-          <meshBasicMaterial
-            map={cityNorthTex}
-            side={THREE.DoubleSide}
-            toneMapped={false}
-            fog={false}
-          />
-        </mesh>
-      )}
-
-      {/* 외부 뷰 배경 (남쪽) — 거실/안방 창문 방향 billboard plane, 카메라쪽(-Z)을 향하도록 회전 */}
-      {showCityBackground && citySouthTex && (
-        <mesh position={[LR_W / 2, 0, LR_D + 40]} rotation={[0, Math.PI, 0]}>
-          <planeGeometry args={[140, 70]} />
-          <meshBasicMaterial
-            map={citySouthTex}
-            side={THREE.DoubleSide}
-            toneMapped={false}
-            fog={false}
-          />
-        </mesh>
-      )}
-
-      {/* 바닥 */}
-      {rooms.map((room, ri) => {
-        const tex = roomFloorTextures[ri]
-        const fY = room.floorY ?? 0
-        return (
-          <mesh
-            key={`floor-${room.name}`}
-            rotation={[-Math.PI / 2, 0, 0]}
-            position={[room.center[0], fY + 0.001, room.center[1]]}
-           
-            renderOrder={1}
-          >
-            <planeGeometry args={room.size} />
-            <meshStandardMaterial map={tex} roughness={room.floorTile ? 0.2 : 0.35} polygonOffset polygonOffsetFactor={-1} />
-          </mesh>
-        )
-      })}
-
-      {/* 벽체 */}
-      {walls.map((wall, i) => {
-        const dx = wall.end[0] - wall.start[0]
-        const dz = wall.end[1] - wall.start[1]
-        const length = Math.sqrt(dx * dx + dz * dz)
-        const isH = Math.abs(dz) < 0.001
-        const specifiedH = wall.height ?? WALL_HEIGHT
-        const bY = wall.bottomY ?? -0.03  // 기본 -30mm까지 내림
-        const h = wall.bottomY !== undefined ? specifiedH : specifiedH + 0.03  // bottomY 미지정 시 높이 30mm 추가
-        const t = wall.thickness
-
-        // 실크 벽지 텍스처 — 가로는 2m당 1회 반복, 세로는 벽 전체 높이에 1회(하단 100px 흰색 = 걸레받이)
-        const silk = silkTex.clone()
-        silk.wrapS = THREE.RepeatWrapping
-        silk.wrapT = THREE.ClampToEdgeWrapping
-        silk.repeat.set(length / 2, 1)
-        silk.colorSpace = THREE.SRGBColorSpace
-
-        return (
-          <mesh
-            key={i}
-            position={[
-              wall.start[0] + dx / 2,
-              bY + h / 2,
-              wall.start[1] + dz / 2,
-            ]}
-           
-           
-          >
-            <boxGeometry args={[isH ? length : t, h, isH ? t : length]} />
-            <meshStandardMaterial
-              map={silk}
-              roughness={0.55}
-              metalness={0}
-            />
-          </mesh>
-        )
-      })}
-
-      {/* 2분할 슬라이딩 창문 (하얀 PVC 샷시) */}
-      {windows.map((w, i) => {
-        const cx = w.position[0]
-        const cz = w.position[1]
-        const cy = w.sillHeight + w.height / 2
-        const ww = w.width
-        const wh = w.height
-        const frame = 0.04   // 프레임 두께 40mm
-        const mid = 0.03     // 중앙 분할대 30mm
-        const depth = 0.08   // 샷시 깊이 80mm
-        const isX = w.axis === 'x'
-        const rot: [number, number, number] = isX ? [0, 0, 0] : [0, Math.PI / 2, 0]
-
-        const halfW = (ww - mid) / 2
-
-        return (
-          <group key={`win-${i}`} position={[cx, cy, cz]} rotation={rot}>
-            {/* 외곽 프레임 — 상 */}
-            <mesh position={[0, wh / 2 - frame / 2, 0]}>
-              <boxGeometry args={[ww, frame, depth]} />
-              <meshStandardMaterial color="#f0f0f0" />
-            </mesh>
-            {/* 외곽 프레임 — 하 */}
-            <mesh position={[0, -wh / 2 + frame / 2 + 0.003, 0]}>
-              <boxGeometry args={[ww, frame, depth]} />
-              <meshStandardMaterial color="#f0f0f0" />
-            </mesh>
-            {/* 외곽 프레임 — 좌 */}
-            <mesh position={[-ww / 2 + frame / 2, 0, 0]}>
-              <boxGeometry args={[frame, wh, depth]} />
-              <meshStandardMaterial color="#f0f0f0" />
-            </mesh>
-            {/* 외곽 프레임 — 우 */}
-            <mesh position={[ww / 2 - frame / 2, 0, 0]}>
-              <boxGeometry args={[frame, wh, depth]} />
-              <meshStandardMaterial color="#f0f0f0" />
-            </mesh>
-            {/* 중앙 분할대 */}
-            <mesh position={[0, 0, 0]}>
-              <boxGeometry args={[mid, wh - frame * 2, depth]} />
-              <meshStandardMaterial color="#e8e8e8" />
-            </mesh>
-
-            {/* 좌측 유리창 패널 */}
-            {(() => {
-              const pH = wh - frame * 2  // 패널 높이
-              const pf = 0.025           // 패널 프레임 두께
-              const glassW = halfW - pf * 2
-              const glassH = pH - pf * 2
-              return (
-                <group position={[-halfW / 2 - mid / 2, 0, -depth * 0.2]}>
-                  {/* 패널 프레임 4변 */}
-                  <mesh position={[0, pH / 2 - pf / 2, 0]}><boxGeometry args={[halfW, pf, 0.02]} /><meshStandardMaterial color="#e8e8e8" /></mesh>
-                  <mesh position={[0, -pH / 2 + pf / 2, 0]}><boxGeometry args={[halfW, pf, 0.02]} /><meshStandardMaterial color="#e8e8e8" /></mesh>
-                  <mesh position={[-halfW / 2 + pf / 2, 0, 0]}><boxGeometry args={[pf, pH, 0.02]} /><meshStandardMaterial color="#e8e8e8" /></mesh>
-                  <mesh position={[halfW / 2 - pf / 2, 0, 0]}><boxGeometry args={[pf, pH, 0.02]} /><meshStandardMaterial color="#e8e8e8" /></mesh>
-                  {/* 유리 */}
-                  <mesh><planeGeometry args={[glassW, glassH]} /><meshStandardMaterial color="#4477aa" transparent opacity={0.35} side={THREE.DoubleSide} /></mesh>
-                  {/* 손잡이 (우측=중앙쪽, 실내면) */}
-                  <mesh position={[halfW / 2 - 0.035, 0, 0.015]}><boxGeometry args={[0.01, 0.07, 0.018]} /><meshStandardMaterial color="#555" /></mesh>
-                </group>
-              )
-            })()}
-
-            {/* 우측 유리창 패널 */}
-            {(() => {
-              const pH = wh - frame * 2
-              const pf = 0.025
-              const glassW = halfW - pf * 2
-              const glassH = pH - pf * 2
-              return (
-                <group position={[halfW / 2 + mid / 2, 0, depth * 0.2]}>
-                  {/* 패널 프레임 4변 */}
-                  <mesh position={[0, pH / 2 - pf / 2, 0]}><boxGeometry args={[halfW, pf, 0.02]} /><meshStandardMaterial color="#e8e8e8" /></mesh>
-                  <mesh position={[0, -pH / 2 + pf / 2, 0]}><boxGeometry args={[halfW, pf, 0.02]} /><meshStandardMaterial color="#e8e8e8" /></mesh>
-                  <mesh position={[-halfW / 2 + pf / 2, 0, 0]}><boxGeometry args={[pf, pH, 0.02]} /><meshStandardMaterial color="#e8e8e8" /></mesh>
-                  <mesh position={[halfW / 2 - pf / 2, 0, 0]}><boxGeometry args={[pf, pH, 0.02]} /><meshStandardMaterial color="#e8e8e8" /></mesh>
-                  {/* 유리 */}
-                  <mesh><planeGeometry args={[glassW, glassH]} /><meshStandardMaterial color="#4477aa" transparent opacity={0.35} side={THREE.DoubleSide} /></mesh>
-                  {/* 손잡이 (좌측=중앙쪽, 실내면) */}
-                  <mesh position={[-halfW / 2 + 0.035, 0, 0.015]}><boxGeometry args={[0.01, 0.07, 0.018]} /><meshStandardMaterial color="#555" /></mesh>
-                </group>
-              )
-            })()}
-          </group>
-        )
-      })}
+      <ExteriorBackground show={showCityBackground} isNight={isNight} />
+      <Floors />
+      <Walls />
+      <Windows />
 
       {/* 붙박이장/수납공간 */}
       {closets.map((c, i) => {
@@ -491,123 +330,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         )
       })()}
 
-      {/* 안방/거실 하단 천장 단내림 (800mm 깊이, 100mm 내림) */}
-      {/* 안방/거실 하단 천장 단내림 (조감도에서 수직면 숨김) */}
-      {showCeiling && (
-        <>
-          {/* 간접조명 — 단내림 앞쪽 코브 LED */}
-          {/* 안방 간접조명 — playerPos 연동 */}
-          {(() => {
-            const mbActive = allLightsOn || (playerPos && playerPos[0] >= mbLeft && playerPos[0] <= -WALL_THICKNESS && playerPos[1] >= 0 && playerPos[1] <= LR_D)
-            const lrActive = allLightsOn || (playerPos && playerPos[0] >= 0 && playerPos[0] <= LR_W && playerPos[1] >= 0 && playerPos[1] <= LR_D)
-            return (
-              <>
-                {/* 안방 LED 스트립 */}
-                <mesh position={[mbLeft + MB_W / 2, WALL_HEIGHT - 0.008, LR_D - 0.8 - 0.01]}>
-                  <boxGeometry args={[MB_W, 0.015, 0.008]} />
-                  <meshStandardMaterial color={mbActive ? '#fff' : '#444'} emissive={mbActive ? '#ffe0b0' : '#111'} emissiveIntensity={mbActive ? 3.0 : 0.1} />
-                </mesh>
-                {mbActive && (
-                  <rectAreaLight
-                    position={[mbLeft + MB_W / 2, WALL_HEIGHT - 0.005, LR_D - 0.8 - 0.02]}
-                    width={MB_W}
-                    height={0.03}
-                    intensity={8}
-                    color="#ffe0b0"
-                    rotation={[-Math.PI / 2, 0, 0]}
-                  />
-                )}
-                {/* 거실 LED 스트립 */}
-                <mesh position={[LR_W / 2, WALL_HEIGHT - 0.008, LR_D - 0.8 - 0.01]}>
-                  <boxGeometry args={[LR_W, 0.015, 0.008]} />
-                  <meshStandardMaterial color={lrActive ? '#fff' : '#444'} emissive={lrActive ? '#ffe0b0' : '#111'} emissiveIntensity={lrActive ? 3.0 : 0.1} />
-                </mesh>
-                {lrActive && (
-                  <rectAreaLight
-                    position={[LR_W / 2, WALL_HEIGHT - 0.005, LR_D - 0.8 - 0.02]}
-                    width={LR_W}
-                    height={0.03}
-                    intensity={16}
-                    color="#ffe0b0"
-                    rotation={[-Math.PI / 2, 0, 0]}
-                  />
-                )}
-              </>
-            )
-          })()}
-
-          {/* 안방 단내림 천장 (150mm 두께 박스) */}
-          <mesh position={[mbLeft + MB_W / 2, WALL_HEIGHT - 0.075, LR_D - 0.4]}>
-            <boxGeometry args={[MB_W + WALL_THICKNESS, 0.15, 0.8]} />
-            <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
-          </mesh>
-          {/* 거실 단내림 천장 (150mm 두께 박스) */}
-          <mesh position={[LR_W / 2, WALL_HEIGHT - 0.075, LR_D - 0.4]}>
-            <boxGeometry args={[LR_W + WALL_THICKNESS, 0.15, 0.8]} />
-            <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
-          </mesh>
-
-          {/* === 아기방 단내림 (상단벽쪽, 거울상) === */}
-          <mesh position={[(babyLeft + babyRight + 0.2) / 2, WALL_HEIGHT - 0.075, babyTop + 0.4]}>
-            <boxGeometry args={[BABY_INNER_W + 0.2, 0.15, 0.8]} />
-            <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
-          </mesh>
-          {/* 아기방 간접조명 */}
-          {(() => {
-            const babyActive = allLightsOn || (playerPos && playerPos[0] >= babyLeft && playerPos[0] <= babyRight && playerPos[1] >= babyTop && playerPos[1] <= babyBottomZ)
-            return (
-              <>
-                <mesh position={[(babyLeft + babyRight + 0.2) / 2, WALL_HEIGHT - 0.008, babyTop + 0.8 + 0.01]}>
-                  <boxGeometry args={[BABY_INNER_W + 0.2, 0.015, 0.008]} />
-                  <meshStandardMaterial color={babyActive ? '#fff' : '#444'} emissive={babyActive ? '#ffe0b0' : '#111'} emissiveIntensity={babyActive ? 3.0 : 0.1} />
-                </mesh>
-                {babyActive && (
-                  <rectAreaLight
-                    position={[(babyLeft + babyRight + 0.2) / 2, WALL_HEIGHT - 0.005, babyTop + 0.8 + 0.02]}
-                    width={BABY_INNER_W + 0.2}
-                    height={0.03}
-                    intensity={8}
-                    color="#ffe0b0"
-                    rotation={[-Math.PI / 2, 0, 0]}
-                  />
-                )}
-              </>
-            )
-          })()}
-
-          {/* === 작업실 단내림 (상단벽쪽, 거울상) === */}
-          {(() => {
-            const workLeftX = babyRight + 2.555 + 0.1 + 0.1
-            const workRightX = LR_W
-            const workTopZ = right1Z - 0.770 + 0.795 + 1.418 + 0.1  // screen top (most negative)
-            const workW = workRightX - workLeftX
-            const workCenterX = (workLeftX + workRightX) / 2
-            const workActive = allLightsOn || (playerPos && playerPos[0] >= workLeftX - 0.2 && playerPos[0] <= workRightX + 0.1 && playerPos[1] <= -0.1 - 1.591 - 0.1 && playerPos[1] >= workTopZ - 0.2)
-            return (
-              <>
-                <mesh position={[workCenterX, WALL_HEIGHT - 0.075, workTopZ + 0.4]}>
-                  <boxGeometry args={[workW, 0.15, 0.8]} />
-                  <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
-                </mesh>
-                <mesh position={[workCenterX, WALL_HEIGHT - 0.008, workTopZ + 0.8 + 0.01]}>
-                  <boxGeometry args={[workW, 0.015, 0.008]} />
-                  <meshStandardMaterial color={workActive ? '#fff' : '#444'} emissive={workActive ? '#ffe0b0' : '#111'} emissiveIntensity={workActive ? 3.0 : 0.1} />
-                </mesh>
-                {workActive && (
-                  <rectAreaLight
-                    position={[workCenterX, WALL_HEIGHT - 0.005, workTopZ + 0.8 + 0.02]}
-                    width={workW}
-                    height={0.03}
-                    intensity={8}
-                    color="#ffe0b0"
-                    rotation={[-Math.PI / 2, 0, 0]}
-                  />
-                )}
-              </>
-            )
-          })()}
-        </>
-      )}
+      <Ceilings showCeiling={showCeiling} playerPos={playerPos} allLightsOn={allLightsOn} />
 
       {/* 주방 ㄱ자 조명 — playerPos 연동 */}
       {(() => {
@@ -2331,17 +2054,6 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         <Sofa />
       </Suspense>
 
-      {/* 천장 — 각 방마다 */}
-      {showCeiling && rooms.map((room) => (
-        <mesh
-          key={`ceiling-${room.name}-${room.center[0]}`}
-          rotation={[-Math.PI / 2, 0, 0]}
-          position={[room.center[0], WALL_HEIGHT, room.center[1]]}
-        >
-          <planeGeometry args={room.size} />
-          <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} side={THREE.BackSide} />
-        </mesh>
-      ))}
     </group>
   )
 }

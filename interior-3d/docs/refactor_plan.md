@@ -427,14 +427,14 @@ interface FlushDoorProps {
 - [x] 커밋: "Phase 2: 도어 컴포넌트 분리 + 상태 리프트"
 
 ## Phase 3 — Shell 분리
-- [ ] `shell/Walls.tsx` 생성 (cut)
-- [ ] `shell/Windows.tsx` 생성 (cut)
-- [ ] `shell/Floors.tsx` 생성 (cut)
-- [ ] `shell/Ceilings.tsx` 생성 (cut)
-- [ ] `shell/ExteriorBackground.tsx` 생성 (cut)
-- [ ] ApartmentModel에서 import + 조립
+- [x] `shell/Walls.tsx` 생성 (cut)
+- [x] `shell/Windows.tsx` 생성 (cut)
+- [x] `shell/Floors.tsx` 생성 (cut)
+- [x] `shell/Ceilings.tsx` 생성 (cut, 단내림 + 코브 LED + 방별 천장 plane 통합)
+- [x] `shell/ExteriorBackground.tsx` 생성 (cut)
+- [x] ApartmentModel에서 import + 조립
 - [ ] 시각 동일 확인
-- [ ] 커밋: "Phase 3: 벽/창/바닥/천장 shell 분리"
+- [x] 커밋: "Phase 3: 벽/창/바닥/천장 shell 분리"
 
 ## Phase 4 — 방 컴포넌트 추출 (한 번에 하나, 14개 커밋)
 - [ ] `rooms/Cage.tsx`
