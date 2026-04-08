@@ -423,7 +423,7 @@ interface FlushDoorProps {
 - [x] WalkthroughView에 doorOpenStates state + 콜백 안정화
 - [x] doorOpenStatesRef 동기화
 - [x] dev flag 제거
-- [ ] 도어 토글 → 충돌 통과 변경 확인
+- [x] 도어 토글 → 충돌 통과 변경 확인
 - [x] 커밋: "Phase 2: 도어 컴포넌트 분리 + 상태 리프트"
 
 ## Phase 3 — Shell 분리
@@ -433,15 +433,15 @@ interface FlushDoorProps {
 - [x] `shell/Ceilings.tsx` 생성 (cut, 단내림 + 코브 LED + 방별 천장 plane 통합)
 - [x] `shell/ExteriorBackground.tsx` 생성 (cut)
 - [x] ApartmentModel에서 import + 조립
-- [ ] 시각 동일 확인
+- [x] 시각 동일 확인
 - [x] 커밋: "Phase 3: 벽/창/바닥/천장 shell 분리"
 
 ## Phase 4 — 방 컴포넌트 추출 (한 번에 하나, 14개 커밋)
-- [ ] `rooms/Cage.tsx`
-- [ ] `rooms/OutdoorUnit.tsx`
-- [ ] `rooms/MainVeranda.tsx`
-- [ ] `rooms/WorkVeranda.tsx`
-- [ ] `rooms/Laundry.tsx`
+- [x] `rooms/Cage.tsx`
+- [x] `rooms/OutdoorUnit.tsx`
+- [x] `rooms/MainVeranda.tsx`
+- [x] `rooms/WorkVeranda.tsx`
+- [x] `rooms/Laundry.tsx` (+ models/WashTower, primitives/DropCeilingLight 부수 추출)
 - [ ] `rooms/MasterBath.tsx`
 - [ ] `rooms/MainBath.tsx`
 - [ ] `rooms/BabyRoom.tsx`
