@@ -43,6 +43,13 @@ const MOVE_SPEED_MOBILE = 3.2
 const MOUSE_SENSITIVITY = 0.002
 const TOUCH_SENSITIVITY = 0.0035
 
+// 매 프레임 재사용 — new THREE.Vector3() 할당 회피 (GC 압력 ↓)
+const _scratchDir = new THREE.Vector3()
+const _scratchRight = new THREE.Vector3()
+const _scratchUp = new THREE.Vector3(0, 1, 0)
+const _scratchNewPos = new THREE.Vector3()
+const _scratchFwd = new THREE.Vector3()
+
 function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, onHeightChange, onActiveDoorChange }: { bindings: KeyBindings; height: number; isMobile: boolean; doorOpenStatesRef: React.MutableRefObject<Map<DoorId, boolean>>; onMove?: (x: number, z: number) => void; onHeightChange?: (h: number) => void; onActiveDoorChange?: (id: DoorId | null) => void }) {
   const { camera, gl, invalidate } = useThree()
   const keys = useRef<Set<string>>(new Set())
@@ -179,27 +186,25 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
     const delta = Math.min(rawDelta, 0.05)
     camera.quaternion.setFromEuler(euler.current)
 
-    const direction = new THREE.Vector3()
-    const right = new THREE.Vector3()
+    // 모듈 스코프 scratch 재사용 — new THREE.Vector3() 할당 회피
+    camera.getWorldDirection(_scratchDir)
+    _scratchDir.y = 0
+    _scratchDir.normalize()
 
-    camera.getWorldDirection(direction)
-    direction.y = 0
-    direction.normalize()
-
-    right.crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize()
+    _scratchRight.crossVectors(_scratchDir, _scratchUp).normalize()
 
     const speed = (isMobile ? MOVE_SPEED_MOBILE : MOVE_SPEED) * delta
-    const newPos = camera.position.clone()
+    _scratchNewPos.copy(camera.position)
 
-    if (keys.current.has(bindings.forward)) newPos.add(direction.multiplyScalar(speed))
-    if (keys.current.has(bindings.backward)) {
-      camera.getWorldDirection(direction)
-      direction.y = 0
-      direction.normalize()
-      newPos.sub(direction.multiplyScalar(speed))
-    }
-    if (keys.current.has(bindings.left)) newPos.sub(right.multiplyScalar(speed))
-    if (keys.current.has(bindings.right)) newPos.add(right.multiplyScalar(speed))
+    // 정규화된 forward 를 직접 multiplyScalar 하지 않고 임시 합산용 스칼라로 — direction 손상 방지
+    let fwdAmt = 0
+    let rightAmt = 0
+    if (keys.current.has(bindings.forward)) fwdAmt += speed
+    if (keys.current.has(bindings.backward)) fwdAmt -= speed
+    if (keys.current.has(bindings.right)) rightAmt += speed
+    if (keys.current.has(bindings.left)) rightAmt -= speed
+    if (fwdAmt !== 0) _scratchNewPos.addScaledVector(_scratchDir, fwdAmt)
+    if (rightAmt !== 0) _scratchNewPos.addScaledVector(_scratchRight, rightAmt)
 
     // Q: 높이 낮추기, E: 높이 높이기 (연속 홀드)
     const qHeld = keys.current.has('q')
@@ -212,26 +217,25 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
     // 벽 충돌 (axis-slide). 도어 상태는 lift된 ref에서 (Phase 2).
     const [resolvedX, resolvedZ] = moveWithCollision(
       [camera.position.x, camera.position.z],
-      [newPos.x, newPos.z],
+      [_scratchNewPos.x, _scratchNewPos.z],
       doorOpenStatesRef.current,
     )
-    newPos.x = resolvedX
-    newPos.z = resolvedZ
+    _scratchNewPos.x = resolvedX
+    _scratchNewPos.z = resolvedZ
 
     // 외곽 clamp는 보험으로 유지 (충돌 그물에 안 잡히는 외부 영역 방지)
     const margin = 0.3
-    newPos.x = Math.max(totalMinX + margin, Math.min(totalMaxX - margin, newPos.x))
-    newPos.z = Math.max(totalMinZ + margin, Math.min(totalMaxZ - margin, newPos.z))
-    newPos.y = heightRef.current
+    _scratchNewPos.x = Math.max(totalMinX + margin, Math.min(totalMaxX - margin, _scratchNewPos.x))
+    _scratchNewPos.z = Math.max(totalMinZ + margin, Math.min(totalMaxZ - margin, _scratchNewPos.z))
+    _scratchNewPos.y = heightRef.current
 
-    camera.position.copy(newPos)
+    camera.position.copy(_scratchNewPos)
 
     // 카메라가 향하는 도어 1개 선택 (각도 우선, 거리 보조)
     // 변경 시에만 부모에 알림 → 매 프레임 re-render 방지
     {
-      const fwd = new THREE.Vector3()
-      camera.getWorldDirection(fwd)
-      const newActive = pickActiveDoor(camera.position.x, camera.position.z, fwd.x, fwd.z)
+      camera.getWorldDirection(_scratchFwd)
+      const newActive = pickActiveDoor(camera.position.x, camera.position.z, _scratchFwd.x, _scratchFwd.z)
       if (newActive !== lastActiveDoorIdRef.current) {
         lastActiveDoorIdRef.current = newActive
         onActiveDoorChange?.(newActive)
@@ -242,13 +246,13 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
     // 초당 최대 4회 (250ms 간격) + 의미 있는 움직임이 있을 때만
     const now = performance.now()
     const [lx, lz] = lastReportedPos.current
-    const moved = Math.abs(newPos.x - lx) > 0.001 || Math.abs(newPos.z - lz) > 0.001
+    const moved = Math.abs(_scratchNewPos.x - lx) > 0.001 || Math.abs(_scratchNewPos.z - lz) > 0.001
     const heightChanged = Math.abs(heightRef.current - lastReportedHeight.current) > 0.01
     if ((moved || heightChanged) && now - lastReportedAt.current >= THROTTLE_MS) {
       lastReportedAt.current = now
       if (moved) {
-        lastReportedPos.current = [newPos.x, newPos.z]
-        onMove?.(newPos.x, newPos.z)
+        lastReportedPos.current = [_scratchNewPos.x, _scratchNewPos.z]
+        onMove?.(_scratchNewPos.x, _scratchNewPos.z)
       }
       if (heightChanged) {
         lastReportedHeight.current = heightRef.current

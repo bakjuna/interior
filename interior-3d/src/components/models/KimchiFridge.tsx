@@ -5,6 +5,7 @@
  * 단, 일반 냉장고와 같은 frontFace에 정렬되어야 함 → frontFaceX prop으로 받음.
  */
 
+import { useMemo } from 'react'
 import { useLoader } from '@react-three/fiber'
 import { TextureLoader } from 'three'
 import * as THREE from 'three'
@@ -22,11 +23,14 @@ const H = 1.800
 
 export function KimchiFridge({ frontFaceX, centerZ }: KimchiFridgeProps) {
   const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
-  const walnutBodyTex = closetDoorTex.clone()
-  walnutBodyTex.wrapS = THREE.RepeatWrapping
-  walnutBodyTex.wrapT = THREE.RepeatWrapping
-  walnutBodyTex.repeat.set(1, 1)
-  walnutBodyTex.colorSpace = THREE.SRGBColorSpace
+  const walnutBodyTex = useMemo(() => {
+    const t = closetDoorTex.clone()
+    t.wrapS = THREE.RepeatWrapping
+    t.wrapT = THREE.RepeatWrapping
+    t.repeat.set(1, 1)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [closetDoorTex])
 
   const cx = frontFaceX + D / 2  // 본체 중심 (정면 정렬)
   const topH = H * 0.55

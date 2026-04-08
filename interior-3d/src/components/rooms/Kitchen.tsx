@@ -6,7 +6,7 @@
  * 주방 활성: playerPos가 주방 bounds 내 또는 allLightsOn.
  */
 
-import { Suspense } from 'react'
+import { Suspense, useMemo } from 'react'
 import { useLoader } from '@react-three/fiber'
 import { TextureLoader } from 'three'
 import * as THREE from 'three'
@@ -36,13 +36,18 @@ interface KitchenProps {
 export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
   const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
 
-  if (!visible) return null
+  // 주방 내 모든 호두 마감(본체/도어/선반/패널)이 동일 텍스처(repeat 1×1) 공유 — clone 1번만.
+  // 기존엔 매 렌더마다 13회 clone → 4Hz playerPos throttle 과 결합 시 초당 50+ alloc.
+  const walnutBodyTex = useMemo(() => {
+    const t = closetDoorTex.clone()
+    t.wrapS = THREE.RepeatWrapping
+    t.wrapT = THREE.RepeatWrapping
+    t.repeat.set(1, 1)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [closetDoorTex])
 
-  const walnutBodyTex = closetDoorTex.clone()
-  walnutBodyTex.wrapS = THREE.RepeatWrapping
-  walnutBodyTex.wrapT = THREE.RepeatWrapping
-  walnutBodyTex.repeat.set(1, 1)
-  walnutBodyTex.colorSpace = THREE.SRGBColorSpace
+  if (!visible) return null
 
   // === 주방 ㄱ자 조명 ===
   const wall2300Z = babyTop - T2 - 1.119 - 0.770
@@ -170,14 +175,11 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
       {Array.from({ length: Math.round(lowerCabW / 0.5) }).map((_, di) => {
         const dw = lowerCabW / Math.round(lowerCabW / 0.5)
         const dx = kitLeft + dw / 2 + di * dw
-        const dt = closetDoorTex.clone()
-        dt.wrapS = THREE.RepeatWrapping; dt.wrapT = THREE.RepeatWrapping
-        dt.repeat.set(1, 1); dt.colorSpace = THREE.SRGBColorSpace
         return (
           <group key={`lc-${di}`}>
             <mesh position={[dx, 0.41, cabinetZ + 0.301]}>
               <planeGeometry args={[dw - 0.005, 0.8]} />
-              <meshStandardMaterial map={dt} roughness={0.45} />
+              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
             <mesh position={[dx, 0.41, cabinetZ + 0.31]}>
               <boxGeometry args={[0.01, 0.08, 0.015]} />
@@ -200,13 +202,10 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
           {Array.from({ length: Math.max(1, Math.round(upperLeftW / 0.5)) }).map((_, di) => {
             const dw = upperLeftW / Math.max(1, Math.round(upperLeftW / 0.5))
             const dx = kitLeft + dw / 2 + di * dw
-            const dt = closetDoorTex.clone()
-            dt.wrapS = THREE.RepeatWrapping; dt.wrapT = THREE.RepeatWrapping
-            dt.repeat.set(1, 1); dt.colorSpace = THREE.SRGBColorSpace
             return (
               <mesh key={`uc-l-${di}`} position={[dx, 1.80, upperZ + 0.176]}>
                 <planeGeometry args={[dw - 0.005, 0.68]} />
-                <meshStandardMaterial map={dt} roughness={0.45} />
+                <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
               </mesh>
             )
           })}
@@ -226,13 +225,10 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
             {Array.from({ length: Math.max(1, Math.round(urLen / 0.5)) }).map((_, di) => {
               const dw = urLen / Math.max(1, Math.round(urLen / 0.5))
               const dz = urStartZ + dw / 2 + di * dw
-              const dt = closetDoorTex.clone()
-              dt.wrapS = THREE.RepeatWrapping; dt.wrapT = THREE.RepeatWrapping
-              dt.repeat.set(1, 1); dt.colorSpace = THREE.SRGBColorSpace
               return (
                 <mesh key={`uc-r-${di}`} position={[kitRight - 0.175 - 0.176, 1.80, dz]} rotation={[0, -Math.PI / 2, 0]}>
                   <planeGeometry args={[dw - 0.005, 0.68]} />
-                  <meshStandardMaterial map={dt} roughness={0.45} />
+                  <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                 </mesh>
               )
             })}
@@ -288,9 +284,8 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
               const cnt = Math.max(1, Math.round(cabBeforeLen / 0.5))
               const dw = cabBeforeLen / cnt
               const dz = extStartZ + dw / 2 + di * dw
-              const dt2 = closetDoorTex.clone(); dt2.wrapS = THREE.RepeatWrapping; dt2.wrapT = THREE.RepeatWrapping; dt2.repeat.set(1, 1); dt2.colorSpace = THREE.SRGBColorSpace
               return (<group key={`ext-lc-${di}`}>
-                <mesh position={[extCabCenterX - 0.301, 0.41, dz]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[dw - 0.005, 0.8]} /><meshStandardMaterial map={dt2} roughness={0.45} /></mesh>
+                <mesh position={[extCabCenterX - 0.301, 0.41, dz]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[dw - 0.005, 0.8]} /><meshStandardMaterial map={walnutBodyTex} roughness={0.45} /></mesh>
                 <mesh position={[extCabCenterX - 0.31, 0.41, dz]}><boxGeometry args={[0.015, 0.08, 0.01]} /><meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} /></mesh>
               </group>)
             })}
@@ -299,9 +294,8 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
               const sinkDoorW = (sinkHalfD * 2) / sinkDoorCount
               return Array.from({ length: sinkDoorCount }).map((_, di) => {
                 const dz = (sinkZpos - sinkHalfD) + sinkDoorW / 2 + di * sinkDoorW
-                const dt2 = closetDoorTex.clone(); dt2.wrapS = THREE.RepeatWrapping; dt2.wrapT = THREE.RepeatWrapping; dt2.repeat.set(1, 1); dt2.colorSpace = THREE.SRGBColorSpace
-                return (<group key={`ext-lc-sink-${di}`}>
-                  <mesh position={[extCabCenterX - 0.301, 0.41, dz]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[sinkDoorW, 0.8]} /><meshStandardMaterial map={dt2} roughness={0.45} /></mesh>
+                  return (<group key={`ext-lc-sink-${di}`}>
+                  <mesh position={[extCabCenterX - 0.301, 0.41, dz]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[sinkDoorW, 0.8]} /><meshStandardMaterial map={walnutBodyTex} roughness={0.45} /></mesh>
                   <mesh position={[extCabCenterX - 0.31, 0.41, dz]}><boxGeometry args={[0.015, 0.08, 0.01]} /><meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} /></mesh>
                 </group>)
               })
@@ -310,9 +304,8 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
               const cnt = Math.max(1, Math.round(cabAfterLen / 0.5))
               const dw = cabAfterLen / cnt
               const dz = (sinkZpos + sinkHalfD) + dw / 2 + di * dw
-              const dt2 = closetDoorTex.clone(); dt2.wrapS = THREE.RepeatWrapping; dt2.wrapT = THREE.RepeatWrapping; dt2.repeat.set(1, 1); dt2.colorSpace = THREE.SRGBColorSpace
               return (<group key={`ext-lc-after-${di}`}>
-                <mesh position={[extCabCenterX - 0.301, 0.41, dz]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[dw - 0.005, 0.8]} /><meshStandardMaterial map={dt2} roughness={0.45} /></mesh>
+                <mesh position={[extCabCenterX - 0.301, 0.41, dz]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[dw - 0.005, 0.8]} /><meshStandardMaterial map={walnutBodyTex} roughness={0.45} /></mesh>
                 <mesh position={[extCabCenterX - 0.31, 0.41, dz]}><boxGeometry args={[0.015, 0.08, 0.01]} /><meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} /></mesh>
               </group>)
             })}
@@ -407,8 +400,7 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
             })()}
             <mesh position={[extUpperCenterX, 1.80, extCenterZ]}><boxGeometry args={[0.35, 0.7, extLen]} /><meshStandardMaterial map={walnutBodyTex} roughness={0.45} /></mesh>
             {[0.25, 0.75].map((tt, di) => {
-              const dt2 = closetDoorTex.clone(); dt2.wrapS = THREE.RepeatWrapping; dt2.wrapT = THREE.RepeatWrapping; dt2.repeat.set(1, 1); dt2.colorSpace = THREE.SRGBColorSpace
-              return (<mesh key={`ext-uc-${di}`} position={[extUpperCenterX - 0.176, 1.80, extStartZ + extLen * tt]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[extLen / 2 - 0.005, 0.68]} /><meshStandardMaterial map={dt2} roughness={0.45} /></mesh>)
+              return (<mesh key={`ext-uc-${di}`} position={[extUpperCenterX - 0.176, 1.80, extStartZ + extLen * tt]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[extLen / 2 - 0.005, 0.68]} /><meshStandardMaterial map={walnutBodyTex} roughness={0.45} /></mesh>)
             })}
             {(() => {
               const purifierD = 0.506
@@ -464,11 +456,6 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
             </mesh>
             {Array.from({ length: doorCount }).map((_, di) => {
               const dz = groupZStart + doorLen * (di + 0.5)
-              const dt = closetDoorTex.clone()
-              dt.wrapS = THREE.RepeatWrapping
-              dt.wrapT = THREE.RepeatWrapping
-              dt.repeat.set(1, 1)
-              dt.colorSpace = THREE.SRGBColorSpace
               return (
                 <mesh
                   key={`fridge-uc-${di}`}
@@ -476,7 +463,7 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
                   rotation={[0, -Math.PI / 2, 0]}
                 >
                   <planeGeometry args={[doorLen - doorGap, cabH - 0.010]} />
-                  <meshStandardMaterial map={dt} roughness={0.45} />
+                  <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                 </mesh>
               )
             })}
@@ -528,9 +515,8 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
             {Array.from({ length: doorCountL }).map((_, di) => {
               const dw = leftLen / doorCountL
               const dz = leftEndZ + dw / 2 + di * dw
-              const dt2 = closetDoorTex.clone(); dt2.wrapS = THREE.RepeatWrapping; dt2.wrapT = THREE.RepeatWrapping; dt2.repeat.set(1, 1); dt2.colorSpace = THREE.SRGBColorSpace
               return (<group key={`left-lc-${di}`}>
-                <mesh position={[leftCabX + leftCabDepth / 2 + 0.001, 0.41, dz]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[dw - 0.005, 0.8]} /><meshStandardMaterial map={dt2} roughness={0.45} /></mesh>
+                <mesh position={[leftCabX + leftCabDepth / 2 + 0.001, 0.41, dz]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[dw - 0.005, 0.8]} /><meshStandardMaterial map={walnutBodyTex} roughness={0.45} /></mesh>
                 <mesh position={[leftCabX + leftCabDepth / 2 + 0.01, 0.41, dz]}><boxGeometry args={[0.015, 0.08, 0.01]} /><meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} /></mesh>
               </group>)
             })}
@@ -568,17 +554,12 @@ export function Kitchen({ visible, playerPos, allLightsOn }: KitchenProps) {
         const shelfX = wallInnerX + shelfDepth / 2
         const shelfY1 = 1.28
         const shelfY2 = 1.68
-        const shelfTex = closetDoorTex.clone()
-        shelfTex.wrapS = THREE.RepeatWrapping
-        shelfTex.wrapT = THREE.RepeatWrapping
-        shelfTex.repeat.set(1, 1)
-        shelfTex.colorSpace = THREE.SRGBColorSpace
         return (
           <>
             {[shelfY1, shelfY2].map((y, i) => (
               <mesh key={`kit-shelf-${i}`} position={[shelfX, y, cabCenterZ]}>
                 <boxGeometry args={[shelfDepth, shelfThick, shelfLen]} />
-                <meshStandardMaterial map={shelfTex} roughness={0.55} metalness={0.05} />
+                <meshStandardMaterial map={walnutBodyTex} roughness={0.55} metalness={0.05} />
               </mesh>
             ))}
           </>

@@ -194,6 +194,47 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
     return tex
   }, [closetDoorTex])
 
+  // === 다운라이트 정적 메타데이터 — 1번만 계산 ===
+  // 위치/sector/단내림 여부/색상 등은 downlights 데이터 + 상수에만 의존하므로
+  // 매 렌더마다 reduce 할 필요 없음. playerPos 변경 시 isActive 만 다시 계산.
+  const downlightStatic = useMemo(() => {
+    const workTopZ = right1Z - 0.770 + 0.795 + 1.418 + 0.1
+    return downlights.map(([x, z]) => {
+      const sector = findSector(x, z)
+      const isDropCeilingBottom = z > LR_D - 0.8 && x >= mbLeft && x <= LR_W
+      const isDropCeilingBabyTop = z < babyTop + 0.8 && z >= babyTop && x >= babyLeft && x <= babyRight + 0.2
+      const isDropCeilingWorkTop = z < workTopZ + 0.8 && z >= workTopZ && x >= babyRight + 2.555 + 0.2 && x <= LR_W
+      const isDropCeiling = isDropCeilingBottom || isDropCeilingBabyTop || isDropCeilingWorkTop
+      const ceilingY = isDropCeiling ? WALL_HEIGHT - 0.15 : WALL_HEIGHT
+      // 화장대 앞 다운라이트 (안방 좌측 상단) → 흰색
+      const isVanity = Math.abs(x - (mbLeft + 1.013)) < 0.05 && z < 0.8
+      const color = isVanity ? '#fff5e6' : '#ffe0b0'
+      const key = `${x.toFixed(4)}|${z.toFixed(4)}`
+      return { x, z, sector, ceilingY, color, isVanity, key }
+    })
+  }, [])
+
+  // 현재 플레이어가 있는 방의 라이트 그룹 — playerPos 변경 시에만 갱신
+  const activeGroup = useMemo(() => {
+    if (!playerPos) return null
+    return downlightGroups.find(g => {
+      const minZ = Math.min(g.bounds.topZ, g.bounds.bottomZ)
+      const maxZ = Math.max(g.bounds.topZ, g.bounds.bottomZ)
+      return playerPos[0] >= g.bounds.leftX && playerPos[0] <= g.bounds.rightX &&
+        playerPos[1] >= minZ && playerPos[1] <= maxZ
+    }) ?? null
+  }, [playerPos])
+
+  // activeGroup 의 라이트 좌표를 Set 으로 — O(1) 멤버십 검사
+  const activeGroupKeys = useMemo(() => {
+    if (!activeGroup) return null
+    const set = new Set<string>()
+    for (const [lx, lz] of activeGroup.lights) {
+      set.add(`${lx.toFixed(4)}|${lz.toFixed(4)}`)
+    }
+    return set
+  }, [activeGroup])
+
   // 방별 바닥 텍스처 — 1번만 생성 (매 렌더마다 clone 방지)
   const roomFloorTextures = useMemo(() => {
     return rooms.map((room) => {
@@ -219,79 +260,43 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
 
       <Closets />
 
-      {/* 다운라이트 */}
-      {(() => {
-        // 현재 플레이어가 있는 방의 라이트 그룹 찾기
-        const activeGroup = playerPos
-          ? downlightGroups.find(g => {
-              const minZ = Math.min(g.bounds.topZ, g.bounds.bottomZ)
-              const maxZ = Math.max(g.bounds.topZ, g.bounds.bottomZ)
-              return playerPos[0] >= g.bounds.leftX && playerPos[0] <= g.bounds.rightX &&
-                playerPos[1] >= minZ && playerPos[1] <= maxZ
-            })
-          : null
-        const hasLightsInRoom = !!activeGroup
-
+      {/* 다운라이트 — 정적 메타데이터는 useMemo 캐시, 렌더 루프는 isActive 만 계산 */}
+      {downlightStatic.map((d, i) => {
+        const inActiveGroup = activeGroupKeys?.has(d.key) ?? false
+        // allLightsOn 이어도 visible sector 의 다운라이트만 활성 (벽 통과 누출 방지)
+        const isActive = inActiveGroup ||
+          (!!allLightsOn && (d.sector ? visibleSectors.has(d.sector) : true))
         return (
-          <>
-            {/* 모든 다운라이트 하우징 (항상 보임) */}
-            {downlights.map(([x, z], i) => {
-              // 다운라이트가 속한 sector 판정 (벽 통과 라이트 누출 방지용 게이팅)
-              const dlSector = findSector(x, z)
-              const inActiveGroup = !!playerPos &&
-                (activeGroup?.lights.some(([lx, lz]) => lx === x && lz === z) ?? false)
-              // allLightsOn 이어도 visible sector 의 다운라이트만 활성
-              // (sector 매칭 실패 시엔 그대로 통과)
-              const isActive = inActiveGroup ||
-                (!!allLightsOn && (dlSector ? visibleSectors.has(dlSector) : true))
-
-              // 단내림 영역: 안방/거실 하단 + 아기방/작업실 상단
-              const isDropCeilingBottom = z > LR_D - 0.8 && x >= mbLeft && x <= LR_W
-              const isDropCeilingBabyTop = z < babyTop + 0.8 && z >= babyTop && x >= babyLeft && x <= babyRight + 0.2
-              const workTopZ = right1Z - 0.770 + 0.795 + 1.418 + 0.1
-              const isDropCeilingWorkTop = z < workTopZ + 0.8 && z >= workTopZ && x >= babyRight + 2.555 + 0.2 && x <= LR_W
-              const isDropCeiling = isDropCeilingBottom || isDropCeilingBabyTop || isDropCeilingWorkTop
-              const ceilingY = isDropCeiling ? WALL_HEIGHT - 0.15 : WALL_HEIGHT
-
-              return (
-                <group key={`dl-${i}`}>
-                  {/* 발광면 */}
-                  <mesh position={[x, ceilingY - 0.005, z]} rotation={[Math.PI / 2, 0, 0]}>
-                    <circleGeometry args={[0.035, 16]} />
-                    <meshStandardMaterial
-                      color={isActive ? '#fff' : '#888'}
-                      emissive={isActive ? ((Math.abs(x - (mbLeft + 1.013)) < 0.05 && z < 0.8) ? '#fff5e6' : '#ffe0b0') : '#222'}
-                      emissiveIntensity={isActive ? 1.0 : 0.1}
-                    />
-                  </mesh>
-                  {/* 크롬 링 */}
-                  <mesh position={[x, ceilingY - 0.006, z]} rotation={[Math.PI / 2, 0, 0]}>
-                    <ringGeometry args={[0.035, 0.045, 16]} />
-                    <meshStandardMaterial color="#ccc" metalness={0.6} roughness={0.3} />
-                  </mesh>
-                  {/* 워크스루: 모든 다운라이트를 SpotLight로 */}
-                  <DropCeilingLight x={x} z={z} ceilingY={ceilingY} active={isActive}
-                    color={
-                      // 화장대 앞 다운라이트 (안방 좌측 상단) → 흰색
-                      (Math.abs(x - (mbLeft + 1.013)) < 0.05 && z < 0.8) ? '#fff5e6' : '#ffe0b0'
-                    }
-                  />
-                </group>
-              )
-            })}
-            {/* 워크스루: 조명 없는 공간에서만 외부 라이트 */}
-            {playerPos && !hasLightsInRoom && (
-              <pointLight
-                position={[playerPos[0], WALL_HEIGHT - 0.1, playerPos[1]]}
-                intensity={0.5}
-                distance={4}
-                decay={2}
-                color="#ffffff"
+          <group key={`dl-${i}`}>
+            {/* 발광면 */}
+            <mesh position={[d.x, d.ceilingY - 0.005, d.z]} rotation={[Math.PI / 2, 0, 0]}>
+              <circleGeometry args={[0.035, 16]} />
+              <meshStandardMaterial
+                color={isActive ? '#fff' : '#888'}
+                emissive={isActive ? d.color : '#222'}
+                emissiveIntensity={isActive ? 1.0 : 0.1}
               />
-            )}
-          </>
+            </mesh>
+            {/* 크롬 링 */}
+            <mesh position={[d.x, d.ceilingY - 0.006, d.z]} rotation={[Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[0.035, 0.045, 16]} />
+              <meshStandardMaterial color="#ccc" metalness={0.6} roughness={0.3} />
+            </mesh>
+            {/* 워크스루: 모든 다운라이트를 SpotLight로 */}
+            <DropCeilingLight x={d.x} z={d.z} ceilingY={d.ceilingY} active={isActive} color={d.color} />
+          </group>
         )
-      })()}
+      })}
+      {/* 워크스루: 조명 없는 공간에서만 외부 라이트 */}
+      {playerPos && !activeGroup && (
+        <pointLight
+          position={[playerPos[0], WALL_HEIGHT - 0.1, playerPos[1]]}
+          intensity={0.5}
+          distance={4}
+          decay={2}
+          color="#ffffff"
+        />
+      )}
 
       <Ceilings showCeiling={showCeiling} playerPos={playerPos} allLightsOn={allLightsOn} visibleSectors={visibleSectors} />
 
@@ -300,8 +305,11 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
       <MainVeranda visible={visibleSectors.has('mainVeranda')} />
       <WorkVeranda visible={visibleSectors.has('workVeranda')} />
       <Laundry visible={visibleSectors.has('laundry')} />
-      <OutdoorUnit visible={visibleSectors.has('outdoor')} />
-      <Cage visible={visibleSectors.has('cage')} />
+      <OutdoorUnit
+        wallVisible={visibleSectors.has('outdoor') || visibleSectors.has('mainVeranda')}
+        contentsVisible={visibleSectors.has('outdoor')}
+      />
+      <Cage wallVisible={visibleSectors.has('cage') || visibleSectors.has('mainVeranda')} />
       <BabyRoom visible={visibleSectors.has('baby')} />
       <WorkRoom visible={visibleSectors.has('work')} />
       <Hallway visible={visibleSectors.has('hall')} playerPos={playerPos} allLightsOn={allLightsOn} />

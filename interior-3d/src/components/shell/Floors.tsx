@@ -36,7 +36,7 @@ export function Floors() {
         const fY = room.floorY ?? 0
         return (
           <mesh
-            key={`floor-${room.name}`}
+            key={`floor-${ri}-${room.name}`}
             rotation={[-Math.PI / 2, 0, 0]}
             position={[room.center[0], fY + 0.001, room.center[1]]}
             renderOrder={1}

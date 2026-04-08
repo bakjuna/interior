@@ -9,6 +9,12 @@ const KO_TO_EN: Record<string, string> = {
   'ㅈ': 'w', 'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd',
 }
 
+// 매 프레임 재사용 — new THREE.Vector3() 할당 회피
+const _bevForward = new THREE.Vector3()
+const _bevRight = new THREE.Vector3()
+const _bevUp = new THREE.Vector3(0, 1, 0)
+const _bevMove = new THREE.Vector3()
+
 function WASDController({ controlsRef }: { controlsRef: React.RefObject<any> }) {
   const { camera } = useThree()
   const keys = useRef<Set<string>>(new Set())
@@ -32,26 +38,29 @@ function WASDController({ controlsRef }: { controlsRef: React.RefObject<any> }) 
 
   useFrame((_, delta) => {
     const speed = 5 * delta
-    const forward = new THREE.Vector3()
-    const right = new THREE.Vector3()
 
-    camera.getWorldDirection(forward)
-    forward.y = 0
-    forward.normalize()
-    right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize()
+    camera.getWorldDirection(_bevForward)
+    _bevForward.y = 0
+    _bevForward.normalize()
+    _bevRight.crossVectors(_bevForward, _bevUp).normalize()
 
-    const move = new THREE.Vector3()
-    if (keys.current.has('w')) move.add(forward.clone().multiplyScalar(speed))
-    if (keys.current.has('s')) move.sub(forward.clone().multiplyScalar(speed))
-    if (keys.current.has('a')) move.sub(right.clone().multiplyScalar(speed))
-    if (keys.current.has('d')) move.add(right.clone().multiplyScalar(speed))
+    let fwdAmt = 0
+    let rightAmt = 0
+    if (keys.current.has('w')) fwdAmt += speed
+    if (keys.current.has('s')) fwdAmt -= speed
+    if (keys.current.has('d')) rightAmt += speed
+    if (keys.current.has('a')) rightAmt -= speed
 
-    if (move.length() > 0) {
-      camera.position.add(move)
-      // OrbitControls target도 같이 이동
-      if (controlsRef.current) {
-        controlsRef.current.target.add(move)
-      }
+    if (fwdAmt === 0 && rightAmt === 0) return
+
+    _bevMove.set(0, 0, 0)
+    if (fwdAmt !== 0) _bevMove.addScaledVector(_bevForward, fwdAmt)
+    if (rightAmt !== 0) _bevMove.addScaledVector(_bevRight, rightAmt)
+
+    camera.position.add(_bevMove)
+    // OrbitControls target도 같이 이동
+    if (controlsRef.current) {
+      controlsRef.current.target.add(_bevMove)
     }
   })
 

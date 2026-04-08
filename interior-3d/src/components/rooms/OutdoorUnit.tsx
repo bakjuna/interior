@@ -16,11 +16,14 @@ import {
 const T2 = WALL_THICKNESS / 2
 
 interface OutdoorUnitProps {
-  visible: boolean
+  /** 가벽(파티션) 가시성 — mainVeranda 또는 outdoor 중 하나라도 visible이면 true */
+  wallVisible: boolean
+  /** 실외기실 내부 컨텐츠(에어컨 본체 등) 가시성 — outdoor sector visible일 때만 */
+  contentsVisible: boolean
 }
 
-export function OutdoorUnit({ visible }: OutdoorUnitProps) {
-  if (!visible) return null
+export function OutdoorUnit({ wallVisible, contentsVisible }: OutdoorUnitProps) {
+  if (!wallVisible && !contentsVisible) return null
 
   const pX = 0.870 + 2.000  // 가벽 X (거실 창문 우측)
   const vTopZ = LR_D + WALL_THICKNESS
@@ -34,36 +37,44 @@ export function OutdoorUnit({ visible }: OutdoorUnitProps) {
 
   return (
     <group>
-      {/* 가벽 상단 */}
-      <mesh position={[pX, WALL_HEIGHT / 2, vTopZ + topSegLen / 2]}>
-        <boxGeometry args={[0.05, WALL_HEIGHT, topSegLen]} />
-        <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
-      </mesh>
-      {/* 가벽 하단 */}
-      <mesh position={[pX, WALL_HEIGHT / 2, vBotZ - botSegLen / 2]}>
-        <boxGeometry args={[0.05, WALL_HEIGHT, botSegLen]} />
-        <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
-      </mesh>
-      {/* 상인방 (문 위 100mm) */}
-      <mesh position={[pX, WALL_HEIGHT - 0.05, doorCZ]}>
-        <boxGeometry args={[0.05, 0.1, 0.9]} />
-        <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
-      </mesh>
+      {wallVisible && (
+        <>
+          {/* 가벽 상단 */}
+          <mesh position={[pX, WALL_HEIGHT / 2, vTopZ + topSegLen / 2]}>
+            <boxGeometry args={[0.05, WALL_HEIGHT, topSegLen]} />
+            <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
+          </mesh>
+          {/* 가벽 하단 */}
+          <mesh position={[pX, WALL_HEIGHT / 2, vBotZ - botSegLen / 2]}>
+            <boxGeometry args={[0.05, WALL_HEIGHT, botSegLen]} />
+            <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
+          </mesh>
+          {/* 상인방 (문 위 100mm) */}
+          <mesh position={[pX, WALL_HEIGHT - 0.05, doorCZ]}>
+            <boxGeometry args={[0.05, 0.1, 0.9]} />
+            <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
+          </mesh>
+        </>
+      )}
 
-      {/* 에어컨 실외기 본체 */}
-      <mesh position={[acX, 0.4, acZ]}>
-        <boxGeometry args={[0.9, 0.8, 0.35]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.3} roughness={0.4} />
-      </mesh>
-      {/* 실외기 바깥쪽 검정 원형 구멍 */}
-      <mesh position={[acX, 0.4, acZ + 0.176]}>
-        <circleGeometry args={[0.25, 24]} />
-        <meshStandardMaterial color="#111" roughness={0.8} side={THREE.DoubleSide} />
-      </mesh>
-      <mesh position={[acX, 0.4, acZ + 0.177]}>
-        <ringGeometry args={[0.22, 0.25, 24]} />
-        <meshStandardMaterial color="#333" metalness={0.4} roughness={0.3} side={THREE.DoubleSide} />
-      </mesh>
+      {contentsVisible && (
+        <>
+          {/* 에어컨 실외기 본체 */}
+          <mesh position={[acX, 0.4, acZ]}>
+            <boxGeometry args={[0.9, 0.8, 0.35]} />
+            <meshStandardMaterial color="#e8e8e8" metalness={0.3} roughness={0.4} />
+          </mesh>
+          {/* 실외기 바깥쪽 검정 원형 구멍 */}
+          <mesh position={[acX, 0.4, acZ + 0.176]}>
+            <circleGeometry args={[0.25, 24]} />
+            <meshStandardMaterial color="#111" roughness={0.8} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh position={[acX, 0.4, acZ + 0.177]}>
+            <ringGeometry args={[0.22, 0.25, 24]} />
+            <meshStandardMaterial color="#333" metalness={0.4} roughness={0.3} side={THREE.DoubleSide} />
+          </mesh>
+        </>
+      )}
     </group>
   )
 }

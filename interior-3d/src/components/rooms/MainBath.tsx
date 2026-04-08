@@ -3,7 +3,7 @@
  * 4면 600×1200 포세린 타일, 우측벽은 도어 개구부 분할.
  */
 
-import { Suspense } from 'react'
+import { Suspense, useMemo } from 'react'
 import { useLoader } from '@react-three/fiber'
 import { TextureLoader } from 'three'
 import * as THREE from 'three'
@@ -28,6 +28,42 @@ export function MainBath({ visible, playerPos }: MainBathProps) {
   const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
   const walnutDoorTex = useLoader(TextureLoader, '/textures/walnut_door.png')
 
+  // 타일 텍스처 캐시 — 동일 (uRep, vRep) 조합은 1번만 clone
+  const makeTileTex = useMemo(() => {
+    const cache = new Map<string, THREE.Texture>()
+    return (uRep: number, vRep: number) => {
+      const key = `${uRep.toFixed(4)}|${vRep.toFixed(4)}`
+      let t = cache.get(key)
+      if (!t) {
+        t = bathroomWallTex.clone()
+        t.wrapS = THREE.RepeatWrapping
+        t.wrapT = THREE.RepeatWrapping
+        t.repeat.set(uRep, vRep)
+        t.colorSpace = THREE.SRGBColorSpace
+        cache.set(key, t)
+      }
+      return t
+    }
+  }, [bathroomWallTex])
+
+  const walnutBodyTex = useMemo(() => {
+    const t = walnutDoorTex.clone()
+    t.wrapS = THREE.RepeatWrapping
+    t.wrapT = THREE.RepeatWrapping
+    t.repeat.set(1, 1)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [walnutDoorTex])
+
+  const cabDoorTex = useMemo(() => {
+    const t = closetDoorTex.clone()
+    t.wrapS = THREE.RepeatWrapping
+    t.wrapT = THREE.RepeatWrapping
+    t.repeat.set(1, 1)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [closetDoorTex])
+
   if (!visible) return null
 
   const bL = mbDoorEnd + 0.1 + T2
@@ -41,20 +77,6 @@ export function MainBath({ visible, playerPos }: MainBathProps) {
   const bathActive = !!playerPos && playerPos[0] >= bL && playerPos[0] <= bR && playerPos[1] >= bB && playerPos[1] <= bT
   const tileW = 0.6
   const tileH = 1.2
-  const makeTileTex = (uRep: number, vRep: number) => {
-    const t = bathroomWallTex.clone()
-    t.wrapS = THREE.RepeatWrapping
-    t.wrapT = THREE.RepeatWrapping
-    t.repeat.set(uRep, vRep)
-    t.colorSpace = THREE.SRGBColorSpace
-    return t
-  }
-
-  const walnutBodyTex = walnutDoorTex.clone()
-  walnutBodyTex.wrapS = THREE.RepeatWrapping
-  walnutBodyTex.wrapT = THREE.RepeatWrapping
-  walnutBodyTex.repeat.set(1, 1)
-  walnutBodyTex.colorSpace = THREE.SRGBColorSpace
 
   const showerDepth = 0.95
   const showerZend = bB + showerDepth
@@ -130,17 +152,12 @@ export function MainBath({ visible, playerPos }: MainBathProps) {
               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
             {Array.from({ length: doorCount }).map((_, di) => {
-              const dt = closetDoorTex.clone()
-              dt.wrapS = THREE.RepeatWrapping
-              dt.wrapT = THREE.RepeatWrapping
-              dt.repeat.set(1, 1)
-              dt.colorSpace = THREE.SRGBColorSpace
               const dz = (toiletZ - ucW / 2) + dW / 2 + di * dW
               return (
                 <group key={`mb2-uc-${di}`}>
                   <mesh position={[bL + ucD + 0.001, ucCY, dz]} rotation={[0, Math.PI / 2, 0]}>
                     <planeGeometry args={[dW - 0.005, ucH - 0.01]} />
-                    <meshStandardMaterial map={dt} roughness={0.45} />
+                    <meshStandardMaterial map={cabDoorTex} roughness={0.45} />
                   </mesh>
                   <mesh position={[bL + ucD + 0.01, ucCY - ucH / 2 + 0.08, dz]}>
                     <boxGeometry args={[0.015, 0.06, 0.01]} />

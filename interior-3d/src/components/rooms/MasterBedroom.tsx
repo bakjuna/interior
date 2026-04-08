@@ -3,7 +3,7 @@
  * 단내림 + 코브 LED는 shell/Ceilings.tsx.
  */
 
-import { Suspense } from 'react'
+import { Suspense, useMemo } from 'react'
 import { useLoader } from '@react-three/fiber'
 import { TextureLoader } from 'three'
 import * as THREE from 'three'
@@ -25,26 +25,33 @@ export function MasterBedroom({ visible }: MasterBedroomProps) {
   const silkTex = useLoader(TextureLoader, '/textures/silk.png')
   const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
 
-  if (!visible) return null
-
   // 안방 가벽 (안방욕실 문쪽~2600mm, 두께 50mm) — 실크벽지
   const partLen = 2.6
-  const silk = silkTex.clone()
-  silk.wrapS = THREE.RepeatWrapping
-  silk.wrapT = THREE.ClampToEdgeWrapping
-  silk.repeat.set(partLen / 2, 1)
-  silk.colorSpace = THREE.SRGBColorSpace
+  const silk = useMemo(() => {
+    const t = silkTex.clone()
+    t.wrapS = THREE.RepeatWrapping
+    t.wrapT = THREE.ClampToEdgeWrapping
+    t.repeat.set(partLen / 2, 1)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [silkTex])
+
+  // 화장대 + 도어들이 공유하는 호두 텍스처 — clone 1번만
+  const walnutBodyTex = useMemo(() => {
+    const t = closetDoorTex.clone()
+    t.wrapS = THREE.RepeatWrapping
+    t.wrapT = THREE.RepeatWrapping
+    t.repeat.set(1, 1)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [closetDoorTex])
+
+  if (!visible) return null
 
   // 화장대 — 안방욕실 인접
   const vanityX = mbLeft + 0.275
   const vanityZ = 0.3
   const vanityW = 0.55
-
-  const walnutBodyTex = closetDoorTex.clone()
-  walnutBodyTex.wrapS = THREE.RepeatWrapping
-  walnutBodyTex.wrapT = THREE.RepeatWrapping
-  walnutBodyTex.repeat.set(1, 1)
-  walnutBodyTex.colorSpace = THREE.SRGBColorSpace
 
   return (
     <group>
@@ -65,16 +72,11 @@ export function MasterBedroom({ visible }: MasterBedroomProps) {
           <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
         </mesh>
         {[0.55, 0.25].map((yRatio, di) => {
-          const dt = closetDoorTex.clone()
-          dt.wrapS = THREE.RepeatWrapping
-          dt.wrapT = THREE.RepeatWrapping
-          dt.repeat.set(1, 1)
-          dt.colorSpace = THREE.SRGBColorSpace
           return (
             <group key={`vanity-d-${di}`}>
               <mesh position={[vanityX + vanityW / 2 + 0.001, yRatio, vanityZ]} rotation={[0, Math.PI / 2, 0]}>
                 <planeGeometry args={[0.58, 0.33]} />
-                <meshStandardMaterial map={dt} roughness={0.45} />
+                <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
               </mesh>
               <mesh position={[vanityX + vanityW / 2 + 0.01, yRatio, vanityZ]}>
                 <boxGeometry args={[0.015, 0.06, 0.01]} />

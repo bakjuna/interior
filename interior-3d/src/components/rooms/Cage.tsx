@@ -13,11 +13,13 @@ import {
 const mbLeft = -WALL_THICKNESS - MB_W
 
 interface CageProps {
-  visible: boolean
+  /** 가벽(파티션) 가시성 — mainVeranda 또는 cage 중 하나라도 visible이면 true.
+   *  Cage는 내부 컨텐츠가 없으므로 wallVisible 단일 prop만 사용. */
+  wallVisible: boolean
 }
 
-export function Cage({ visible }: CageProps) {
-  if (!visible) return null
+export function Cage({ wallVisible }: CageProps) {
+  if (!wallVisible) return null
 
   const pX = mbLeft + 1.340
   const vTopZ = LR_D + WALL_THICKNESS

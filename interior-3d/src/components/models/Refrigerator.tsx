@@ -5,6 +5,7 @@
  * position: [centerX, 0, centerZ] (바닥 기준)
  */
 
+import { useMemo } from 'react'
 import { useLoader } from '@react-three/fiber'
 import { TextureLoader } from 'three'
 import * as THREE from 'three'
@@ -19,11 +20,14 @@ const H = 1.800
 
 export function Refrigerator({ position }: RefrigeratorProps) {
   const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
-  const walnutBodyTex = closetDoorTex.clone()
-  walnutBodyTex.wrapS = THREE.RepeatWrapping
-  walnutBodyTex.wrapT = THREE.RepeatWrapping
-  walnutBodyTex.repeat.set(1, 1)
-  walnutBodyTex.colorSpace = THREE.SRGBColorSpace
+  const walnutBodyTex = useMemo(() => {
+    const t = closetDoorTex.clone()
+    t.wrapS = THREE.RepeatWrapping
+    t.wrapT = THREE.RepeatWrapping
+    t.repeat.set(1, 1)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [closetDoorTex])
 
   const [cx, cz] = position
   const frontFace = cx - D / 2  // -X 정면

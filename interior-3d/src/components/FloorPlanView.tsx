@@ -76,9 +76,9 @@ function FloorPlanScene() {
       })}
 
       {/* 방 이름 */}
-      {rooms.map((room) => (
+      {rooms.map((room, ri) => (
         <Text
-          key={`label-${room.name}`}
+          key={`label-${ri}-${room.name}`}
           position={[room.center[0], 0.1, room.center[1] + (room.name === '맹지' ? -0.1 : 0)]}
           rotation={[-Math.PI / 2, 0, 0]}
           fontSize={0.2}
