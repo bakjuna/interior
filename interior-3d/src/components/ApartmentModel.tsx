@@ -312,7 +312,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
       />
       <Cage wallVisible={visibleSectors.has('cage') || visibleSectors.has('mainVeranda')} />
       <BabyRoom visible={visibleSectors.has('baby')} />
-      <WorkRoom visible={visibleSectors.has('work')} />
+      <WorkRoom visible={visibleSectors.has('work')} playerPos={playerPos} allLightsOn={allLightsOn} />
       <Hallway visible={visibleSectors.has('hall')} playerPos={playerPos} allLightsOn={allLightsOn} />
       <MainBath visible={visibleSectors.has('mainBath')} playerPos={playerPos} />
       <MasterBath visible={visibleSectors.has('mbBath')} playerPos={playerPos} />

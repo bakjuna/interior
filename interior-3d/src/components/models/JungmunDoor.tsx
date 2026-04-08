@@ -110,7 +110,8 @@ export function JungmunSwingDoor({
   const sign = freeEndZ > hingeWorld[1] ? 1 : -1
   const maxOpenAngle = -sign * (90 * Math.PI / 180)
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.05)   // demand frameloop idle 후 delta 폭주 방지
     if (isOpen && openAtMsRef.current && performance.now() < openAtMsRef.current) {
       invalidate()
       return

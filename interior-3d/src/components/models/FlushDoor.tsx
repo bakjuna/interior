@@ -111,7 +111,8 @@ export function FlushDoor({
   const swingSign = swing === 'in' ? 1 : -1
   const targetAngle = (maxOpenAngle * Math.PI / 180) * swingSign * (hinge === 'left' ? -1 : 1)
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.05)   // demand frameloop idle 후 delta 폭주 방지
     // 열기 지연 — 목적지 방이 먼저 렌더/컴파일 될 시간을 벌어 freeze 후에 회전 시작
     if (isOpen && openAtMsRef.current && performance.now() < openAtMsRef.current) {
       invalidate()

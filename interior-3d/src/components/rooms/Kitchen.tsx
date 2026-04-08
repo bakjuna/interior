@@ -1103,12 +1103,13 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
         )
       })()}
 
-      {/* === 식탁 + 펜던트 조명 + 의자 — 90° 회전, 동측 벽 + 주방 하단장 남쪽 끝에 이어붙임 === */}
+      {/* === 식탁 + 펜던트 조명 + 의자 — 회전 해제(east-west), 주방 남쪽 빈 공간 가운데 === */}
       {(() => {
-        const tableExtEndZ = babyBottomZ - 0.22 - 0.9 + 0.42
-        const trueEastWallInnerX = kitRight + 0.055
-        const tableCenterX = trueEastWallInnerX - 0.9 / 2
-        const tableCenterZ = tableExtEndZ + 1.8 / 2 + 0.04
+        // 식탁 1.8m(X) × 0.9m(Z). 주방 남쪽 빈 공간 Z [extEndZ_, kitchenSouthZ] = [-3.273, -1.591] (1.682m)
+        // 의자 4개 (2 N + 2 S) — 식탁 안쪽으로 200mm tucked
+        const extEndZ_ = (babyBottomZ - 0.22 - 0.9) + 0.42        // ≈ -3.273 (동측 하부장 남쪽 끝)
+        const tableCenterX = kitRight - 0.85             // 주방 X 가운데
+        const tableCenterZ = extEndZ_ + 0.75 + 0.45       // 빈 공간 Z 가운데 ≈ -2.432
 
         const woodColor = '#5a3018'
         const cushionColor = '#1a1a1a'
@@ -1164,29 +1165,27 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
           </group>
         )
 
-        // 서측 의자 3개 — 식탁 서쪽 면 앞, 정면 = +X (동쪽)
-        // 의자를 식탁 안쪽으로 200mm 밀어넣음
-        // 닿음(0.0 gap): chairX = tableCenterX - 0.45 - 0.23 = -0.68
-        // 200mm 밀어넣음: chairX = -0.68 + 0.20 = -0.48
-        const westChairX = tableCenterX - 0.48
-        const westChairZs = [tableCenterZ - 0.55, tableCenterZ, tableCenterZ + 0.55]
-
-        // 복도(남쪽) 의자 1개 — 식탁 남쪽 끝, 정면 = -Z (북쪽, 식탁 향함)
-        // local +X → world -Z 회전 = +π/2. 식탁 남쪽 면에서 200mm 밀어넣음.
-        const corridorChairZ = tableCenterZ + 0.9 - 0.20 + 0.23
-        const corridorChairX = tableCenterX
+        // 의자 4개 — 2개 북측(+ S 향함, rot -π/2), 2개 남측(N 향함, rot +π/2)
+        // 식탁 안쪽으로 200mm tucked: chair Z = tableCenterZ ± (0.45 + 0.23 - 0.20) = ±0.48
+        const nChairZ = tableCenterZ - 0.48
+        const sChairZ = tableCenterZ + 0.48
+        // 의자 X 위치 — 긴 축(1.8m) 위에 좌우 ±0.45
+        const chairXOffset = 0.45
+        const leftChairX = tableCenterX - chairXOffset
+        const rightChairX = tableCenterX + chairXOffset
 
         return (
           <>
-            <group position={[tableCenterX, 0, tableCenterZ]} rotation={[0, Math.PI / 2, 0]}>
-              <DiningTable position={[0, 0]} active={kitchenActive} />
-            </group>
+            {/* 식탁 — 회전 없음 (TABLE_W=1.8 along X, TABLE_D=0.9 along Z) */}
+            <DiningTable position={[tableCenterX, tableCenterZ]} active={kitchenActive} />
 
-            {/* 서측 의자 3개 (식탁 향함, +X) */}
-            {westChairZs.map((cz, i) => renderChair(westChairX, cz, 0, `chair-w-${i}`))}
+            {/* 북측 의자 2개 (남쪽 향함, rot -π/2 → local +X = world +Z) */}
+            {renderChair(leftChairX, nChairZ, -Math.PI / 2, 'chair-n-l')}
+            {renderChair(rightChairX, nChairZ, -Math.PI / 2, 'chair-n-r')}
 
-            {/* 복도측 의자 1개 (식탁 남쪽, 식탁 향함, -Z) */}
-            {renderChair(corridorChairX, corridorChairZ, Math.PI / 2, 'chair-s-corridor')}
+            {/* 남측 의자 2개 (북쪽 향함, rot +π/2 → local +X = world -Z) */}
+            {renderChair(leftChairX, sChairZ, Math.PI / 2, 'chair-s-l')}
+            {renderChair(rightChairX, sChairZ, Math.PI / 2, 'chair-s-r')}
           </>
         )
       })()}
@@ -1274,7 +1273,9 @@ function KitchenRiceCookerDrawer({
   const SWING_TARGET = swingDoorBelow
     ? (Math.PI / 2) * (swingDoorBelow.hingeZend === 'north' ? -1 : 1)
     : 0
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    // frameloop="demand" idle 후 첫 프레임 delta 폭주 방지 → clamp 50ms
+    const delta = Math.min(rawDelta, 0.05)
     let dirty = false
     // drawer 슬라이드
     const target = isOpen ? -OPEN_DIST : 0
@@ -1623,7 +1624,8 @@ function KitchenPetPassDoor({
 
   // 회전 애니메이션 (90° = π/2). extendDir=+1 → +rot, -1 → -rot.
   const TARGET_ANGLE = (Math.PI / 2) * extendDir
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.05)   // demand frameloop idle 후 delta 폭주 방지
     const target = isOpen ? TARGET_ANGLE : 0
     const diff = target - angleRef.current
     if (Math.abs(diff) < 0.0005) return
@@ -1760,7 +1762,8 @@ function KitchenTallBackDrawer({
 
   // 슬라이드 거리: 지정값 또는 drawerLenZ/2
   const OPEN_DIST = openDistance ?? drawerLenZ / 2
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.05)   // demand frameloop idle 후 delta 폭주 방지
     const target = isOpen ? OPEN_DIST : 0
     const diff = target - offsetRef.current
     if (Math.abs(diff) < 0.0005) return
@@ -1926,7 +1929,8 @@ function KitchenUpperCabinet({
   //                z = extendDir * (width - 0.005) / 2
   // free end 가 +X 로 가려면: extendDir=+1 → -rot, extendDir=-1 → +rot
   const TARGET_ANGLE = (Math.PI / 2) * (-extendDir)
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.05)   // demand frameloop idle 후 delta 폭주 방지
     const target = isOpen ? TARGET_ANGLE : 0
     const diff = target - angleRef.current
     if (Math.abs(diff) < 0.0005) return
