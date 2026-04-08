@@ -45,7 +45,7 @@ import {
   babyTopWallZ,
 } from '../data/apartment'
 import type { DoorId } from '../data/sectors'
-import { computeVisibleSectors } from '../systems/visibility'
+import { computeVisibleSectors, findSector } from '../systems/visibility'
 import { Doors } from './shell/Doors'
 import { Walls } from './shell/Walls'
 import { Windows } from './shell/Windows'
@@ -94,7 +94,9 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
   const playerPos = isNight ? rawPlayerPos : undefined
 
   // === Phase 6: portal culling ===
-  // playerPos 없으면(BirdsEye/FloorPlan) computeVisibleSectors가 모든 sector 반환.
+  // visualOnly portal (베란다 창문) 은 한 경로에서 최대 1 hop 제한.
+  // 즉 mb → mainVeranda 보임, mb → mainVeranda → lr 차단.
+  // playerPos 없으면(BirdsEye/FloorPlan) 모든 sector 반환.
   const visibleSectors = useMemo(
     () => computeVisibleSectors(rawPlayerPos, doorOpenStates ?? new Map()),
     [rawPlayerPos, doorOpenStates]
@@ -233,10 +235,14 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
           <>
             {/* 모든 다운라이트 하우징 (항상 보임) */}
             {downlights.map(([x, z], i) => {
-              // allLightsOn=true 이면 전체 ON, 아니면 조감도=off / 워크스루=현재 방만
-              const isActive = !!allLightsOn || (playerPos
-                ? (activeGroup?.lights.some(([lx, lz]) => lx === x && lz === z) ?? false)
-                : false)
+              // 다운라이트가 속한 sector 판정 (벽 통과 라이트 누출 방지용 게이팅)
+              const dlSector = findSector(x, z)
+              const inActiveGroup = !!playerPos &&
+                (activeGroup?.lights.some(([lx, lz]) => lx === x && lz === z) ?? false)
+              // allLightsOn 이어도 visible sector 의 다운라이트만 활성
+              // (sector 매칭 실패 시엔 그대로 통과)
+              const isActive = inActiveGroup ||
+                (!!allLightsOn && (dlSector ? visibleSectors.has(dlSector) : true))
 
               // 단내림 영역: 안방/거실 하단 + 아기방/작업실 상단
               const isDropCeilingBottom = z > LR_D - 0.8 && x >= mbLeft && x <= LR_W

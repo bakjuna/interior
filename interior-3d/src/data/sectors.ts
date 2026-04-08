@@ -114,16 +114,19 @@ export const sectorAABBs: SectorAABB[] = [
 export interface Portal {
   a: SectorId
   b: SectorId
-  doorId?: DoorId  // 없으면 always-open (창/오픈 통로)
+  doorId?: DoorId   // 없으면 always-open (창/오픈 통로)
+  visualOnly?: boolean  // true 면 시각/렌더에는 통과하지만 라이트(litSectors)는 전파 안 함
+                        // (베란다 창문처럼 보이긴 해도 'G 전체 불'에는 포함 안 됨)
 }
 
 export const portals: Portal[] = [
-  // --- always-open (창문/오픈 통로) ---
+  // --- always-open 오픈 통로 (라이트 + 시각 모두 전파) ---
   { a: 'hall', b: 'lr' },
   { a: 'hall', b: 'kitchen' },
-  { a: 'mb', b: 'mainVeranda' },
-  { a: 'lr', b: 'mainVeranda' },
-  { a: 'work', b: 'workVeranda' },
+  // --- 베란다 창문 (시각만 전파, 라이트 그룹에는 미포함) ---
+  { a: 'mb', b: 'mainVeranda', visualOnly: true },
+  { a: 'lr', b: 'mainVeranda', visualOnly: true },
+  { a: 'work', b: 'workVeranda', visualOnly: true },
 
   // --- 도어 통과 ---
   { a: 'mb', b: 'hall', doorId: 'mb-hall' },
