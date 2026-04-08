@@ -3,6 +3,24 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ApartmentModel } from './ApartmentModel'
 import { LR_W, LR_D, MB_W, WALL_THICKNESS, WALL_HEIGHT, babyTop } from '../data/apartment'
+import { moveWithCollision } from '../systems/collision'
+import type { DoorId } from '../data/sectors'
+
+// Phase 1 dev flag: Phase 2에서 도어 상태 lift 끝나면 false로.
+// true 면 모든 도어를 열린 것으로 취급 → 도어 갭 통과 가능.
+const COLLISION_ALL_DOORS_OPEN = true
+
+const ALL_DOORS_OPEN_MAP: Map<DoorId, boolean> = new Map([
+  ['mb-hall', true],
+  ['mb-mbBath', true],
+  ['mainBath-hall', true],
+  ['baby-hall', true],
+  ['laundry-kitchen', true],
+  ['work-hall', true],
+  ['jungmun', true],
+  ['cage-mainVeranda', true],
+  ['outdoor-mainVeranda', true],
+])
 
 // 전체 이동 범위 — 외벽 바깥 0.5m 마진까지 (집 외부로 빠져나가지 못하게 제한)
 const totalMinX = -WALL_THICKNESS - MB_W - 0.5
@@ -40,7 +58,7 @@ const MOVE_SPEED_MOBILE = 3.2
 const MOUSE_SENSITIVITY = 0.002
 const TOUCH_SENSITIVITY = 0.0035
 
-function FPSController({ bindings, height, isMobile, onMove, onHeightChange }: { bindings: KeyBindings; height: number; isMobile: boolean; onMove?: (x: number, z: number) => void; onHeightChange?: (h: number) => void }) {
+function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, onHeightChange }: { bindings: KeyBindings; height: number; isMobile: boolean; doorOpenStatesRef: React.MutableRefObject<Map<DoorId, boolean>>; onMove?: (x: number, z: number) => void; onHeightChange?: (h: number) => void }) {
   const { camera, gl, invalidate } = useThree()
   const keys = useRef<Set<string>>(new Set())
   const euler = useRef(new THREE.Euler(0, 0, 0, 'YXZ'))
@@ -205,6 +223,17 @@ function FPSController({ bindings, height, isMobile, onMove, onHeightChange }: {
       heightRef.current = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, heightRef.current + dir * HEIGHT_SPEED * delta))
     }
 
+    // 벽 충돌 (axis-slide). 도어 상태는 dev flag 또는 lift된 ref에서.
+    const doorOpen = COLLISION_ALL_DOORS_OPEN ? ALL_DOORS_OPEN_MAP : doorOpenStatesRef.current
+    const [resolvedX, resolvedZ] = moveWithCollision(
+      [camera.position.x, camera.position.z],
+      [newPos.x, newPos.z],
+      doorOpen,
+    )
+    newPos.x = resolvedX
+    newPos.z = resolvedZ
+
+    // 외곽 clamp는 보험으로 유지 (충돌 그물에 안 잡히는 외부 영역 방지)
     const margin = 0.3
     newPos.x = Math.max(totalMinX + margin, Math.min(totalMaxX - margin, newPos.x))
     newPos.z = Math.max(totalMinZ + margin, Math.min(totalMaxZ - margin, newPos.z))
@@ -301,6 +330,9 @@ export function WalkthroughView() {
   const [allLightsOn, setAllLightsOn] = useState(false)
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 800)
 
+  // Phase 1: 빈 Map (모든 도어 닫힘 취급). Phase 2에서 도어 컴포넌트 콜백으로 채워짐.
+  const doorOpenStatesRef = useRef<Map<DoorId, boolean>>(new Map())
+
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= 800)
     window.addEventListener('resize', handler)
@@ -393,7 +425,7 @@ export function WalkthroughView() {
         <ambientLight intensity={isNight ? 0.08 : 0.6} />
         {!isNight && <directionalLight position={[5, 10, 5]} intensity={0.8} />}
         <ApartmentModel showCeiling={true} playerPos={playerPos} isNight={isNight} allLightsOn={allLightsOn} />
-        <FPSController bindings={bindings} height={height} isMobile={isMobile} onMove={handleMove} onHeightChange={setHeight} />
+        <FPSController bindings={bindings} height={height} isMobile={isMobile} doorOpenStatesRef={doorOpenStatesRef} onMove={handleMove} onHeightChange={setHeight} />
       </Canvas>
       <div className="crosshair" />
       {!isMobile && (

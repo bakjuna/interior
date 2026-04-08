@@ -409,11 +409,11 @@ interface FlushDoorProps {
 - [x] 커밋: "Phase 0: sectors/visibility/collision 데이터 레이어"
 
 ## Phase 1 — 벽 충돌 적용
-- [ ] WalkthroughView에 `doorOpenStatesRef` 추가
-- [ ] FPSController의 useFrame에 moveWithCollision 통합
-- [ ] dev flag `COLLISION_ALL_DOORS_OPEN = true` 추가
+- [x] WalkthroughView에 `doorOpenStatesRef` 추가
+- [x] FPSController의 useFrame에 moveWithCollision 통합
+- [x] dev flag `COLLISION_ALL_DOORS_OPEN = true` 추가
 - [ ] 워크스루에서 모든 벽 막힘 + 거실 창 통과 가능 확인
-- [ ] 커밋: "Phase 1: 벽 충돌 시스템 도입"
+- [x] 커밋: "Phase 1: 벽 충돌 시스템 도입"
 
 ## Phase 2 — 도어 분리 + 상태 lift
 - [ ] `models/FlushDoor.tsx` 생성 (cut from ApartmentModel)
