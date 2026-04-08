@@ -577,43 +577,49 @@ function MobileControls({
     touchAction: 'manipulation',
     backdropFilter: 'blur(8px)',
   }
+  // 모바일 주소창 영역에 묻히지 않도록:
+  //  - 바깥 컨테이너를 position:fixed + height:100dvh 로 잡아 dynamic viewport 추적
+  //  - safe-area-inset-bottom 추가 마진
+  //  - pointer-events:none 으로 캔버스 터치(시점 회전) 방해 안 함, 버튼에서만 auto
+  const safeBottom = 'calc(env(safe-area-inset-bottom, 0px) + 20px)'
   return (
-    <div data-mobile-ui>
-      {/* 좌하단 — WASD 패드 */}
+    <div
+      data-mobile-ui
+      style={{
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        height: '100dvh',
+        pointerEvents: 'none',
+      }}
+    >
+      {/* 좌하단 — 앞으로 버튼 1개 */}
       <div
         style={{
           position: 'absolute',
-          bottom: 24,
-          left: 16,
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 56px)',
-          gridTemplateRows: 'repeat(3, 56px)',
-          gap: 6,
+          bottom: safeBottom,
+          left: 20,
           touchAction: 'none',
+          pointerEvents: 'auto',
         }}
       >
-        <div />
-        <button {...holdProps('w')} style={padBtn}>↑</button>
-        <div />
-        <button {...holdProps('a')} style={padBtn}>←</button>
-        <button {...holdProps('s')} style={padBtn}>↓</button>
-        <button {...holdProps('d')} style={padBtn}>→</button>
-        <div />
-        <div />
-        <div />
+        <button {...holdProps('w')} style={{ ...padBtn, width: 72, height: 72, fontSize: 28 }}>↑</button>
       </div>
 
       {/* 우하단 — 액션 버튼 */}
       <div
         style={{
           position: 'absolute',
-          bottom: 24,
+          bottom: safeBottom,
           right: 16,
           display: 'flex',
           flexDirection: 'column',
           gap: 8,
           alignItems: 'flex-end',
           touchAction: 'manipulation',
+          pointerEvents: 'auto',
         }}
       >
         <div style={{ display: 'flex', gap: 8 }}>
