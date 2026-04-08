@@ -56,6 +56,9 @@ import { WorkVeranda } from './rooms/WorkVeranda'
 import { Laundry } from './rooms/Laundry'
 import { OutdoorUnit } from './rooms/OutdoorUnit'
 import { Cage } from './rooms/Cage'
+import { BabyRoom } from './rooms/BabyRoom'
+import { WorkRoom } from './rooms/WorkRoom'
+import { Hallway } from './rooms/Hallway'
 import { DropCeilingLight } from './primitives/DropCeilingLight'
 
 const T2 = WALL_THICKNESS / 2
@@ -451,12 +454,15 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         )
       })()}
 
-      {/* Phase 4: 베란다/세탁실/실외기실/새장 → rooms/* */}
+      {/* Phase 4: 방 컴포넌트 → rooms/* */}
       <MainVeranda visible={true} />
       <WorkVeranda visible={true} />
       <Laundry visible={true} />
       <OutdoorUnit visible={true} />
       <Cage visible={true} />
+      <BabyRoom visible={true} />
+      <WorkRoom visible={true} />
+      <Hallway visible={true} playerPos={playerPos} allLightsOn={allLightsOn} />
 
       {/* === 주방 하부장/상부장 === */}
       {(() => {
@@ -1439,46 +1445,6 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         </mesh>
       </group>
 
-      {/* 복도/거실 공유벽 (800mm) 하단 간접조명 */}
-      {(() => {
-        const wallStartX = LR_W - 1.481 - 0.800
-        const wallEndX = LR_W - 1.481
-        const wallZ = -T2
-        const wallLen = wallEndX - wallStartX  // 800mm
-        const wallCenterX = (wallStartX + wallEndX) / 2
-
-        const isActive = !!allLightsOn || (playerPos ? (
-          // 복도
-          (playerPos[0] >= -1.2 && playerPos[0] <= LR_W - 1.481 &&
-            playerPos[1] >= Math.min(-WALL_THICKNESS, -T2 - 1.591 + T2) && playerPos[1] <= Math.max(-WALL_THICKNESS, -T2 - 1.591 + T2)) ||
-          // 현관
-          (playerPos[0] >= LR_W - 1.481 && playerPos[0] <= LR_W + T2 &&
-            playerPos[1] >= Math.min(-WALL_THICKNESS, -T2 - 1.591 + T2) && playerPos[1] <= Math.max(-WALL_THICKNESS, -T2 - 1.591 + T2)) ||
-          // 거실
-          (playerPos[0] >= 0 && playerPos[0] <= LR_W && playerPos[1] >= 0 && playerPos[1] <= LR_D)
-        ) : false)
-
-        return (
-          <>
-            {/* LED 스트립 (벽 아랫면, Y=0.1) */}
-            <mesh position={[wallCenterX, 0.1, wallZ]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[wallLen, WALL_THICKNESS]} />
-              <meshStandardMaterial color={isActive ? '#fff' : '#444'} emissive={isActive ? '#ffe0b0' : '#111'} emissiveIntensity={isActive ? 3.0 : 0.1} />
-            </mesh>
-            {isActive && (
-              <rectAreaLight
-                position={[wallCenterX, 0.1, wallZ]}
-                width={wallLen}
-                height={WALL_THICKNESS}
-                intensity={30}
-                color="#ffe0b0"
-                rotation={[Math.PI / 2, 0, 0]}
-              />
-            )}
-          </>
-        )
-      })()}
-
       {/* 안방 가벽 (안방욕실 문쪽~2600mm, 두께 50mm, 창문쪽 1066mm 개구부) — 실크벽지 일괄 적용 */}
       {(() => {
         const partLen = 2.6
@@ -1550,38 +1516,6 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
 
       {/* 도어는 shell/Doors.tsx 가 일괄 렌더 (Phase 2) */}
       <Doors playerPos={rawPlayerPos} onDoorOpenChange={onDoorOpenChange} />
-
-      {/* 아기방 침대 — 범퍼 포함 총 1115×2065mm, 배면=창문(상단벽)쪽, 우측=우측벽 flush */}
-      <ToddlerBed
-        position={[
-          babyRight - 2.065 / 2,                             // 우측 범퍼 외측이 babyRight
-          babyTop + 1.115 / 2,                               // 배면 범퍼 외측이 babyTop
-        ]}
-        rotationY={0}
-      />
-
-      {/* 작업실 책상 2개 — 우측벽 기준, 긴 변 Z축, 창문쪽=1200, 안쪽=1800 */}
-      {(() => {
-        const workTopZ = right1Z - 0.770 + 0.795 + 1.418 + 0.1   // 북쪽 내측 (창문쪽)
-        const wallGap = 0.020                                     // 벽에서 20mm 띄움
-        const deskDepth = 0.720
-        const gapBetween = 0.100
-        const cx = LR_W - deskDepth / 2 - wallGap                // 우측벽에서 20mm 띄움
-        // 창문쪽(북) 1200 — 북쪽 벽에서 20mm 띄우고 배치
-        const w1 = 1.200
-        const z1 = workTopZ + wallGap + w1 / 2
-        // 1200 테이블은 북쪽 벽 꺾임(돌출부)과 겹치지 않도록 140mm 왼쪽(-X)으로 이동
-        const cx1 = cx - 0.140
-        // 안쪽(남) 1800 — 1200 바로 아래 + gap
-        const w2 = 1.800
-        const z2 = z1 + w1 / 2 + gapBetween + w2 / 2
-        return (
-          <>
-            <TrestleDesk position={[cx1, z1]} rotationY={Math.PI / 2} width={w1} />
-            <TrestleDesk position={[cx, z2]} rotationY={Math.PI / 2} width={w2} />
-          </>
-        )
-      })()}
 
       {/* === 메인욕실 인테리어 (벽 타일 + 변기 + 세면대 + 샤워부스 + 니치) === */}
       {(() => {
@@ -2220,189 +2154,3 @@ function Sofa() {
   )
 }
 
-// 아기 침대 — 1115×2065mm, 4면 모두 범퍼 (동일 높이, 회색)
-function ToddlerBed({
-  position,
-  rotationY = 0,
-  length = 1.905,          // 베이스 길이 (총 외곽 2065 - 범퍼 80×2)
-  width = 0.955,           // 베이스 폭  (총 외곽 1115 - 범퍼 80×2)
-  baseH = 0.150,
-  mattH = 0.120,
-  bumperT = 0.080,
-  bumperH = 0.600,
-  cornerR = 0.040,
-  frontCutRight = 0.500,       // 전면 범퍼 +X 쪽 절단 (통행 공간)
-  bumperColor = '#a3a3a3',
-  mattColor = '#ffffff',
-  frameColor = '#f3efe9',
-}: {
-  position: [number, number]
-  rotationY?: number
-  length?: number
-  width?: number
-  baseH?: number
-  mattH?: number
-  bumperT?: number
-  bumperH?: number
-  cornerR?: number
-  frontCutRight?: number
-  bumperColor?: string
-  mattColor?: string
-  frameColor?: string
-}) {
-  // 전면 범퍼: 좌측(-X)끝은 헤드 범퍼와 맞닿고, 우측(+X)끝은 frontCutRight 만큼 짧게
-  const frontFullLen = length + bumperT * 2
-  const frontLen = frontFullLen - frontCutRight
-  const frontCx = -frontCutRight / 2   // 중심이 -X 쪽으로 이동
-
-  return (
-    <group position={[position[0], 0, position[1]]} rotation={[0, rotationY, 0]}>
-      {/* 베이스 프레임 */}
-      <mesh position={[0, baseH / 2, 0]}>
-        <boxGeometry args={[length, baseH, width]} />
-        <meshStandardMaterial color={frameColor} roughness={0.7} />
-      </mesh>
-
-      {/* 매트리스 */}
-      <mesh position={[0, baseH + mattH / 2, 0]}>
-        <boxGeometry args={[length - 0.04, mattH, width - 0.04]} />
-        <meshStandardMaterial color={mattColor} roughness={0.85} />
-      </mesh>
-
-      {/* 배면 범퍼 (긴 변, -Z 쪽 — 벽에 닿음) */}
-      <RoundedBox
-        args={[length + bumperT * 2, bumperH, bumperT]}
-        radius={cornerR}
-        smoothness={4}
-        position={[0, bumperH / 2, -width / 2 - bumperT / 2]}
-       
-       
-      >
-        <meshStandardMaterial color={bumperColor} roughness={0.6} />
-      </RoundedBox>
-
-      {/* 전면 범퍼 (긴 변, +Z 쪽 — 방 입구쪽, 우측 통행 공간만큼 짧음) */}
-      <RoundedBox
-        args={[frontLen, bumperH, bumperT]}
-        radius={cornerR}
-        smoothness={4}
-        position={[frontCx, bumperH / 2, width / 2 + bumperT / 2]}
-       
-       
-      >
-        <meshStandardMaterial color={bumperColor} roughness={0.6} />
-      </RoundedBox>
-
-      {/* 헤드 범퍼 (짧은 변, -X 쪽) */}
-      <RoundedBox
-        args={[bumperT, bumperH, width]}
-        radius={cornerR}
-        smoothness={4}
-        position={[-length / 2 - bumperT / 2, bumperH / 2, 0]}
-       
-       
-      >
-        <meshStandardMaterial color={bumperColor} roughness={0.6} />
-      </RoundedBox>
-
-      {/* 발치 범퍼 (짧은 변, +X 쪽) */}
-      <RoundedBox
-        args={[bumperT, bumperH, width]}
-        radius={cornerR}
-        smoothness={4}
-        position={[length / 2 + bumperT / 2, bumperH / 2, 0]}
-       
-       
-      >
-        <meshStandardMaterial color={bumperColor} roughness={0.6} />
-      </RoundedBox>
-    </group>
-  )
-}
-
-// 책상 — IKEA IDÅSEN 스타일 트레슬 레그 + 블랙 상판
-// position: 상판 중심 월드 좌표 [x, z]
-// rotationY: 상판 긴 변 방향 (0 = X축, π/2 = Z축)
-function TrestleDesk({
-  position,
-  rotationY = 0,
-  width = 1.800,         // 긴 변
-  depth = 0.720,         // 짧은 변
-  height = 0.730,        // 상판 윗면 높이
-  topT = 0.025,          // 상판 두께
-  topColor = '#121212',
-  legColor = '#3a3a3d',
-}: {
-  position: [number, number]
-  rotationY?: number
-  width?: number
-  depth?: number
-  height?: number
-  topT?: number
-  topColor?: string
-  legColor?: string
-}) {
-  // 양쪽 다리는 상판 양 끝에서 150mm 안쪽
-  const legInset = 0.150
-  const postT = 0.050     // 세로 기둥 두께
-  const braceT = 0.030    // 사선 브레이스 두께
-  const footLen = depth - 0.10
-  const postH = height - topT   // 기둥 총 높이 (상판 바닥까지)
-  const topSurfaceY = height    // 상판 윗면
-  const topCenterY = topSurfaceY - topT / 2
-
-  const legXs = [-width / 2 + legInset, width / 2 - legInset]
-
-  return (
-    <group position={[position[0], 0, position[1]]} rotation={[0, rotationY, 0]}>
-      {/* 상판 */}
-      <mesh position={[0, topCenterY, 0]}>
-        <boxGeometry args={[width, topT, depth]} />
-        <meshStandardMaterial color={topColor} roughness={0.35} metalness={0.1} />
-      </mesh>
-
-      {/* 다리 (트레슬) — 좌우 2세트 */}
-      {legXs.map((lx, i) => {
-        const pivotY = postH / 2
-        return (
-          <group key={`leg-${i}`} position={[lx, 0, 0]}>
-            {/* 세로 기둥 */}
-            <mesh position={[0, pivotY, 0]}>
-              <boxGeometry args={[postT, postH, postT]} />
-              <meshStandardMaterial color={legColor} roughness={0.45} metalness={0.5} />
-            </mesh>
-            {/* 바닥 가로 풋 (depth 방향) */}
-            <mesh position={[0, 0.020, 0]}>
-              <boxGeometry args={[postT, 0.030, footLen]} />
-              <meshStandardMaterial color={legColor} roughness={0.45} metalness={0.5} />
-            </mesh>
-
-            {/* 사선 브레이스 — 기둥 상단부터 발 끝 2곳까지 (V자) */}
-            {[-1, 1].map((dir) => {
-              const dz = dir * (footLen / 2)
-              const bx = 0
-              const by = postH - 0.050   // 기둥 상단 근처
-              const cy = 0.02             // 발 바닥
-              const midY = (by + cy) / 2
-              const midZ = dz / 2
-              const len = Math.hypot(by - cy, dz)
-              const angle = Math.atan2(dz, by - cy)
-              return (
-                <mesh
-                  key={`br-${dir}`}
-                  position={[bx, midY, midZ]}
-                  rotation={[angle, 0, 0]}
-                 
-                 
-                >
-                  <boxGeometry args={[braceT, len, braceT]} />
-                  <meshStandardMaterial color={legColor} roughness={0.45} metalness={0.5} />
-                </mesh>
-              )
-            })}
-          </group>
-        )
-      })}
-    </group>
-  )
-}

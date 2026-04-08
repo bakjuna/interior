@@ -444,10 +444,10 @@ interface FlushDoorProps {
 - [x] `rooms/Laundry.tsx` (+ models/WashTower, primitives/DropCeilingLight 부수 추출)
 - [ ] `rooms/MasterBath.tsx`
 - [ ] `rooms/MainBath.tsx`
-- [ ] `rooms/BabyRoom.tsx`
-- [ ] `rooms/WorkRoom.tsx`
+- [x] `rooms/BabyRoom.tsx` (+ models/ToddlerBed)
+- [x] `rooms/WorkRoom.tsx` (+ models/TrestleDesk)
 - [ ] `rooms/Entrance.tsx`
-- [ ] `rooms/Hallway.tsx`
+- [x] `rooms/Hallway.tsx`
 - [ ] `rooms/Kitchen.tsx`
 - [ ] `rooms/MasterBedroom.tsx`
 - [ ] `rooms/LivingRoom.tsx`
