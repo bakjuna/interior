@@ -183,6 +183,11 @@ export function MainBath({ visible, playerPos }: MainBathProps) {
         )
       })()}
 
+      {/* 진입 시 보조 포인트라이트 */}
+      {bathActive && (
+        <pointLight position={[cX, WALL_HEIGHT - 0.3, (bT + bB) / 2]} intensity={1.5} distance={3} decay={1.5} color="#ffffff" />
+      )}
+
       {/* 샤워부스 */}
       {(() => {
         const glassH = 2.0

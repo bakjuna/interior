@@ -150,6 +150,11 @@ export function MasterBath({ visible, playerPos }: MasterBathProps) {
         )
       })()}
 
+      {/* 진입 시 보조 포인트라이트 */}
+      {mbBathActive && (
+        <pointLight position={[cX2, WALL_HEIGHT - 0.3, cZ2]} intensity={1.5} distance={3} decay={1.5} color="#ffffff" />
+      )}
+
       {/* 세면대 + 거울 */}
       <Suspense fallback={null}>
         <Sink position={[sink2X - 0.2, 0.61, sink2Z + 0.12]} rotation={Math.PI} scale={1.5} />
