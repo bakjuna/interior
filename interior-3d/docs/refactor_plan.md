@@ -442,15 +442,15 @@ interface FlushDoorProps {
 - [x] `rooms/MainVeranda.tsx`
 - [x] `rooms/WorkVeranda.tsx`
 - [x] `rooms/Laundry.tsx` (+ models/WashTower, primitives/DropCeilingLight 부수 추출)
-- [ ] `rooms/MasterBath.tsx`
-- [ ] `rooms/MainBath.tsx`
+- [x] `rooms/MasterBath.tsx`
+- [x] `rooms/MainBath.tsx`
 - [x] `rooms/BabyRoom.tsx` (+ models/ToddlerBed)
 - [x] `rooms/WorkRoom.tsx` (+ models/TrestleDesk)
-- [ ] `rooms/Entrance.tsx`
+- [x] `rooms/Entrance.tsx`
 - [x] `rooms/Hallway.tsx`
-- [ ] `rooms/Kitchen.tsx`
-- [ ] `rooms/MasterBedroom.tsx`
-- [ ] `rooms/LivingRoom.tsx`
+- [x] `rooms/Kitchen.tsx` (+ models/RiceCooker/CuckooWaterPurifier/LightWaveOven)
+- [x] `rooms/MasterBedroom.tsx` (+ models/Bed)
+- [x] `rooms/LivingRoom.tsx` (+ models/Sofa)
 
 ## Phase 5 — 가구/가전 모델 분리
 - [ ] `models/Bed.tsx`
