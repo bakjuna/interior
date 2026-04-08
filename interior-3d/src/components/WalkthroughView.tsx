@@ -382,7 +382,7 @@ export function WalkthroughView() {
       <Canvas
         shadows={false}
         frameloop="demand"
-        dpr={allLightsOn ? 1 : [1, 2]}
+        dpr={allLightsOn ? 1 : [1, 1.5]}
         camera={{
           fov: 75,
           near: 0.1,

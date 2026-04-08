@@ -69,6 +69,24 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
   const floorTex = useLoader(TextureLoader, '/textures/walnut-floor.png')
   const porcelainTex = useLoader(TextureLoader, '/textures/porcelain-tile.png')
   const entranceTex = useLoader(TextureLoader, '/textures/entrance-tile.png')
+  const bathroomWallTex = useLoader(TextureLoader, '/textures/bathroom-wall-tile.png')
+
+  // 화장실 타일 메지(grout) — 흰색 라인. 타일 600×1200mm 기준 약 3mm 두께
+  // x축 threshold = 3/600 ≈ 0.005, y축 threshold = 3/1200 ≈ 0.0025
+  const tileGroutOnBeforeCompile = useMemo(() => (shader: THREE.Shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `
+      #include <map_fragment>
+      vec2 _tuv = fract(vMapUv);
+      float _gx = 0.005;
+      float _gy = 0.0025;
+      if (_tuv.x < _gx || _tuv.x > 1.0 - _gx || _tuv.y < _gy || _tuv.y > 1.0 - _gy) {
+        diffuseColor.rgb = vec3(1.0);
+      }
+      `
+    )
+  }, [])
   const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
   const walnutDoorTex = useLoader(TextureLoader, '/textures/walnut_door.png')
   const silkTex = useLoader(TextureLoader, '/textures/silk.png')
@@ -193,7 +211,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
             key={`floor-${room.name}`}
             rotation={[-Math.PI / 2, 0, 0]}
             position={[room.center[0], fY + 0.001, room.center[1]]}
-            receiveShadow
+           
             renderOrder={1}
           >
             <planeGeometry args={room.size} />
@@ -228,17 +246,14 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
               bY + h / 2,
               wall.start[1] + dz / 2,
             ]}
-            castShadow
-            receiveShadow
+           
+           
           >
             <boxGeometry args={[isH ? length : t, h, isH ? t : length]} />
-            <meshPhysicalMaterial
+            <meshStandardMaterial
               map={silk}
               roughness={0.55}
               metalness={0}
-              sheen={1}
-              sheenColor={'#ffffff'}
-              sheenRoughness={0.3}
             />
           </mesh>
         )
@@ -346,7 +361,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         return (
           <group key={`closet-${i}`}>
             {/* 본체 (뒤판) */}
-            <mesh position={c.position} castShadow receiveShadow>
+            <mesh position={c.position}>
               <boxGeometry args={c.size} />
               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
@@ -1189,7 +1204,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                     return (
                       <group>
                         {/* 상부장 본체 — 측면 벽 포함한 외곽 Z 전체 */}
-                        <mesh position={[cabX, cabCenterY, outerCenterZ]} castShadow receiveShadow>
+                        <mesh position={[cabX, cabCenterY, outerCenterZ]}>
                           <boxGeometry args={[cabDepth, cabH, outerLen]} />
                           <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                         </mesh>
@@ -1215,13 +1230,13 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                         })}
 
                         {/* 북쪽 30mm 측면 벽 — 상부장 아래 ~ 바닥까지 */}
-                        <mesh position={[cabX, cabBottomY / 2, outerZStart + sideT / 2]} castShadow receiveShadow>
+                        <mesh position={[cabX, cabBottomY / 2, outerZStart + sideT / 2]}>
                           <boxGeometry args={[cabDepth, cabBottomY, sideT]} />
                           <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                         </mesh>
 
                         {/* 남쪽 30mm 측면 벽 — 상부장 아래 ~ 바닥까지 */}
-                        <mesh position={[cabX, cabBottomY / 2, outerZEnd - sideT / 2]} castShadow receiveShadow>
+                        <mesh position={[cabX, cabBottomY / 2, outerZEnd - sideT / 2]}>
                           <boxGeometry args={[cabDepth, cabBottomY, sideT]} />
                           <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                         </mesh>
@@ -1233,7 +1248,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
                           const kimchiZStart = f2Z - f2W / 2
                           const kimchiZEnd = f2Z + f2W / 2
                           return (
-                            <mesh position={[fillerX, 1.800 / 2, (kimchiZStart + kimchiZEnd) / 2]} castShadow receiveShadow>
+                            <mesh position={[fillerX, 1.800 / 2, (kimchiZStart + kimchiZEnd) / 2]}>
                               <boxGeometry args={[fillerD, 1.800, f2W]} />
                               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                             </mesh>
@@ -1456,25 +1471,25 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
 
         return (
           <group>
-            <mesh position={[xCenter, floorClear + cabH / 2, zBack - t / 2]} castShadow receiveShadow>
+            <mesh position={[xCenter, floorClear + cabH / 2, zBack - t / 2]}>
               <boxGeometry args={[totalW, cabH, t]} />
               <meshStandardMaterial color={bodyColor} roughness={0.5} />
             </mesh>
             {/* 좌측 측판 — 바닥까지 */}
-            <mesh position={[xLeft - t / 2, topY / 2, zCenter]} castShadow receiveShadow>
+            <mesh position={[xLeft - t / 2, topY / 2, zCenter]}>
               <boxGeometry args={[t, topY, depth]} />
               <meshStandardMaterial color={bodyColor} roughness={0.5} />
             </mesh>
             {/* 우측 측판 — 바닥까지 */}
-            <mesh position={[xLeft + totalW + t / 2, topY / 2, zCenter]} castShadow receiveShadow>
+            <mesh position={[xLeft + totalW + t / 2, topY / 2, zCenter]}>
               <boxGeometry args={[t, topY, depth]} />
               <meshStandardMaterial color={bodyColor} roughness={0.5} />
             </mesh>
-            <mesh position={[xCenter, topY + t / 2, zCenter]} castShadow receiveShadow>
+            <mesh position={[xCenter, topY + t / 2, zCenter]}>
               <boxGeometry args={[totalW + t * 2, t, depth]} />
               <meshStandardMaterial color={bodyColor} roughness={0.5} />
             </mesh>
-            <mesh position={[xCenter, floorClear - t / 2, zCenter]} castShadow receiveShadow>
+            <mesh position={[xCenter, floorClear - t / 2, zCenter]}>
               <boxGeometry args={[totalW + t * 2, t, depth]} />
               <meshStandardMaterial color={bodyColor} roughness={0.5} />
             </mesh>
@@ -1482,28 +1497,28 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
             {[1, 2].map((i) => (
               <group key={`shoe-div-${i}`}>
                 {/* 하부 구간 */}
-                <mesh position={[xLeft + colW * i, floorClear + lowerH / 2, zCenter]} castShadow receiveShadow>
+                <mesh position={[xLeft + colW * i, floorClear + lowerH / 2, zCenter]}>
                   <boxGeometry args={[t, lowerH, depth - 0.01]} />
                   <meshPhysicalMaterial color={doorColor} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
                 </mesh>
                 {/* 상부 구간 */}
-                <mesh position={[xLeft + colW * i, floorClear + lowerH + openH + upperH / 2, zCenter]} castShadow receiveShadow>
+                <mesh position={[xLeft + colW * i, floorClear + lowerH + openH + upperH / 2, zCenter]}>
                   <boxGeometry args={[t, upperH, depth - 0.01]} />
                   <meshPhysicalMaterial color={doorColor} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
                 </mesh>
               </group>
             ))}
             {/* 거울 경계 칸막이 (풀 높이) */}
-            <mesh position={[xLeft + colW * 3, floorClear + cabH / 2, zCenter]} castShadow receiveShadow>
+            <mesh position={[xLeft + colW * 3, floorClear + cabH / 2, zCenter]}>
               <boxGeometry args={[t, cabH, depth - 0.01]} />
               <meshPhysicalMaterial color={doorColor} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
             </mesh>
             {/* 오픈 선반 상/하 수평판 (몸체 자체) */}
-            <mesh position={[xLeft + colW * 1.5, floorClear + lowerH + t / 2, zCenter]} castShadow receiveShadow>
+            <mesh position={[xLeft + colW * 1.5, floorClear + lowerH + t / 2, zCenter]}>
               <boxGeometry args={[colW * 3 - t, t, depth - 0.005]} />
               <meshStandardMaterial color={bodyColor} roughness={0.5} />
             </mesh>
-            <mesh position={[xLeft + colW * 1.5, floorClear + lowerH + openH - t / 2, zCenter]} castShadow receiveShadow>
+            <mesh position={[xLeft + colW * 1.5, floorClear + lowerH + openH - t / 2, zCenter]}>
               <boxGeometry args={[colW * 3 - t, t, depth - 0.005]} />
               <meshStandardMaterial color={bodyColor} roughness={0.5} />
             </mesh>
@@ -1599,11 +1614,11 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
               const dW = rightBound - leftBound
               return (
                 <group key={`shoe-col-${ci}`}>
-                  <mesh position={[cx, lowerCenterY, zFront - t / 2]} castShadow receiveShadow>
+                  <mesh position={[cx, lowerCenterY, zFront - t / 2]}>
                     <boxGeometry args={[dW, lowerH, t]} />
                     <meshPhysicalMaterial color={doorColor} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
                   </mesh>
-                  <mesh position={[cx, upperCenterY, zFront - t / 2]} castShadow receiveShadow>
+                  <mesh position={[cx, upperCenterY, zFront - t / 2]}>
                     <boxGeometry args={[dW, upperH, t]} />
                     <meshPhysicalMaterial color={doorColor} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
                   </mesh>
@@ -1614,7 +1629,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
               const cx = xLeft + colW * 3.5
               return (
                 <group>
-                  <mesh position={[cx, floorClear + cabH / 2, zFront - 0.004]} castShadow receiveShadow>
+                  <mesh position={[cx, floorClear + cabH / 2, zFront - 0.004]}>
                     <boxGeometry args={[colW - 0.006, cabH - 0.006, 0.008]} />
                     <meshStandardMaterial color="#e8e8e8" roughness={0.3} />
                   </mesh>
@@ -1823,15 +1838,12 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         silk.repeat.set(partLen / 2, 1)
         silk.colorSpace = THREE.SRGBColorSpace
         return (
-          <mesh position={[mbLeft + 1.476, WALL_HEIGHT / 2, -T2 + 1.3]} castShadow receiveShadow>
+          <mesh position={[mbLeft + 1.476, WALL_HEIGHT / 2, -T2 + 1.3]}>
             <boxGeometry args={[0.05, WALL_HEIGHT, partLen]} />
-            <meshPhysicalMaterial
+            <meshStandardMaterial
               map={silk}
               roughness={0.55}
               metalness={0}
-              sheen={1}
-              sheenColor={'#ffffff'}
-              sheenRoughness={0.3}
             />
           </mesh>
         )
@@ -2017,7 +2029,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         return (
           <group>
             {/* 상단 솔리드 헤더 (도어 위 ~ 천장) */}
-            <mesh position={[jungX, (doorH + WALL_HEIGHT) / 2, (zNorth + zSouth) / 2]} castShadow receiveShadow>
+            <mesh position={[jungX, (doorH + WALL_HEIGHT) / 2, (zNorth + zSouth) / 2]}>
               <boxGeometry args={[doorT, WALL_HEIGHT - doorH, totalW]} />
               <meshPhysicalMaterial color={panelColor} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
             </mesh>
@@ -2065,7 +2077,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         const tileW = 0.6
         const tileH = 1.2
         const makeTileTex = (uRep: number, vRep: number) => {
-          const t = porcelainTex.clone()
+          const t = bathroomWallTex.clone()
           t.wrapS = THREE.RepeatWrapping
           t.wrapT = THREE.RepeatWrapping
           t.repeat.set(uRep, vRep)
@@ -2094,18 +2106,53 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
             {/* 좌측벽 (X=bL, +X 면) */}
             <mesh position={[bL + 0.001, WALL_HEIGHT / 2, (bT + bB) / 2]} rotation={[0, Math.PI / 2, 0]}>
               <planeGeometry args={[innerD, WALL_HEIGHT]} />
-              <meshStandardMaterial map={makeTileTex(innerD / tileW, WALL_HEIGHT / tileH)} roughness={0.15} metalness={0.05} />
+              <meshStandardMaterial map={makeTileTex(innerD / tileW, WALL_HEIGHT / tileH)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
             </mesh>
-            {/* 우측벽 (문이 있는 벽) — 타일 없음 */}
+            {/* 우측벽 (문이 있는 벽) — 도어 개구부를 피해 3조각으로 분할 타일 */}
+            {(() => {
+              const doorH = 2.1
+              const doorW = 0.9
+              const doorZ = -WALL_THICKNESS - 0.1 - 0.45  // 도어 중심 Z
+              const doorZmin = doorZ - doorW / 2
+              const doorZmax = doorZ + doorW / 2
+              const aboveH = WALL_HEIGHT - doorH
+              const leftLen = doorZmin - bB        // 작은 Z(먼쪽)에서 도어 좌단까지
+              const rightLen = bT - doorZmax       // 도어 우단에서 큰 Z(안방쪽)까지
+              return (
+                <>
+                  {/* 도어 위쪽 (가로=doorW, 세로=WALL_HEIGHT-doorH) */}
+                  {aboveH > 0.001 && (
+                    <mesh position={[bR - 0.001, doorH + aboveH / 2, doorZ]} rotation={[0, -Math.PI / 2, 0]}>
+                      <planeGeometry args={[doorW, aboveH]} />
+                      <meshStandardMaterial map={makeTileTex(doorW / tileW, aboveH / tileH)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
+                    </mesh>
+                  )}
+                  {/* 도어 좌측 (Z < doorZmin) */}
+                  {leftLen > 0.001 && (
+                    <mesh position={[bR - 0.001, WALL_HEIGHT / 2, (bB + doorZmin) / 2]} rotation={[0, -Math.PI / 2, 0]}>
+                      <planeGeometry args={[leftLen, WALL_HEIGHT]} />
+                      <meshStandardMaterial map={makeTileTex(leftLen / tileW, WALL_HEIGHT / tileH)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
+                    </mesh>
+                  )}
+                  {/* 도어 우측 (Z > doorZmax) */}
+                  {rightLen > 0.001 && (
+                    <mesh position={[bR - 0.001, WALL_HEIGHT / 2, (doorZmax + bT) / 2]} rotation={[0, -Math.PI / 2, 0]}>
+                      <planeGeometry args={[rightLen, WALL_HEIGHT]} />
+                      <meshStandardMaterial map={makeTileTex(rightLen / tileW, WALL_HEIGHT / tileH)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
+                    </mesh>
+                  )}
+                </>
+              )
+            })()}
             {/* 안방쪽 벽 (Z=bT, -Z 면) */}
             <mesh position={[cX, WALL_HEIGHT / 2, bT - 0.001]} rotation={[0, Math.PI, 0]}>
               <planeGeometry args={[innerW, WALL_HEIGHT]} />
-              <meshStandardMaterial map={makeTileTex(innerW / tileW, WALL_HEIGHT / tileH)} roughness={0.15} metalness={0.05} />
+              <meshStandardMaterial map={makeTileTex(innerW / tileW, WALL_HEIGHT / tileH)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
             </mesh>
             {/* 먼쪽 벽 (Z=bB, +Z 면) */}
             <mesh position={[cX, WALL_HEIGHT / 2, bB + 0.001]}>
               <planeGeometry args={[innerW, WALL_HEIGHT]} />
-              <meshStandardMaterial map={makeTileTex(innerW / tileW, WALL_HEIGHT / tileH)} roughness={0.15} metalness={0.05} />
+              <meshStandardMaterial map={makeTileTex(innerW / tileW, WALL_HEIGHT / tileH)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
             </mesh>
 
             {/* === 변기 (GLB) === */}
@@ -2235,6 +2282,22 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         // 안방욕실 메인 조명 활성
         const mbBathActive = !!playerPos && playerPos[0] >= bL2 && playerPos[0] <= bR2 && playerPos[1] >= bB2 && playerPos[1] <= bT2
 
+        // 벽 타일 (600×1200 포세린)
+        const innerW2 = bR2 - bL2
+        const innerD2 = Math.abs(bT2 - bB2)
+        const tileW2 = 0.6
+        const tileH2 = 1.2
+        const cX2 = (bL2 + bR2) / 2
+        const cZ2 = (bT2 + bB2) / 2
+        const makeTileTex2 = (uRep: number, vRep: number) => {
+          const t = bathroomWallTex.clone()
+          t.wrapS = THREE.RepeatWrapping
+          t.wrapT = THREE.RepeatWrapping
+          t.repeat.set(uRep, vRep)
+          t.colorSpace = THREE.SRGBColorSpace
+          return t
+        }
+
         // 변기/세면대 — 북쪽 벽 (Z = bB2) 부착, 변기 서쪽, 세면대 동쪽
         const toilet2X = bL2 + 0.40
         const toilet2Z = bB2 + 0.30
@@ -2242,6 +2305,59 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         const sink2Z = bB2 + 0.30
         return (
           <group>
+            {/* === 벽 타일 (4면) === */}
+            {/* 좌측벽 (X=bL2, +X 면) */}
+            <mesh position={[bL2 + 0.001, WALL_HEIGHT / 2, cZ2]} rotation={[0, Math.PI / 2, 0]}>
+              <planeGeometry args={[innerD2, WALL_HEIGHT]} />
+              <meshStandardMaterial map={makeTileTex2(innerD2 / tileW2, WALL_HEIGHT / tileH2)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
+            </mesh>
+            {/* 우측벽 (X=bR2, -X 면) */}
+            <mesh position={[bR2 - 0.001, WALL_HEIGHT / 2, cZ2]} rotation={[0, -Math.PI / 2, 0]}>
+              <planeGeometry args={[innerD2, WALL_HEIGHT]} />
+              <meshStandardMaterial map={makeTileTex2(innerD2 / tileW2, WALL_HEIGHT / tileH2)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
+            </mesh>
+            {/* 안방쪽 벽 (Z=bT2, -Z 면) — 도어 개구부를 피해 3조각으로 분할 타일 */}
+            {(() => {
+              const doorH = 2.1
+              const doorW = 0.9
+              const doorXmin = mbDoorHinge
+              const doorXmax = mbDoorEnd
+              const doorXc = (doorXmin + doorXmax) / 2
+              const aboveH = WALL_HEIGHT - doorH
+              const leftLen = doorXmin - bL2
+              const rightLen = bR2 - doorXmax
+              return (
+                <>
+                  {/* 도어 위쪽 */}
+                  {aboveH > 0.001 && (
+                    <mesh position={[doorXc, doorH + aboveH / 2, bT2 - 0.001]} rotation={[0, Math.PI, 0]}>
+                      <planeGeometry args={[doorW, aboveH]} />
+                      <meshStandardMaterial map={makeTileTex2(doorW / tileW2, aboveH / tileH2)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
+                    </mesh>
+                  )}
+                  {/* 도어 좌측 (X < doorXmin) */}
+                  {leftLen > 0.001 && (
+                    <mesh position={[(bL2 + doorXmin) / 2, WALL_HEIGHT / 2, bT2 - 0.001]} rotation={[0, Math.PI, 0]}>
+                      <planeGeometry args={[leftLen, WALL_HEIGHT]} />
+                      <meshStandardMaterial map={makeTileTex2(leftLen / tileW2, WALL_HEIGHT / tileH2)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
+                    </mesh>
+                  )}
+                  {/* 도어 우측 (X > doorXmax) */}
+                  {rightLen > 0.001 && (
+                    <mesh position={[(doorXmax + bR2) / 2, WALL_HEIGHT / 2, bT2 - 0.001]} rotation={[0, Math.PI, 0]}>
+                      <planeGeometry args={[rightLen, WALL_HEIGHT]} />
+                      <meshStandardMaterial map={makeTileTex2(rightLen / tileW2, WALL_HEIGHT / tileH2)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
+                    </mesh>
+                  )}
+                </>
+              )
+            })()}
+            {/* 먼쪽벽 (Z=bB2, +Z 면) */}
+            <mesh position={[cX2, WALL_HEIGHT / 2, bB2 + 0.001]}>
+              <planeGeometry args={[innerW2, WALL_HEIGHT]} />
+              <meshStandardMaterial map={makeTileTex2(innerW2 / tileW2, WALL_HEIGHT / tileH2)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
+            </mesh>
+
             {/* 변기 (rotation = π/2 - π/2 = 0) */}
             <Suspense fallback={null}>
               <Toilet position={[toilet2X, 0, toilet2Z]} rotation={0} scale={0.4} />
@@ -2411,7 +2527,7 @@ function CuckooWaterPurifier({ position, rotation = 0 }: { position: [number, nu
   const silverColor = '#c8c8c8'
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      <mesh position={[0, H / 2, 0]} castShadow receiveShadow>
+      <mesh position={[0, H / 2, 0]}>
         <boxGeometry args={[W, H, D]} />
         <meshStandardMaterial color={bodyColor} roughness={0.3} metalness={0.05} />
       </mesh>
@@ -2485,7 +2601,7 @@ function LightWaveOven({ position, rotation = 0 }: { position: [number, number, 
   const sideColor = '#2a2a2a'
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      <mesh position={[0, 0, 0]} castShadow receiveShadow>
+      <mesh position={[0, 0, 0]}>
         <boxGeometry args={[W, H, D]} />
         <meshStandardMaterial color={sideColor} roughness={0.45} metalness={0.25} />
       </mesh>
@@ -2563,7 +2679,7 @@ function WashTower({ position, rotation = 0 }: { position: [number, number, numb
   return (
     <group position={position} rotation={[0, rotation, 0]}>
       {/* 본체 (베이지) */}
-      <mesh position={[0, H / 2, 0]} castShadow receiveShadow>
+      <mesh position={[0, H / 2, 0]}>
         <boxGeometry args={[W, H, D]} />
         <meshStandardMaterial color={bodyColor} roughness={0.4} metalness={0.1} />
       </mesh>
@@ -3267,7 +3383,7 @@ function JungmunSwingDoor({
     <group position={[hingeWorld[0], 0, hingeWorld[1]]}>
       <group ref={pivotRef}>
         <group position={[0, height / 2, localDoorCenterZ]} rotation={[0, sign * Math.PI / 2, 0]}>
-          <mesh position={[0, 0, -thickness / 2]} castShadow receiveShadow>
+          <mesh position={[0, 0, -thickness / 2]}>
             <extrudeGeometry args={[frameShape, { depth: thickness, bevelEnabled: false }]} />
             <meshPhysicalMaterial color={color} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
           </mesh>
@@ -3349,7 +3465,7 @@ function JungmunFixedPanel({
 
   return (
     <group position={[centerWorld[0], height / 2, centerWorld[1]]} rotation={[0, Math.PI / 2, 0]}>
-      <mesh position={[0, 0, -thickness / 2]} castShadow receiveShadow>
+      <mesh position={[0, 0, -thickness / 2]}>
         <extrudeGeometry args={[frameShape, { depth: thickness, bevelEnabled: false }]} />
         <meshPhysicalMaterial color={color} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
       </mesh>
@@ -3399,13 +3515,13 @@ function ToddlerBed({
   return (
     <group position={[position[0], 0, position[1]]} rotation={[0, rotationY, 0]}>
       {/* 베이스 프레임 */}
-      <mesh position={[0, baseH / 2, 0]} castShadow receiveShadow>
+      <mesh position={[0, baseH / 2, 0]}>
         <boxGeometry args={[length, baseH, width]} />
         <meshStandardMaterial color={frameColor} roughness={0.7} />
       </mesh>
 
       {/* 매트리스 */}
-      <mesh position={[0, baseH + mattH / 2, 0]} castShadow receiveShadow>
+      <mesh position={[0, baseH + mattH / 2, 0]}>
         <boxGeometry args={[length - 0.04, mattH, width - 0.04]} />
         <meshStandardMaterial color={mattColor} roughness={0.85} />
       </mesh>
@@ -3416,8 +3532,8 @@ function ToddlerBed({
         radius={cornerR}
         smoothness={4}
         position={[0, bumperH / 2, -width / 2 - bumperT / 2]}
-        castShadow
-        receiveShadow
+       
+       
       >
         <meshStandardMaterial color={bumperColor} roughness={0.6} />
       </RoundedBox>
@@ -3428,8 +3544,8 @@ function ToddlerBed({
         radius={cornerR}
         smoothness={4}
         position={[frontCx, bumperH / 2, width / 2 + bumperT / 2]}
-        castShadow
-        receiveShadow
+       
+       
       >
         <meshStandardMaterial color={bumperColor} roughness={0.6} />
       </RoundedBox>
@@ -3440,8 +3556,8 @@ function ToddlerBed({
         radius={cornerR}
         smoothness={4}
         position={[-length / 2 - bumperT / 2, bumperH / 2, 0]}
-        castShadow
-        receiveShadow
+       
+       
       >
         <meshStandardMaterial color={bumperColor} roughness={0.6} />
       </RoundedBox>
@@ -3452,8 +3568,8 @@ function ToddlerBed({
         radius={cornerR}
         smoothness={4}
         position={[length / 2 + bumperT / 2, bumperH / 2, 0]}
-        castShadow
-        receiveShadow
+       
+       
       >
         <meshStandardMaterial color={bumperColor} roughness={0.6} />
       </RoundedBox>
@@ -3497,7 +3613,7 @@ function TrestleDesk({
   return (
     <group position={[position[0], 0, position[1]]} rotation={[0, rotationY, 0]}>
       {/* 상판 */}
-      <mesh position={[0, topCenterY, 0]} castShadow receiveShadow>
+      <mesh position={[0, topCenterY, 0]}>
         <boxGeometry args={[width, topT, depth]} />
         <meshStandardMaterial color={topColor} roughness={0.35} metalness={0.1} />
       </mesh>
@@ -3508,12 +3624,12 @@ function TrestleDesk({
         return (
           <group key={`leg-${i}`} position={[lx, 0, 0]}>
             {/* 세로 기둥 */}
-            <mesh position={[0, pivotY, 0]} castShadow receiveShadow>
+            <mesh position={[0, pivotY, 0]}>
               <boxGeometry args={[postT, postH, postT]} />
               <meshStandardMaterial color={legColor} roughness={0.45} metalness={0.5} />
             </mesh>
             {/* 바닥 가로 풋 (depth 방향) */}
-            <mesh position={[0, 0.020, 0]} castShadow receiveShadow>
+            <mesh position={[0, 0.020, 0]}>
               <boxGeometry args={[postT, 0.030, footLen]} />
               <meshStandardMaterial color={legColor} roughness={0.45} metalness={0.5} />
             </mesh>
@@ -3533,8 +3649,8 @@ function TrestleDesk({
                   key={`br-${dir}`}
                   position={[bx, midY, midZ]}
                   rotation={[angle, 0, 0]}
-                  castShadow
-                  receiveShadow
+                 
+                 
                 >
                   <boxGeometry args={[braceT, len, braceT]} />
                   <meshStandardMaterial color={legColor} roughness={0.45} metalness={0.5} />
