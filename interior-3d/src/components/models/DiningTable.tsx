@@ -5,9 +5,8 @@
 
 import { useMemo } from 'react'
 import * as THREE from 'three'
-import { useLoader } from '@react-three/fiber'
-import { TextureLoader } from 'three'
 import { WALL_HEIGHT } from '../../data/apartment'
+import { useKTX2 } from '../../systems/useKTX2'
 
 /** XZ 평면 모서리만 둥글린 직사각형 → Y축으로 extrude한 thin slab geometry.
  *  top/side UV가 [0,1]로 정규화되어 텍스처가 한 번에 매핑됨. */
@@ -68,7 +67,7 @@ export function DiningTable({ position, active }: DiningTableProps) {
   const barLen = 1.2
 
   const topGeom = useMemo(() => makeRoundedSlab(TABLE_W, TABLE_D, 0.03, 0.1), [])
-  const marbleTex = useLoader(TextureLoader, '/textures/marble-table.png')
+  const marbleTex = useKTX2('/textures/marble-table.ktx2')
   const marbleMap = useMemo(() => {
     const t = marbleTex.clone()
     t.colorSpace = THREE.SRGBColorSpace
@@ -77,67 +76,66 @@ export function DiningTable({ position, active }: DiningTableProps) {
   }, [marbleTex])
 
   return (
-    <group>
-      {/* 상판 (대리석) — XZ 모서리만 100mm 라운딩, 두께 30mm 유지, marble 텍스처 */}
-      <mesh geometry={topGeom} position={[tableX, TABLE_H, tableZ]}>
-        <meshStandardMaterial map={marbleMap} roughness={0.15} metalness={0.05} />
-      </mesh>
-      {/* 가운데 기둥 */}
-      <mesh position={[tableX, TABLE_H / 2 - 0.02, tableZ]}>
-        <cylinderGeometry args={[0.04, 0.04, TABLE_H - 0.06, 12]} />
-        <meshStandardMaterial color="#6b4226" roughness={0.7} />
-      </mesh>
-      {/* 받침판 */}
-      <mesh position={[tableX, 0.015, tableZ]}>
-        <cylinderGeometry args={[0.3, 0.35, 0.03, 16]} />
-        <meshStandardMaterial color="#5a3620" roughness={0.7} />
-      </mesh>
-      {/* 기둥-상판 연결 */}
-      <mesh position={[tableX, TABLE_H - 0.05, tableZ]}>
-        <cylinderGeometry args={[0.15, 0.04, 0.06, 12]} />
-        <meshStandardMaterial color="#6b4226" roughness={0.7} />
-      </mesh>
+    <>
+      {/* lights outside group for stable Three.js light count */}
+      <rectAreaLight
+        position={[tableX, WALL_HEIGHT - 0.52, tableZ]}
+        width={1.15}
+        height={0.025}
+        intensity={active ? 15 : 0}
+        color="#ffe0b0"
+        rotation={[Math.PI / 2, 0, 0]}
+      />
+      <pointLight
+        position={[tableX, WALL_HEIGHT - 0.55, tableZ]}
+        intensity={active ? 0.8 : 0}
+        distance={2.5}
+        decay={2}
+        color="#ffe0b0"
+      />
+      <group>
+        {/* 상판 (대리석) — XZ 모서리만 100mm 라운딩, 두께 30mm 유지, marble 텍스처 */}
+        <mesh geometry={topGeom} position={[tableX, TABLE_H, tableZ]}>
+          <meshStandardMaterial map={marbleMap} roughness={0.15} metalness={0.05} />
+        </mesh>
+        {/* 가운데 기둥 */}
+        <mesh position={[tableX, TABLE_H / 2 - 0.02, tableZ]}>
+          <cylinderGeometry args={[0.04, 0.04, TABLE_H - 0.06, 12]} />
+          <meshStandardMaterial color="#6b4226" roughness={0.7} />
+        </mesh>
+        {/* 받침판 */}
+        <mesh position={[tableX, 0.015, tableZ]}>
+          <cylinderGeometry args={[0.3, 0.35, 0.03, 16]} />
+          <meshStandardMaterial color="#5a3620" roughness={0.7} />
+        </mesh>
+        {/* 기둥-상판 연결 */}
+        <mesh position={[tableX, TABLE_H - 0.05, tableZ]}>
+          <cylinderGeometry args={[0.15, 0.04, 0.06, 12]} />
+          <meshStandardMaterial color="#6b4226" roughness={0.7} />
+        </mesh>
 
-      {/* 펜던트 조명 */}
-      <mesh position={[tableX, WALL_HEIGHT - 0.01, tableZ]}>
-        <boxGeometry args={[0.2, 0.02, 0.04]} />
-        <meshStandardMaterial color="#222" metalness={0.5} roughness={0.3} />
-      </mesh>
-      <mesh position={[tableX - barLen / 2 + 0.05, (WALL_HEIGHT + pendantY) / 2, tableZ]}>
-        <cylinderGeometry args={[0.001, 0.001, WALL_HEIGHT - pendantY - 0.02, 4]} />
-        <meshStandardMaterial color="#888" metalness={0.8} roughness={0.2} />
-      </mesh>
-      <mesh position={[tableX + barLen / 2 - 0.05, (WALL_HEIGHT + pendantY) / 2, tableZ]}>
-        <cylinderGeometry args={[0.001, 0.001, WALL_HEIGHT - pendantY - 0.02, 4]} />
-        <meshStandardMaterial color="#888" metalness={0.8} roughness={0.2} />
-      </mesh>
-      <mesh position={[tableX, pendantY, tableZ]}>
-        <boxGeometry args={[barLen, 0.04, 0.05]} />
-        <meshStandardMaterial color="#1a1a1a" metalness={0.5} roughness={0.3} />
-      </mesh>
-      <mesh position={[tableX, pendantY - 0.021, tableZ]}>
-        <boxGeometry args={[barLen - 0.02, 0.005, 0.04]} />
-        <meshStandardMaterial color={active ? '#fff' : '#444'} emissive={active ? '#fff5e6' : '#111'} emissiveIntensity={active ? 4.0 : 0.1} />
-      </mesh>
-      {active && (
-        <rectAreaLight
-          position={[tableX, WALL_HEIGHT - 0.52, tableZ]}
-          width={1.15}
-          height={0.025}
-          intensity={15}
-          color="#ffe0b0"
-          rotation={[Math.PI / 2, 0, 0]}
-        />
-      )}
-      {active && (
-        <pointLight
-          position={[tableX, WALL_HEIGHT - 0.55, tableZ]}
-          intensity={0.8}
-          distance={2.5}
-          decay={2}
-          color="#ffe0b0"
-        />
-      )}
-    </group>
+        {/* 펜던트 조명 */}
+        <mesh position={[tableX, WALL_HEIGHT - 0.01, tableZ]}>
+          <boxGeometry args={[0.2, 0.02, 0.04]} />
+          <meshStandardMaterial color="#222" metalness={0.5} roughness={0.3} />
+        </mesh>
+        <mesh position={[tableX - barLen / 2 + 0.05, (WALL_HEIGHT + pendantY) / 2, tableZ]}>
+          <cylinderGeometry args={[0.001, 0.001, WALL_HEIGHT - pendantY - 0.02, 4]} />
+          <meshStandardMaterial color="#888" metalness={0.8} roughness={0.2} />
+        </mesh>
+        <mesh position={[tableX + barLen / 2 - 0.05, (WALL_HEIGHT + pendantY) / 2, tableZ]}>
+          <cylinderGeometry args={[0.001, 0.001, WALL_HEIGHT - pendantY - 0.02, 4]} />
+          <meshStandardMaterial color="#888" metalness={0.8} roughness={0.2} />
+        </mesh>
+        <mesh position={[tableX, pendantY, tableZ]}>
+          <boxGeometry args={[barLen, 0.04, 0.05]} />
+          <meshStandardMaterial color="#1a1a1a" metalness={0.5} roughness={0.3} />
+        </mesh>
+        <mesh position={[tableX, pendantY - 0.021, tableZ]}>
+          <boxGeometry args={[barLen - 0.02, 0.005, 0.04]} />
+          <meshStandardMaterial color={active ? '#fff' : '#444'} emissive={active ? '#fff5e6' : '#111'} emissiveIntensity={active ? 4.0 : 0.1} />
+        </mesh>
+      </group>
+    </>
   )
 }

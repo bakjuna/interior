@@ -74,6 +74,8 @@ export function BirdsEyeView() {
     <>
       <Canvas
         shadows
+        dpr={[1, 2]}
+        performance={{ min: 0.5 }}
         camera={{
           position: [LR_W / 2 + 3, WALL_HEIGHT * 3, LR_D / 2 + 4],
           fov: 50,

@@ -21,8 +21,6 @@ interface HallwayProps {
 }
 
 export function Hallway({ visible, playerPos, allLightsOn }: HallwayProps) {
-  if (!visible) return null
-
   const wallStartX = LR_W - 1.481 - 0.800
   const wallEndX = LR_W - 1.481
   const wallZ = -T2
@@ -42,24 +40,24 @@ export function Hallway({ visible, playerPos, allLightsOn }: HallwayProps) {
 
   return (
     <>
-      <mesh position={[wallCenterX, 0.1, wallZ]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[wallLen, WALL_THICKNESS]} />
-        <meshStandardMaterial
-          color={isActive ? '#fff' : '#444'}
-          emissive={isActive ? '#ffe0b0' : '#111'}
-          emissiveIntensity={isActive ? 3.0 : 0.1}
-        />
-      </mesh>
-      {isActive && (
-        <rectAreaLight
-          position={[wallCenterX, 0.1, wallZ]}
-          width={wallLen}
-          height={WALL_THICKNESS}
-          intensity={30}
-          color="#ffe0b0"
-          rotation={[Math.PI / 2, 0, 0]}
-        />
-      )}
+      <rectAreaLight
+        position={[wallCenterX, 0.1, wallZ]}
+        width={wallLen}
+        height={WALL_THICKNESS}
+        intensity={isActive ? 30 : 0}
+        color="#ffe0b0"
+        rotation={[Math.PI / 2, 0, 0]}
+      />
+      <group visible={visible}>
+        <mesh position={[wallCenterX, 0.1, wallZ]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[wallLen, WALL_THICKNESS]} />
+          <meshStandardMaterial
+            color={isActive ? '#fff' : '#444'}
+            emissive={isActive ? '#ffe0b0' : '#111'}
+            emissiveIntensity={isActive ? 3.0 : 0.1}
+          />
+        </mesh>
+      </group>
     </>
   )
 }

@@ -6,8 +6,6 @@
  */
 
 import { useMemo } from 'react'
-import { useLoader } from '@react-three/fiber'
-import { TextureLoader } from 'three'
 import { FlushDoor } from '../models/FlushDoor'
 import { JungmunSwingDoor, JungmunFixedPanel } from '../models/JungmunDoor'
 import {
@@ -24,6 +22,7 @@ import {
   babyTopWallZ,
 } from '../../data/apartment'
 import type { DoorId } from '../../data/sectors'
+import { useKTX2 } from '../../systems/useKTX2'
 
 const T2 = WALL_THICKNESS / 2
 const mbLeft = -WALL_THICKNESS - MB_W
@@ -34,7 +33,7 @@ interface DoorsProps {
 }
 
 export function Doors({ activeDoorId, onDoorOpenChange }: DoorsProps) {
-  const walnutDoorTex = useLoader(TextureLoader, '/textures/walnut_door.png')
+  const walnutDoorTex = useKTX2('/textures/walnut_door.ktx2')
 
   // 안정화된 콜백 맵 — 각 도어 인스턴스마다 고정된 callback 참조 보장
   const handlers = useMemo(() => {

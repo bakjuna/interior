@@ -4,11 +4,11 @@
  */
 
 import { useEffect, useMemo, useRef } from 'react'
-import { useLoader, useThree } from '@react-three/fiber'
-import { TextureLoader } from 'three'
+import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { TrestleDesk } from '../models/TrestleDesk'
 import { LR_W, right1Z, WALL_THICKNESS, WALL_HEIGHT, babyRightWallX } from '../../data/apartment'
+import { useKTX2 } from '../../systems/useKTX2'
 
 const T2 = WALL_THICKNESS / 2
 
@@ -19,7 +19,7 @@ interface WorkRoomProps {
 }
 
 export function WorkRoom({ visible, playerPos, allLightsOn }: WorkRoomProps) {
-  const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
+  const closetDoorTex = useKTX2('/textures/walnut-closet-door.ktx2')
   const walnutTex = useMemo(() => {
     const t = closetDoorTex.clone()
     t.wrapS = THREE.RepeatWrapping
@@ -28,8 +28,6 @@ export function WorkRoom({ visible, playerPos, allLightsOn }: WorkRoomProps) {
     t.colorSpace = THREE.SRGBColorSpace
     return t
   }, [closetDoorTex])
-
-  if (!visible) return null
 
   // 작업실 활성: playerPos가 작업실 bounds 내 또는 allLightsOn
   const workMinX = babyRightWallX + 2.555 + T2
@@ -87,6 +85,15 @@ export function WorkRoom({ visible, playerPos, allLightsOn }: WorkRoomProps) {
 
   return (
     <>
+      {/* bookshelf spotlight — outside visible group */}
+      <pointLight
+        position={[LR_W - 0.30, WALL_HEIGHT - 0.02, shelfCenterZ]}
+        intensity={workActive ? 6.0 : 0}
+        distance={6}
+        decay={2}
+        color="#ffe0b0"
+      />
+      <group visible={visible}>
       <TrestleDesk position={[cx1, z1]} rotationY={Math.PI / 2} width={w1} />
       <TrestleDesk position={[cx, z2]} rotationY={Math.PI / 2} width={w2} />
 
@@ -152,6 +159,7 @@ export function WorkRoom({ visible, playerPos, allLightsOn }: WorkRoomProps) {
         targetZ={shelfCenterZ}
         active={workActive}
       />
+    </group>
     </>
   )
 }
@@ -200,21 +208,7 @@ function BookshelfSpotlight({ ceilingY, spotX, spotZ, targetX, targetY, targetZ,
         <ringGeometry args={[0.035, 0.045, 16]} />
         <meshStandardMaterial color="#ccc" metalness={0.6} roughness={0.3} />
       </mesh>
-      {/* 책장 향해 비추는 spotLight — 자동 정렬 (target=책장 중앙).
-          half-angle ~25° → 거리 ~2.5m 에서 콘 직경 ≈ 2.3m, 책장 영역에 fit.
-          beam 방향은 수평 거리 ≈ 2.12m / 수직 ≈ 1.28m → 약 31° 아래쪽. */}
-      {active && (
-        <spotLight
-          ref={lightRef}
-          position={[spotX, ceilingY - 0.02, spotZ]}
-          angle={Math.PI / 7}
-          penumbra={0.5}
-          intensity={6.0}
-          distance={6}
-          decay={2}
-          color="#ffe0b0"
-        />
-      )}
+      {/* pointLight moved outside visible group in WorkRoom */}
     </>
   )
 }

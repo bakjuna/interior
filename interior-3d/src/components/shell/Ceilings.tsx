@@ -6,7 +6,9 @@
  * Rooms.tsx 가 아닌 shell에서 처리.
  */
 
+import { useMemo } from 'react'
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import {
   rooms,
   walls,
@@ -26,6 +28,27 @@ import type { SectorId } from '../../data/sectors'
 
 const T2 = WALL_THICKNESS / 2
 const mbLeft = -WALL_THICKNESS - MB_W
+
+function MergedCeilings() {
+  const geometry = useMemo(() => {
+    const geos = rooms.map((room) => {
+      const g = new THREE.PlaneGeometry(room.size[0], room.size[1])
+      g.rotateX(-Math.PI / 2)
+      g.translate(room.center[0], WALL_HEIGHT, room.center[1])
+      return g
+    })
+    const merged = mergeGeometries(geos, false)
+    geos.forEach(g => g.dispose())
+    return merged
+  }, [])
+
+  if (!geometry) return null
+  return (
+    <mesh geometry={geometry}>
+      <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} side={THREE.BackSide} />
+    </mesh>
+  )
+}
 
 interface CeilingsProps {
   showCeiling: boolean
@@ -65,32 +88,28 @@ export function Ceilings({ showCeiling, playerPos, allLightsOn, visibleSectors }
         <boxGeometry args={[MB_W, 0.015, 0.008]} />
         <meshStandardMaterial color={mbActive ? '#fff' : '#444'} emissive={mbActive ? '#ffe0b0' : '#111'} emissiveIntensity={mbActive ? 3.0 : 0.1} />
       </mesh>
-      {mbActive && (
-        <rectAreaLight
-          position={[mbLeft + MB_W / 2, WALL_HEIGHT - 0.005, LR_D - 0.8 - 0.02]}
-          width={MB_W}
-          height={0.03}
-          intensity={8}
-          color="#ffe0b0"
-          rotation={[-Math.PI / 2, 0, 0]}
-        />
-      )}
+      <rectAreaLight
+        position={[mbLeft + MB_W / 2, WALL_HEIGHT - 0.005, LR_D - 0.8 - 0.02]}
+        width={MB_W}
+        height={0.03}
+        intensity={mbActive ? 8 : 0}
+        color="#ffe0b0"
+        rotation={[-Math.PI / 2, 0, 0]}
+      />
 
       {/* 거실 LED 스트립 */}
       <mesh position={[LR_W / 2, WALL_HEIGHT - 0.008, LR_D - 0.8 - 0.01]}>
         <boxGeometry args={[LR_W, 0.015, 0.008]} />
         <meshStandardMaterial color={lrActive ? '#fff' : '#444'} emissive={lrActive ? '#ffe0b0' : '#111'} emissiveIntensity={lrActive ? 3.0 : 0.1} />
       </mesh>
-      {lrActive && (
-        <rectAreaLight
-          position={[LR_W / 2, WALL_HEIGHT - 0.005, LR_D - 0.8 - 0.02]}
-          width={LR_W}
-          height={0.03}
-          intensity={16}
-          color="#ffe0b0"
-          rotation={[-Math.PI / 2, 0, 0]}
-        />
-      )}
+      <rectAreaLight
+        position={[LR_W / 2, WALL_HEIGHT - 0.005, LR_D - 0.8 - 0.02]}
+        width={LR_W}
+        height={0.03}
+        intensity={lrActive ? 16 : 0}
+        color="#ffe0b0"
+        rotation={[-Math.PI / 2, 0, 0]}
+      />
 
       {/* 안방 단내림 천장 */}
       <mesh position={[mbLeft + MB_W / 2, WALL_HEIGHT - 0.075, LR_D - 0.4]}>
@@ -113,16 +132,14 @@ export function Ceilings({ showCeiling, playerPos, allLightsOn, visibleSectors }
         <boxGeometry args={[BABY_INNER_W + 0.2, 0.015, 0.008]} />
         <meshStandardMaterial color={babyActive ? '#fff' : '#444'} emissive={babyActive ? '#ffe0b0' : '#111'} emissiveIntensity={babyActive ? 3.0 : 0.1} />
       </mesh>
-      {babyActive && (
-        <rectAreaLight
-          position={[(babyLeft + babyRight + 0.2) / 2, WALL_HEIGHT - 0.005, babyTop + 0.8 + 0.02]}
-          width={BABY_INNER_W + 0.2}
-          height={0.03}
-          intensity={8}
-          color="#ffe0b0"
-          rotation={[-Math.PI / 2, 0, 0]}
-        />
-      )}
+      <rectAreaLight
+        position={[(babyLeft + babyRight + 0.2) / 2, WALL_HEIGHT - 0.005, babyTop + 0.8 + 0.02]}
+        width={BABY_INNER_W + 0.2}
+        height={0.03}
+        intensity={babyActive ? 8 : 0}
+        color="#ffe0b0"
+        rotation={[-Math.PI / 2, 0, 0]}
+      />
 
       {/* 작업실 단내림 (상단벽쪽, 거울상) */}
       <mesh position={[workCenterX, WALL_HEIGHT - 0.075, workTopZ + 0.4]}>
@@ -133,28 +150,17 @@ export function Ceilings({ showCeiling, playerPos, allLightsOn, visibleSectors }
         <boxGeometry args={[workW, 0.015, 0.008]} />
         <meshStandardMaterial color={workActive ? '#fff' : '#444'} emissive={workActive ? '#ffe0b0' : '#111'} emissiveIntensity={workActive ? 3.0 : 0.1} />
       </mesh>
-      {workActive && (
-        <rectAreaLight
-          position={[workCenterX, WALL_HEIGHT - 0.005, workTopZ + 0.8 + 0.02]}
-          width={workW}
-          height={0.03}
-          intensity={8}
-          color="#ffe0b0"
-          rotation={[-Math.PI / 2, 0, 0]}
-        />
-      )}
+      <rectAreaLight
+        position={[workCenterX, WALL_HEIGHT - 0.005, workTopZ + 0.8 + 0.02]}
+        width={workW}
+        height={0.03}
+        intensity={workActive ? 8 : 0}
+        color="#ffe0b0"
+        rotation={[-Math.PI / 2, 0, 0]}
+      />
 
-      {/* === 방별 천장 plane === */}
-      {rooms.map((room) => (
-        <mesh
-          key={`ceiling-${room.name}-${room.center[0]}`}
-          rotation={[-Math.PI / 2, 0, 0]}
-          position={[room.center[0], WALL_HEIGHT, room.center[1]]}
-        >
-          <planeGeometry args={room.size} />
-          <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} side={THREE.BackSide} />
-        </mesh>
-      ))}
+      {/* === 방별 천장 plane (병합) === */}
+      <MergedCeilings />
     </>
   )
 }

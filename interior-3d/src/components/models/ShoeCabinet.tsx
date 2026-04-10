@@ -10,10 +10,9 @@
  */
 
 import { useMemo } from 'react'
-import { useLoader } from '@react-three/fiber'
-import { TextureLoader } from 'three'
 import * as THREE from 'three'
 import { LR_W, WALL_THICKNESS } from '../../data/apartment'
+import { useKTX2 } from '../../systems/useKTX2'
 
 const T2 = WALL_THICKNESS / 2
 
@@ -22,7 +21,7 @@ interface ShoeCabinetProps {
 }
 
 export function ShoeCabinet({ active }: ShoeCabinetProps) {
-  const walnutDoorTex = useLoader(TextureLoader, '/textures/walnut_door.png')
+  const walnutDoorTex = useKTX2('/textures/walnut_door.ktx2')
 
   const walnutLinerTex2x1 = useMemo(() => {
     const tex = walnutDoorTex.clone()
@@ -62,8 +61,41 @@ export function ShoeCabinet({ active }: ShoeCabinetProps) {
   const doorColor = '#fafaf8'
   const t = 0.018
 
+  // 오픈 선반 LED 위치 — IIFE 밖으로 추출 (lights를 root group 밖에 배치하기 위함)
+  const ledInteriorLeft = xLeft + t / 2
+  const ledInteriorRight = xLeft + colW * 3 - t / 2
+  const ledInteriorTop = floorClear + lowerH + openH - t
+  const ledInteriorCx = (ledInteriorLeft + ledInteriorRight) / 2
+  const ledInteriorWidth = ledInteriorRight - ledInteriorLeft
+  const ledStripDepth = 0.010
+  const ledStripZ = zBack - t - ledStripDepth / 2 - 0.002
+  const ledStripY = ledInteriorTop - 0.001
+
+  // 다운라이트 위치
+  const dlY = floorClear - t - 0.002
+
   return (
-    <group>
+    <>
+      {/* lights outside group for stable Three.js light count */}
+      <rectAreaLight
+        position={[ledInteriorCx, ledStripY - 0.002, ledStripZ]}
+        width={ledInteriorWidth}
+        height={ledStripDepth}
+        intensity={active ? 60 : 0}
+        color="#ffe0b0"
+        rotation={[-Math.PI / 2, 0, 0]}
+      />
+      {[0, 1, 2, 3].map((ci) => (
+        <pointLight
+          key={`shoe-dl-light-${ci}`}
+          position={[xLeft + colW * (ci + 0.5), dlY - 0.005, zCenter]}
+          intensity={active ? 1.5 : 0}
+          distance={1.5}
+          decay={2}
+          color="#ffe0b0"
+        />
+      ))}
+      <group>
       {/* 백패널 */}
       <mesh position={[xCenter, floorClear + cabH / 2, zBack - t / 2]}>
         <boxGeometry args={[totalW, cabH, t]} />
@@ -170,16 +202,7 @@ export function ShoeCabinet({ active }: ShoeCabinetProps) {
                 emissiveIntensity={active ? 3.0 : 0.1}
               />
             </mesh>
-            {active && (
-              <rectAreaLight
-                position={[interiorCx, stripY - 0.002, stripZ]}
-                width={interiorWidth}
-                height={stripDepth}
-                intensity={60}
-                color="#ffe0b0"
-                rotation={[-Math.PI / 2, 0, 0]}
-              />
-            )}
+            {/* rectAreaLight moved outside root group */}
           </>
         )
       })()}
@@ -243,18 +266,7 @@ export function ShoeCabinet({ active }: ShoeCabinetProps) {
                     <ringGeometry args={[0.03, 0.038, 16]} />
                     <meshStandardMaterial color="#ccc" metalness={0.6} roughness={0.3} />
                   </mesh>
-                  {active && (
-                    <spotLight
-                      position={[cx, dlY - 0.005, zCenter]}
-                      target-position={[cx, 0, zCenter]}
-                      angle={Math.PI / 3}
-                      penumbra={0.6}
-                      intensity={1.5}
-                      distance={1.5}
-                      decay={2}
-                      color="#ffe0b0"
-                    />
-                  )}
+                  {/* pointLight moved outside root group */}
                 </group>
               )
             })}
@@ -262,5 +274,6 @@ export function ShoeCabinet({ active }: ShoeCabinetProps) {
         )
       })()}
     </group>
+    </>
   )
 }

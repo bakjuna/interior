@@ -1,22 +1,19 @@
 /**
- * 모든 벽체 일괄 렌더 — walls[] 데이터 그대로.
- * 실크 벽지 텍스처를 한 번 로드해서 벽마다 clone (가로 반복).
- * 방별로 분리하지 않음 — 공유벽 owner 모호 + merging 효과 분산 방지.
+ * 모든 벽체 일괄 렌더 — walls[] 데이터 + 실크 벽지 텍스처.
+ * 벽별 UV repeat 을 geometry 에 bake 한 뒤 mergeGeometries 로 단일 draw call.
  */
 
 import { useMemo } from 'react'
-import { useLoader } from '@react-three/fiber'
-import { TextureLoader } from 'three'
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { walls, WALL_HEIGHT } from '../../data/apartment'
+import { useKTX2 } from '../../systems/useKTX2'
 
 export function Walls() {
-  const silkTex = useLoader(TextureLoader, '/textures/silk.png')
+  const silkTex = useKTX2('/textures/silk.ktx2')
 
-  // 벽별 정적 데이터 + 텍스처 — 1번만 계산 (매 렌더마다 clone 방지).
-  // 부모(ApartmentModel)가 playerPos 4Hz 로 리렌더되므로 clone × 50 walls 가 초당 200회 발생하던 문제 해결.
-  const wallEntries = useMemo(() => {
-    return walls.map((wall) => {
+  const { mergedGeo, material } = useMemo(() => {
+    const geos = walls.map((wall) => {
       const dx = wall.end[0] - wall.start[0]
       const dz = wall.end[1] - wall.start[1]
       const length = Math.sqrt(dx * dx + dz * dz)
@@ -26,36 +23,54 @@ export function Walls() {
       const h = wall.bottomY !== undefined ? specifiedH : specifiedH + 0.03
       const t = wall.thickness
 
-      const silk = silkTex.clone()
-      silk.wrapS = THREE.RepeatWrapping
-      silk.wrapT = THREE.ClampToEdgeWrapping
-      silk.repeat.set(length / 2, 1)
-      silk.colorSpace = THREE.SRGBColorSpace
+      const sizeX = isH ? length : t
+      const sizeZ = isH ? t : length
+      const g = new THREE.BoxGeometry(sizeX, h, sizeZ)
 
-      return {
-        position: [
-          wall.start[0] + dx / 2,
-          bY + h / 2,
-          wall.start[1] + dz / 2,
-        ] as [number, number, number],
-        size: [isH ? length : t, h, isH ? t : length] as [number, number, number],
-        tex: silk,
+      // UV bake: 벽지 repeat = (length / 2, 1) 을 UV 좌표에 직접 적용
+      // BoxGeometry face 순서 (각 4 vertices):
+      //   0: +X, 1: -X, 2: +Y, 3: -Y, 4: +Z, 5: -Z
+      const repeatX = length / 2
+      const uv = g.getAttribute('uv') as THREE.BufferAttribute
+      for (let vi = 0; vi < uv.count; vi++) {
+        const faceIdx = Math.floor(vi / 4)
+        // 가로벽(isH): +Z/-Z 면(4,5)이 큰 면 → U 축 스케일
+        // 세로벽(!isH): +X/-X 면(0,1)이 큰 면 → U 축 스케일
+        if (isH && (faceIdx === 4 || faceIdx === 5)) {
+          uv.setX(vi, uv.getX(vi) * repeatX)
+        } else if (!isH && (faceIdx === 0 || faceIdx === 1)) {
+          uv.setX(vi, uv.getX(vi) * repeatX)
+        }
+        // 나머지 면(얇은 면, 상하면)은 1:1 유지 — 어차피 거의 안 보임
       }
+
+      g.translate(
+        wall.start[0] + dx / 2,
+        bY + h / 2,
+        wall.start[1] + dz / 2,
+      )
+      return g
     })
+
+    const merged = mergeGeometries(geos, false)
+    geos.forEach(g => g.dispose())
+
+    const tex = silkTex.clone()
+    tex.wrapS = THREE.RepeatWrapping
+    tex.wrapT = THREE.ClampToEdgeWrapping
+    tex.repeat.set(1, 1) // UV에 이미 bake
+    tex.colorSpace = THREE.SRGBColorSpace
+
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex,
+      roughness: 0.55,
+      metalness: 0,
+    })
+
+    return { mergedGeo: merged, material: mat }
   }, [silkTex])
 
-  return (
-    <>
-      {wallEntries.map((w, i) => (
-        <mesh key={i} position={w.position}>
-          <boxGeometry args={w.size} />
-          <meshStandardMaterial
-            map={w.tex}
-            roughness={0.55}
-            metalness={0}
-          />
-        </mesh>
-      ))}
-    </>
-  )
+  if (!mergedGeo) return null
+
+  return <mesh geometry={mergedGeo} material={material} />
 }

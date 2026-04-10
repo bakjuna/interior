@@ -7,9 +7,8 @@
  */
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { useFrame, useLoader, useThree } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
-import { TextureLoader } from 'three'
 import * as THREE from 'three'
 import { CuckooWaterPurifier } from '../models/CuckooWaterPurifier'
 import { RiceCooker } from '../models/RiceCooker'
@@ -17,9 +16,9 @@ import { LightWaveOven } from '../models/LightWaveOven'
 import { Refrigerator } from '../models/Refrigerator'
 import { KimchiFridge } from '../models/KimchiFridge'
 import { DiningTable } from '../models/DiningTable'
-import { DropCeilingLight } from '../primitives/DropCeilingLight'
 import { doorRegistry } from '../../systems/doorRegistry'
 import type { DoorId } from '../../data/sectors'
+import { useKTX2 } from '../../systems/useKTX2'
 import {
   WALL_THICKNESS,
   WALL_HEIGHT,
@@ -38,8 +37,8 @@ interface KitchenProps {
 }
 
 export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: KitchenProps) {
-  const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
-  const kitchenTileTex = useLoader(TextureLoader, '/textures/kitchen-tile.png')
+  const closetDoorTex = useKTX2('/textures/walnut-closet-door.ktx2')
+  const kitchenTileTex = useKTX2('/textures/kitchen-tile.ktx2')
 
   // 백스플래시 타일 — 한 이미지 ≈ 1.95m × 0.9m
   // 동측 벽이 Z=-5.062 에서 X=kitRight → X=kitRight+0.055 로 5.5cm 들어가는 step 있음 (apartment.ts 231/301)
@@ -91,8 +90,6 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
     return t
   }, [closetDoorTex])
 
-  if (!visible) return null
-
   // === 주방 좌표 기준 ===
   const wall2300Z = babyTop - T2 - 1.119 - 0.770
   const kitchenTopInner = wall2300Z + T2
@@ -136,37 +133,33 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
   const inductionGroupZ = wall2300Z + T2 + 0.949
 
   return (
-    <group>
-      {/* === 주방 단일 라인 천장 LED + 3 spotLights === */}
+    <>
+      {/* === 주방 천장 LED lights (outside visible group) === */}
+      <rectAreaLight
+        position={[lineCenterX, lightY - 0.005, lineCenterZ]}
+        width={wLight}
+        height={lineLen}
+        intensity={kitchenActive ? 225 : 0}
+        color="#ffffff"
+        rotation={[Math.PI / 2, 0, 0]}
+      />
+      {[0.25, 0.5, 0.75].map((t, i) => (
+        <pointLight
+          key={`kit-pl-${i}`}
+          position={[lineCenterX, WALL_HEIGHT - 0.02, lineZstart + lineLen * t]}
+          intensity={kitchenActive ? 9.0 : 0}
+          distance={6.0}
+          decay={2}
+          color="#ffffff"
+        />
+      ))}
+      <group visible={visible}>
+      {/* === 주방 단일 라인 천장 LED mesh === */}
       <group>
         <mesh position={[lineCenterX, lightY, lineCenterZ]}>
           <boxGeometry args={[wLight, 0.015, lineLen]} />
           <meshStandardMaterial color={kitchenActive ? '#fff' : '#444'} emissive={kitchenActive ? '#fff' : '#111'} emissiveIntensity={kitchenActive ? 3.0 : 0.1} />
         </mesh>
-        {kitchenActive && (
-          <>
-            <rectAreaLight
-              position={[lineCenterX, lightY - 0.005, lineCenterZ]}
-              width={wLight}
-              height={lineLen}
-              intensity={225}
-              color="#ffffff"
-              rotation={[Math.PI / 2, 0, 0]}
-            />
-            {[0.25, 0.5, 0.75].map((t, i) => (
-              <DropCeilingLight
-                key={`kit-spot-${i}`}
-                x={lineCenterX}
-                z={lineZstart + lineLen * t}
-                ceilingY={WALL_HEIGHT}
-                active={kitchenActive}
-                color="#ffffff"
-                intensity={9.0}
-                distance={6.0}
-              />
-            ))}
-          </>
-        )}
       </group>
 
       {/* === 인덕션 (우측 ㄱ자 카운터 코너 — 시계방향 90° 회전) + 화구 3개 (좌 2 / 우 1) === */}
@@ -1193,6 +1186,7 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
       {/* 우측 하부장(밥솥 칸)은 메인 ㄱ자 하부장에 통합됨 — 위 메인 IIFE 의 cabAfter + 밥솥 으로 이동 */}
 
     </group>
+    </>
   )
 }
 

@@ -12,14 +12,15 @@ interface BabyRoomProps {
 }
 
 export function BabyRoom({ visible }: BabyRoomProps) {
-  if (!visible) return null
   return (
-    <ToddlerBed
+    <group visible={visible}>
+      <ToddlerBed
       position={[
         babyRight - 2.065 / 2,
         babyTop + 1.115 / 2,
       ]}
-      rotationY={0}
-    />
+        rotationY={0}
+      />
+    </group>
   )
 }

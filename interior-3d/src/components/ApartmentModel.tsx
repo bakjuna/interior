@@ -1,12 +1,12 @@
-import { useMemo, useRef, useEffect, useCallback, useState, Suspense } from 'react'
+import { useMemo, useRef, useLayoutEffect, useEffect } from 'react'
 import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
-import { useLoader, useThree, useFrame } from '@react-three/fiber'
+import { useThree, useFrame } from '@react-three/fiber'
 
 // RectAreaLight 초기화 (한 번만)
 RectAreaLightUniformsLib.init()
-import { TextureLoader } from 'three'
 import { useGLTF, Html, RoundedBox } from '@react-three/drei'
+import { useKTX2 } from '../systems/useKTX2'
 import {
   walls,
   rooms,
@@ -83,6 +83,77 @@ interface ApartmentModelProps {
   onDoorOpenChange?: (id: DoorId, open: boolean) => void  // 도어 상태 lift (워크스루 충돌/visibility용)
 }
 
+// --- DownlightInstances: 다운라이트 발광면 + 크롬링을 InstancedMesh로 일괄 렌더 ---
+interface DownlightInstancesProps {
+  downlightStatic: Array<{ x: number; z: number; sector: import('../data/sectors').SectorId | null; ceilingY: number; color: string; key: string }>
+  activeGroupKeys: Set<string> | null
+  allLightsOn: boolean
+  visibleSectors: Set<import('../data/sectors').SectorId>
+}
+
+function DownlightInstances({ downlightStatic, activeGroupKeys, allLightsOn, visibleSectors }: DownlightInstancesProps) {
+  const count = downlightStatic.length
+  const circleRef = useRef<THREE.InstancedMesh>(null)
+  const ringRef = useRef<THREE.InstancedMesh>(null)
+  const tempObj = useMemo(() => new THREE.Object3D(), [])
+  const tempColor = useMemo(() => new THREE.Color(), [])
+
+  // 위치 세팅 (1회)
+  useLayoutEffect(() => {
+    if (!circleRef.current || !ringRef.current) return
+    for (let i = 0; i < count; i++) {
+      const d = downlightStatic[i]
+      tempObj.position.set(d.x, d.ceilingY - 0.005, d.z)
+      tempObj.rotation.set(Math.PI / 2, 0, 0)
+      tempObj.updateMatrix()
+      circleRef.current.setMatrixAt(i, tempObj.matrix)
+
+      tempObj.position.y = d.ceilingY - 0.006
+      tempObj.updateMatrix()
+      ringRef.current.setMatrixAt(i, tempObj.matrix)
+    }
+    circleRef.current.instanceMatrix.needsUpdate = true
+    ringRef.current.instanceMatrix.needsUpdate = true
+    // 초기 색상도 세팅 (instanceColor 버퍼 할당)
+    for (let i = 0; i < count; i++) {
+      circleRef.current.setColorAt(i, tempColor.set('#222'))
+      ringRef.current.setColorAt(i, tempColor.set('#ccc'))
+    }
+    if (circleRef.current.instanceColor) circleRef.current.instanceColor.needsUpdate = true
+    if (ringRef.current.instanceColor) ringRef.current.instanceColor.needsUpdate = true
+  }, [downlightStatic, count, tempObj, tempColor])
+
+  // 활성 상태 변경 시 색상 업데이트
+  useEffect(() => {
+    if (!circleRef.current || !ringRef.current) return
+    for (let i = 0; i < count; i++) {
+      const d = downlightStatic[i]
+      const inActiveGroup = activeGroupKeys?.has(d.key) ?? false
+      const isActive = inActiveGroup ||
+        (!!allLightsOn && (d.sector ? visibleSectors.has(d.sector) : true))
+      // 활성: 따뜻한 색 발광, 비활성: 어두운 회색
+      circleRef.current.setColorAt(i, tempColor.set(isActive ? d.color : '#222'))
+    }
+    if (circleRef.current.instanceColor) circleRef.current.instanceColor.needsUpdate = true
+  }, [downlightStatic, activeGroupKeys, allLightsOn, visibleSectors, count, tempColor])
+
+  if (count === 0) return null
+
+  return (
+    <>
+      <instancedMesh ref={circleRef} args={[undefined, undefined, count]}>
+        <circleGeometry args={[0.035, 16]} />
+        <meshStandardMaterial toneMapped={false} emissive="#ffffff" emissiveIntensity={1.0} />
+      </instancedMesh>
+      <instancedMesh ref={ringRef} args={[undefined, undefined, count]}>
+        <ringGeometry args={[0.035, 0.045, 16]} />
+        <meshStandardMaterial color="#ccc" metalness={0.6} roughness={0.3} />
+      </instancedMesh>
+    </>
+  )
+}
+
+
 // 전체 내측 범위
 const totalLeft = -WALL_THICKNESS - MB_W
 const totalRight = LR_W
@@ -103,10 +174,10 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
     [rawPlayerPos, doorOpenStates]
   )
 
-  const floorTex = useLoader(TextureLoader, '/textures/walnut-floor.png')
-  const porcelainTex = useLoader(TextureLoader, '/textures/porcelain-tile.png')
-  const entranceTex = useLoader(TextureLoader, '/textures/entrance-tile.png')
-  const bathroomWallTex = useLoader(TextureLoader, '/textures/bathroom-wall-tile.png')
+  const floorTex = useKTX2('/textures/walnut-floor.ktx2')
+  const porcelainTex = useKTX2('/textures/porcelain-tile.ktx2')
+  const entranceTex = useKTX2('/textures/entrance-tile.ktx2')
+  const bathroomWallTex = useKTX2('/textures/bathroom-wall-tile.ktx2')
 
   // 화장실 타일 메지(grout) — 흰색 라인. 타일 600×1200mm 기준 약 3mm 두께
   // x축 threshold = 3/600 ≈ 0.005, y축 threshold = 3/1200 ≈ 0.0025
@@ -124,38 +195,12 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
       `
     )
   }, [])
-  const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
-  const walnutDoorTex = useLoader(TextureLoader, '/textures/walnut_door.png')
-  const silkTex = useLoader(TextureLoader, '/textures/silk.png')
-
-  // 외부 뷰 텍스처 — 북/남 각각 낮/밤 (파일 없으면 조용히 skip)
-  const [cityNorthDayTex, setCityNorthDayTex] = useState<THREE.Texture | null>(null)
-  const [cityNorthNightTex, setCityNorthNightTex] = useState<THREE.Texture | null>(null)
-  const [citySouthDayTex, setCitySouthDayTex] = useState<THREE.Texture | null>(null)
-  const [citySouthNightTex, setCitySouthNightTex] = useState<THREE.Texture | null>(null)
-  useEffect(() => {
-    const loader = new TextureLoader()
-    const setup = (tex: THREE.Texture) => {
-      tex.colorSpace = THREE.SRGBColorSpace
-      tex.wrapS = THREE.ClampToEdgeWrapping
-      tex.wrapT = THREE.ClampToEdgeWrapping
-      return tex
-    }
-    const loadOne = (path: string, setter: (t: THREE.Texture) => void) => {
-      loader.load(
-        path,
-        (tex) => setter(setup(tex)),
-        undefined,
-        () => console.warn(`[city-view] ${path} not found`)
-      )
-    }
-    loadOne('/textures/city-view-north-day.jpg', setCityNorthDayTex)
-    loadOne('/textures/city-view-north-night.jpg', setCityNorthNightTex)
-    loadOne('/textures/city-view-south-day.jpg', setCitySouthDayTex)
-    loadOne('/textures/city-view-south-night.jpg', setCitySouthNightTex)
-  }, [])
-  const cityNorthTex = isNight ? cityNorthNightTex : cityNorthDayTex
-  const citySouthTex = isNight ? citySouthNightTex : citySouthDayTex
+  const closetDoorTex = useKTX2('/textures/walnut-closet-door.ktx2')
+  const walnutDoorTex = useKTX2('/textures/walnut_door.ktx2')
+  const silkTex = useKTX2('/textures/silk.ktx2')
+  // Room 전용 텍스처도 여기서 미리 로드 — useLoader 캐시에 넣어둬서 room 에서 suspend 방지
+  useKTX2('/textures/kitchen-tile.ktx2')
+  useKTX2('/textures/marble-table.ktx2')
 
   const floorTexture = useMemo(() => {
     const tex = floorTex.clone()
@@ -261,48 +306,42 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
 
       <Closets />
 
-      {/* 다운라이트 — 정적 메타데이터는 useMemo 캐시, 렌더 루프는 isActive 만 계산 */}
+      {/* 다운라이트 — InstancedMesh 로 발광면 + 크롬링 일괄 렌더 */}
+      <DownlightInstances
+        downlightStatic={downlightStatic}
+        activeGroupKeys={activeGroupKeys}
+        allLightsOn={allLightsOn}
+        visibleSectors={visibleSectors}
+      />
+      {/* 다운라이트 SpotLight — 원본과 동일, 모든 활성 라이트 렌더 */}
       {downlightStatic.map((d, i) => {
         const inActiveGroup = activeGroupKeys?.has(d.key) ?? false
-        // allLightsOn 이어도 visible sector 의 다운라이트만 활성 (벽 통과 누출 방지)
         const isActive = inActiveGroup ||
           (!!allLightsOn && (d.sector ? visibleSectors.has(d.sector) : true))
         return (
-          <group key={`dl-${i}`}>
-            {/* 발광면 */}
-            <mesh position={[d.x, d.ceilingY - 0.005, d.z]} rotation={[Math.PI / 2, 0, 0]}>
-              <circleGeometry args={[0.035, 16]} />
-              <meshStandardMaterial
-                color={isActive ? '#fff' : '#888'}
-                emissive={isActive ? d.color : '#222'}
-                emissiveIntensity={isActive ? 1.0 : 0.1}
-              />
-            </mesh>
-            {/* 크롬 링 */}
-            <mesh position={[d.x, d.ceilingY - 0.006, d.z]} rotation={[Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[0.035, 0.045, 16]} />
-              <meshStandardMaterial color="#ccc" metalness={0.6} roughness={0.3} />
-            </mesh>
-            {/* 워크스루: 모든 다운라이트를 SpotLight로 */}
-            <DropCeilingLight x={d.x} z={d.z} ceilingY={d.ceilingY} active={isActive} color={d.color} />
-          </group>
+          <DropCeilingLight key={`dl-${i}`} x={d.x} z={d.z} ceilingY={d.ceilingY} active={isActive} color={d.color} />
         )
       })}
-      {/* 워크스루: 조명 없는 공간에서만 외부 라이트 */}
-      {playerPos && !activeGroup && (
-        <pointLight
-          position={[playerPos[0], WALL_HEIGHT - 0.1, playerPos[1]]}
-          intensity={0.5}
-          distance={4}
-          decay={2}
-          color="#ffffff"
-        />
-      )}
+      {/* 워크스루: 조명 없는 공간에서만 외부 라이트 — 항상 mount, intensity 로 제어 */}
+      <pointLight
+        position={[playerPos?.[0] ?? 0, WALL_HEIGHT - 0.1, playerPos?.[1] ?? 0]}
+        intensity={playerPos && !activeGroup ? 0.5 : 0}
+        distance={4}
+        decay={2}
+        color="#ffffff"
+      />
 
       <Ceilings showCeiling={showCeiling} playerPos={playerPos} allLightsOn={allLightsOn} visibleSectors={visibleSectors} />
 
 
-      {/* Phase 6: visibleSectors 기반 portal culling */}
+      {/* Phase 6: visibleSectors 기반 portal culling
+          visible prop 으로 JSX 렌더 제어하되, 컴포넌트는 항상 mount 상태 유지.
+          room 내부에서 if(!visible) return null 시 Three.js scene 에서 완전 제거되어
+          재진입 시 셰이더 재컴파일 + React reconciliation 비용 발생.
+          → 각 room 을 항상 렌더하되, 바깥에서 <group visible={...}> 으로 감싸서
+          Three.js 레벨에서만 숨김 (scene 에는 유지). */}
+      {/* 모든 텍스처가 ApartmentModel 에서 미리 로드되므로 Suspense 불필요.
+          room 은 항상 mount, <group visible> 로 Three.js 레벨에서만 숨김. */}
       <MainVeranda visible={visibleSectors.has('mainVeranda')} />
       <WorkVeranda visible={visibleSectors.has('workVeranda')} />
       <Laundry visible={visibleSectors.has('laundry')} />
@@ -314,8 +353,8 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
       <BabyRoom visible={visibleSectors.has('baby')} />
       <WorkRoom visible={visibleSectors.has('work')} playerPos={playerPos} allLightsOn={allLightsOn} />
       <Hallway visible={visibleSectors.has('hall')} playerPos={playerPos} allLightsOn={allLightsOn} />
-      <MainBath visible={visibleSectors.has('mainBath')} playerPos={playerPos} />
-      <MasterBath visible={visibleSectors.has('mbBath')} playerPos={playerPos} />
+      <MainBath visible={visibleSectors.has('mainBath')} playerPos={playerPos} allLightsOn={allLightsOn} />
+      <MasterBath visible={visibleSectors.has('mbBath')} playerPos={playerPos} allLightsOn={allLightsOn} />
       <LivingRoom visible={visibleSectors.has('lr')} />
       <MasterBedroom visible={visibleSectors.has('mb')} />
       <Entrance visible={visibleSectors.has('entrance')} playerPos={playerPos} allLightsOn={allLightsOn} />

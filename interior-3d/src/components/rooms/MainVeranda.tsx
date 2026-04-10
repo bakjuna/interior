@@ -3,7 +3,6 @@
  * 내부 가구 없음. 천장 다운라이트 2개 (항상 켜짐).
  */
 
-import { DropCeilingLight } from '../primitives/DropCeilingLight'
 import {
   WALL_THICKNESS,
   WALL_HEIGHT,
@@ -20,12 +19,12 @@ interface MainVerandaProps {
 }
 
 export function MainVeranda({ visible }: MainVerandaProps) {
-  if (!visible) return null
   const z = LR_D + WALL_THICKNESS + verandaInnerD / 2
   return (
-    <group>
-      <DropCeilingLight x={mbLeft + 2.110} z={z} ceilingY={WALL_HEIGHT} active={true} />
-      <DropCeilingLight x={LR_W - 2.000} z={z} ceilingY={WALL_HEIGHT} active={true} />
-    </group>
+    <>
+      <pointLight position={[mbLeft + 2.110, WALL_HEIGHT - 0.02, z]} intensity={2.0} distance={WALL_HEIGHT * 2} decay={2} color="#ffe0b0" />
+      <pointLight position={[LR_W - 2.000, WALL_HEIGHT - 0.02, z]} intensity={2.0} distance={WALL_HEIGHT * 2} decay={2} color="#ffe0b0" />
+      <group visible={visible} />
+    </>
   )
 }

@@ -4,13 +4,12 @@
  */
 
 import { useMemo } from 'react'
-import { useLoader } from '@react-three/fiber'
-import { TextureLoader } from 'three'
 import * as THREE from 'three'
 import { closets } from '../../data/apartment'
+import { useKTX2 } from '../../systems/useKTX2'
 
 export function Closets() {
-  const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
+  const closetDoorTex = useKTX2('/textures/walnut-closet-door.ktx2')
 
   // 본체 + 모든 문짝에서 동일 텍스처(repeat 1×1) 공유 — clone 1번만.
   const walnutBodyTex = useMemo(() => {

@@ -17,12 +17,12 @@ const WalkthroughRoute = WalkthroughRouteImport.update({
   id: '/walkthrough',
   path: '/walkthrough',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/walkthrough.lazy').then((d) => d.Route))
 const BirdseyeRoute = BirdseyeRouteImport.update({
   id: '/birdseye',
   path: '/birdseye',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/birdseye.lazy').then((d) => d.Route))
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',

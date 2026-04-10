@@ -6,6 +6,7 @@ import { LR_W, LR_D, MB_W, WALL_THICKNESS, WALL_HEIGHT, babyTop, downlightGroups
 import { moveWithCollision } from '../systems/collision'
 import type { DoorId } from '../data/sectors'
 import { doorRegistry, pickActiveDoor } from '../systems/doorRegistry'
+import { preloadAllKTX2 } from '../systems/useKTX2'
 
 // 전체 이동 범위 — 외벽 바깥 0.5m 마진까지 (집 외부로 빠져나가지 못하게 제한)
 const totalMinX = -WALL_THICKNESS - MB_W - 0.5
@@ -111,8 +112,38 @@ function SplashScreen({ label, progress }: { label: string; progress: number }) 
   )
 }
 
+/** FPS 업데이터 — Canvas 내부에서 useFrame 으로 외부 DOM 엘리먼트 직접 업데이트 */
+function FPSUpdater({ domRef }: { domRef: React.RefObject<HTMLDivElement | null> }) {
+  const { gl } = useThree()
+  const frames = useRef(0)
+  const lastTime = useRef(performance.now())
+
+  useFrame(() => {
+    frames.current++
+    const now = performance.now()
+    if (now - lastTime.current >= 500) {
+      const fps = Math.round((frames.current * 1000) / (now - lastTime.current))
+      frames.current = 0
+      lastTime.current = now
+      if (domRef.current) {
+        const info = gl.info.render
+        domRef.current.textContent = `${fps} FPS | ${info.calls} draws | ${info.triangles} tris`
+      }
+    }
+  })
+
+  return null
+}
+
 function Prewarm({ index, active, onAdvance }: { index: number; active: boolean; onAdvance: () => void }) {
   const { gl, scene, camera, invalidate } = useThree()
+
+  // 첫 stage에서 모든 KTX2 텍스처를 useLoader 캐시에 preload
+  // → room 전환 시 useKTX2 가 suspend 하지 않음
+  useEffect(() => {
+    if (index === 0) preloadAllKTX2(gl)
+  }, [index, gl])
+
   useEffect(() => {
     if (!active) return
     // 1) 현재 React 트리 mount 가 끝난 후 → next rAF 에서 compile
@@ -120,7 +151,30 @@ function Prewarm({ index, active, onAdvance }: { index: number; active: boolean;
     let rafA = 0, rafB = 0
     invalidate()
     rafA = requestAnimationFrame(() => {
+      // 1) 셰이더 컴파일
       try { gl.compile(scene, camera) } catch { /* noop */ }
+
+      // 2) 텍스처 GPU 업로드
+      const seen = new Set<THREE.Texture>()
+      scene.traverse((obj) => {
+        if (!(obj as THREE.Mesh).isMesh) return
+        const mats = Array.isArray((obj as THREE.Mesh).material)
+          ? (obj as THREE.Mesh).material as THREE.Material[]
+          : [(obj as THREE.Mesh).material]
+        for (const mat of mats) {
+          if (!mat) continue
+          for (const val of Object.values(mat)) {
+            if (val && (val as THREE.Texture).isTexture && !seen.has(val as THREE.Texture)) {
+              seen.add(val as THREE.Texture)
+              try { gl.initTexture(val as THREE.Texture) } catch { /* noop */ }
+            }
+          }
+        }
+      })
+
+      // 3) 실제 렌더 1프레임 — GPU 버퍼(VBO/IBO) 업로드 + draw call 파이프라인 워밍
+      try { gl.render(scene, camera) } catch { /* noop */ }
+
       rafB = requestAnimationFrame(onAdvance)
     })
     return () => {
@@ -418,24 +472,12 @@ export function WalkthroughView() {
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 800)
 
   // === Prewarm ===
-  // 시작 시 가능한 모든 라이트 조합을 미리 mount → gl.compile → shader program 캐시.
-  // 이후 toggle/방 입장 시 동일 조합 재현 시 컴파일 0ms.
-  // Stages:
-  //   0:        baseline allOff (no group active, all sectors visible)
-  //   1..N:     각 downlightGroup 의 중심에 player 배치 (해당 그룹만 활성)
-  //   N+1:     allLightsOn=true (모든 라이트 동시)
+  // 고정 light pool (12 PointLight) 이므로 셰이더 variant 가 적음.
+  // Stage 0: 조명 off (baseline material 컴파일)
+  // Stage 1: 전체 조명 on (모든 room-internal light 활성 variant 컴파일 + 텍스처 GPU 업로드)
   const PREWARM_STAGES = useMemo(() => {
     const stages: Array<{ playerPos: [number, number] | undefined; allLightsOn: boolean; label: string }> = []
     stages.push({ playerPos: undefined, allLightsOn: false, label: '베이스 컴파일 중…' })
-    downlightGroups.forEach((g, i) => {
-      const cx = (g.bounds.leftX + g.bounds.rightX) / 2
-      const cz = (g.bounds.topZ + g.bounds.bottomZ) / 2
-      stages.push({
-        playerPos: [cx, cz],
-        allLightsOn: false,
-        label: `방 조명 컴파일 (${i + 1}/${downlightGroups.length})`,
-      })
-    })
     stages.push({ playerPos: undefined, allLightsOn: true, label: '전체 조명 컴파일 중…' })
     return stages
   }, [])
@@ -548,13 +590,16 @@ export function WalkthroughView() {
     localStorage.setItem('fps-keybindings', JSON.stringify(b))
   }, [])
 
+  const fpsRef = useRef<HTMLDivElement>(null)
+
   return (
     <>
       <Canvas
         shadows={false}
         frameloop="demand"
         // dpr 을 동적으로 바꾸면 캔버스 resize → context 재설정 비용. 정적 유지.
-        dpr={[1, 1.5]}
+        dpr={[0.5, 1.5]}
+        performance={{ min: 0.3 }}
         gl={{
           antialias: true,
           powerPreference: 'high-performance',
@@ -569,13 +614,32 @@ export function WalkthroughView() {
         }}
       >
         <ambientLight intensity={isNight ? 0.08 : 0.6} />
-        {!isNight && <directionalLight position={[5, 10, 5]} intensity={0.8} />}
+        <directionalLight position={[5, 10, 5]} intensity={isNight ? 0 : 0.8} />
         <ApartmentModel showCeiling={true} playerPos={effectivePlayerPos} isNight={isNight} allLightsOn={effectiveAllLightsOn} doorOpenStates={doorOpenStates} activeDoorId={activeDoorId} onDoorOpenChange={handleDoorOpenChange} />
         {!isPrewarming && (
           <FPSController bindings={bindings} height={height} isMobile={isMobile} doorOpenStatesRef={doorOpenStatesRef} onMove={handleMove} onHeightChange={setHeight} onActiveDoorChange={handleActiveDoorChange} />
         )}
         <Prewarm index={prewarmIndex} active={isPrewarming} onAdvance={advancePrewarm} />
+        <FPSUpdater domRef={fpsRef} />
       </Canvas>
+      <div
+        ref={fpsRef}
+        style={{
+          position: 'fixed',
+          top: 8,
+          right: 8,
+          color: '#0f0',
+          background: 'rgba(0,0,0,0.7)',
+          padding: '4px 8px',
+          fontSize: 13,
+          fontFamily: 'monospace',
+          borderRadius: 4,
+          pointerEvents: 'none',
+          zIndex: 99999,
+        }}
+      >
+        -- FPS
+      </div>
       {isPrewarming && (
         <SplashScreen
           label={currentStage.label}

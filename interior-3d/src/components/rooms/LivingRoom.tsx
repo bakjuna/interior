@@ -11,9 +11,8 @@ interface LivingRoomProps {
 }
 
 export function LivingRoom({ visible }: LivingRoomProps) {
-  if (!visible) return null
   return (
-    <group>
+    <group visible={visible}>
       {/* TV — 거실/현관 사이 벽 */}
       <group position={[2.832, 1.2, 0.005]}>
         <mesh>

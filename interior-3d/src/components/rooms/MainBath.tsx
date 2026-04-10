@@ -4,12 +4,11 @@
  */
 
 import { Suspense, useMemo } from 'react'
-import { useLoader } from '@react-three/fiber'
-import { TextureLoader } from 'three'
 import * as THREE from 'three'
 import { Toilet } from '../models/Toilet'
 import { Sink } from '../models/Sink'
 import { tileGroutOnBeforeCompile } from '../primitives/bathroomTile'
+import { useKTX2 } from '../../systems/useKTX2'
 import {
   WALL_THICKNESS,
   WALL_HEIGHT,
@@ -21,12 +20,13 @@ const T2 = WALL_THICKNESS / 2
 interface MainBathProps {
   visible: boolean
   playerPos?: [number, number]
+  allLightsOn?: boolean
 }
 
-export function MainBath({ visible, playerPos }: MainBathProps) {
-  const bathroomWallTex = useLoader(TextureLoader, '/textures/bathroom-wall-tile.png')
-  const closetDoorTex = useLoader(TextureLoader, '/textures/walnut-closet-door.png')
-  const walnutDoorTex = useLoader(TextureLoader, '/textures/walnut_door.png')
+export function MainBath({ visible, playerPos, allLightsOn }: MainBathProps) {
+  const bathroomWallTex = useKTX2('/textures/bathroom-wall-tile.ktx2')
+  const closetDoorTex = useKTX2('/textures/walnut-closet-door.ktx2')
+  const walnutDoorTex = useKTX2('/textures/walnut_door.ktx2')
 
   // 타일 텍스처 캐시 — 동일 (uRep, vRep) 조합은 1번만 clone
   const makeTileTex = useMemo(() => {
@@ -64,8 +64,6 @@ export function MainBath({ visible, playerPos }: MainBathProps) {
     return t
   }, [closetDoorTex])
 
-  if (!visible) return null
-
   const bL = mbDoorEnd + 0.1 + T2
   const bR = bL + 1.413
   const bT = -WALL_THICKNESS
@@ -74,7 +72,7 @@ export function MainBath({ visible, playerPos }: MainBathProps) {
   const innerW = bR - bL
   const innerD = Math.abs(bB - bT)
 
-  const bathActive = !!playerPos && playerPos[0] >= bL && playerPos[0] <= bR && playerPos[1] >= bB && playerPos[1] <= bT
+  const bathActive = !!allLightsOn || (!!playerPos && playerPos[0] >= bL && playerPos[0] <= bR && playerPos[1] >= bB && playerPos[1] <= bT)
   const tileW = 0.6
   const tileH = 1.2
 
@@ -85,6 +83,11 @@ export function MainBath({ visible, playerPos }: MainBathProps) {
   const vanW = 0.6
   const oriVanZ = showerZend + 0.15 + vanW / 2
   const vanZ = showerZend + 0 + vanW / 2
+
+  // 거울 백라이트 위치 — IIFE 밖으로 추출 (lights를 visible group 밖에 배치하기 위함)
+  const mirrorLightX = bL + 0.10
+  const mirrorLightY = 1.45
+  const mirrorLightZ = vanZ - 0.1
 
   const toiletL = 0.68
   const toiletZ = oriVanZ + vanW / 2 - 0.2 + toiletL / 2
@@ -99,7 +102,11 @@ export function MainBath({ visible, playerPos }: MainBathProps) {
   const rightLen = bT - doorZmax
 
   return (
-    <group>
+    <>
+      {/* lights outside visible group */}
+      <pointLight position={[cX, WALL_HEIGHT - 0.3, (bT + bB) / 2]} intensity={bathActive ? 1.5 : 0} distance={3} decay={1.5} color="#ffffff" />
+      <pointLight position={[mirrorLightX, mirrorLightY, mirrorLightZ]} intensity={bathActive ? 0.6 : 0} distance={1.5} decay={2} color="#fff5e6" />
+      <group visible={visible}>
       {/* === 벽 타일 === */}
       <mesh position={[bL + 0.001, WALL_HEIGHT / 2, (bT + bB) / 2]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[innerD, WALL_HEIGHT]} />
@@ -193,17 +200,9 @@ export function MainBath({ visible, playerPos }: MainBathProps) {
                 side={THREE.DoubleSide}
               />
             </mesh>
-            {bathActive && (
-              <pointLight position={[bL + 0.10, mY, mZ]} intensity={0.6} distance={1.5} decay={2} color="#fff5e6" />
-            )}
           </group>
         )
       })()}
-
-      {/* 진입 시 보조 포인트라이트 */}
-      {bathActive && (
-        <pointLight position={[cX, WALL_HEIGHT - 0.3, (bT + bB) / 2]} intensity={1.5} distance={3} decay={1.5} color="#ffffff" />
-      )}
 
       {/* 샤워부스 */}
       {(() => {
@@ -234,5 +233,6 @@ export function MainBath({ visible, playerPos }: MainBathProps) {
         )
       })()}
     </group>
+    </>
   )
 }

@@ -15,12 +15,10 @@ interface EntranceProps {
 }
 
 export function Entrance({ visible, playerPos, allLightsOn }: EntranceProps) {
-  if (!visible) return null
-
   const isActive = !!allLightsOn || (playerPos ? (
     playerPos[0] >= LR_W - 1.481 && playerPos[0] <= LR_W + T2 &&
     playerPos[1] >= -T2 - 1.591 && playerPos[1] <= -T2
   ) : false)
 
-  return <ShoeCabinet active={isActive} />
+  return <group visible={visible}><ShoeCabinet active={isActive} /></group>
 }

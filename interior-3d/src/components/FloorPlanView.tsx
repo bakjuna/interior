@@ -563,7 +563,7 @@ function DimensionLine({
 export function FloorPlanView() {
   return (
     <>
-      <Canvas>
+      <Canvas dpr={[1, 2]} performance={{ min: 0.5 }}>
         <FloorPlanScene />
       </Canvas>
       <div className="overlay-info">

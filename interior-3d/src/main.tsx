@@ -1,3 +1,6 @@
+// 셰이더 패치 — 어떤 Three.js material 보다 먼저 로드해야 함
+import './systems/shaderPatch'
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
