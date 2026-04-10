@@ -543,6 +543,14 @@ export interface Closet {
   position: [number, number, number]  // [x, y, z] center
   size: [number, number, number]      // [width(X), height(Y), depth(Z)]
   color: string
+  openShelf?: {                        // 오픈 선반 영역
+    bottomY: number                    // 하단 Y
+    topY: number                       // 상단 Y
+    startDoor: number                  // 시작 문짝 인덱스 (0-based)
+    endDoor: number                    // 끝 문짝 인덱스 (exclusive)
+  }
+  handleFlipDoors?: number[]           // 손잡이 반대방향 문짝 인덱스
+  doorGroups?: Array<{ doorId: import('../data/sectors').DoorId, doors: number[], flipHinge?: boolean, shelfYs?: number[] }>
 }
 
 export const closets: Closet[] = [
@@ -553,6 +561,11 @@ export const closets: Closet[] = [
     position: [mbLeft + 0.275, (WALL_HEIGHT - 0.050) / 2, (0.6 + LR_D) / 2],
     size: [0.550, WALL_HEIGHT - 0.050, LR_D - 0.6],
     color: '#8B6914',
+    doorGroups: [
+      { doorId: 'closet-mb-0', doors: [0, 1] },
+      { doorId: 'closet-mb-1', doors: [2, 3] },
+      { doorId: 'closet-mb-2', doors: [4], flipHinge: true },
+    ],
   },
   // 거실 수납장 — 안방/거실 공유벽, 거실쪽 (3666 × 450)
   {
@@ -560,6 +573,13 @@ export const closets: Closet[] = [
     position: [0 + 0.225, (WALL_HEIGHT - 0.050) / 2, LR_D / 2],
     size: [0.450, WALL_HEIGHT - 0.050, LR_D],
     color: '#8B6914',
+    openShelf: { bottomY: 0.84, topY: 1.34, startDoor: 1, endDoor: 5 },
+    doorGroups: [
+      { doorId: 'closet-lr-0', doors: [0], shelfYs: [0.43, 0.84, 1.34, 1.745] },
+      { doorId: 'closet-lr-1', doors: [1, 2], shelfYs: [0.28, 0.56, 1.745] },
+      { doorId: 'closet-lr-2', doors: [3, 4], shelfYs: [0.28, 0.56, 1.745] },
+      { doorId: 'closet-lr-3', doors: [5], flipHinge: true, shelfYs: [0.43, 0.84, 1.34, 1.745] },
+    ],
   },
   // 아기방 좌측 벽 수납장 (2563 × 450, 각 150mm 축소)
   {
@@ -567,6 +587,10 @@ export const closets: Closet[] = [
     position: [babyLeft + 0.225, (WALL_HEIGHT - 0.050) / 2, (babyBottom + babyTop) / 2],
     size: [0.450, WALL_HEIGHT - 0.050, BABY_INNER_D - 0.150],
     color: '#8B6914',
+    doorGroups: [
+      { doorId: 'closet-baby-0', doors: [0, 1] },
+      { doorId: 'closet-baby-1', doors: [2, 3] },
+    ],
   },
 ]
 

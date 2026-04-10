@@ -104,8 +104,8 @@ export function MainBath({ visible, playerPos, allLightsOn }: MainBathProps) {
   return (
     <>
       {/* lights outside visible group */}
-      <pointLight position={[cX, WALL_HEIGHT - 0.3, (bT + bB) / 2]} intensity={bathActive ? 1.5 : 0} distance={3} decay={1.5} color="#ffffff" />
-      <pointLight position={[mirrorLightX, mirrorLightY, mirrorLightZ]} intensity={bathActive ? 0.6 : 0} distance={1.5} decay={2} color="#fff5e6" />
+      <pointLight position={[cX, WALL_HEIGHT - 0.3, (bT + bB) / 2]} intensity={bathActive ? 1.5 : 0} distance={3} decay={1.5} color="#ffffff" castShadow shadow-mapSize-width={128} shadow-mapSize-height={128} shadow-bias={-0.002} />
+      <pointLight position={[mirrorLightX, mirrorLightY, mirrorLightZ]} intensity={bathActive ? 0.6 : 0} distance={1.5} decay={2} color="#fff5e6" castShadow shadow-mapSize-width={128} shadow-mapSize-height={128} shadow-bias={-0.002} />
       <group visible={visible}>
       {/* === 벽 타일 === */}
       <mesh position={[bL + 0.001, WALL_HEIGHT / 2, (bT + bB) / 2]} rotation={[0, Math.PI / 2, 0]}>

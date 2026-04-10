@@ -80,12 +80,27 @@ export type DoorId =
   | 'kitchen-tall-drawer'        // 키큰장 상단 (유리장 뒷쪽 30cm) drawer — +Z 50cm 슬라이드
   | 'kitchen-tall-drawer-mid'    // 키큰장 중단 (오븐 뒷쪽 30cm) drawer
   | 'kitchen-tall-drawer-bot'    // 키큰장 하단 (하부장 뒷쪽 30cm) drawer
+  | 'closet-mb-0'                // 안방 붙박이장 페어 #0
+  | 'closet-mb-1'                // 안방 붙박이장 페어 #1
+  | 'closet-mb-2'                // 안방 붙박이장 단독 (최남측)
+  | 'closet-baby-0'              // 아기방 수납장 페어 #0
+  | 'closet-baby-1'              // 아기방 수납장 페어 #1
+  | 'closet-lr-0'                // 거실 수납장 북측 (단독)
+  | 'closet-lr-1'                // 거실 수납장 오픈선반 페어 #0
+  | 'closet-lr-2'                // 거실 수납장 오픈선반 페어 #1
+  | 'closet-lr-3'                // 거실 수납장 남측 (단독)
+  | 'kitchen-lc-north'           // 주방 하단장 — 북측 정수기 drawer 하단 도어
+  | 'kitchen-lc-cab12'           // 주방 하단장 — cab1+cab2 페어 (인덕션 아래)
+  | 'kitchen-lc-sink'            // 주방 하단장 — 싱크 도어 페어
+  | 'kitchen-lc-cab3'            // 주방 하단장 — cab3 단독
+  | 'kitchen-fridge-uc-0'         // 냉장고 상부장 페어 #0
+  | 'kitchen-fridge-uc-1'         // 냉장고 상부장 페어 #1
+  | 'kitchen-tall-lower'          // 키큰장 하단 도어 페어
+  | 'kitchen-tall-upper'          // 키큰장 상단 유리 도어 페어
   | 'kitchen-uc-purifier'        // 주방 동측 상부장 — 정수기 위 (50cm, 내부 수직 3분할)
-  | 'kitchen-uc-0'               // 주방 동측 상부장 — 후드 남쪽 #0 (40cm, 4분할)
-  | 'kitchen-uc-1'
-  | 'kitchen-uc-2'
-  | 'kitchen-uc-3'
-  | 'kitchen-uc-4'
+  | 'kitchen-uc-0'               // 주방 동측 상부장 페어 #0 (40cm×2, 4분할)
+  | 'kitchen-uc-1'               // 주방 동측 상부장 페어 #1
+  | 'kitchen-uc-2'               // 주방 동측 상부장 페어 #2
 
 export interface SectorAABB {
   sector: SectorId

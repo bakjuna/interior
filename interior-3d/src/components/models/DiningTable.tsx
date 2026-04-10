@@ -92,6 +92,10 @@ export function DiningTable({ position, active }: DiningTableProps) {
         distance={2.5}
         decay={2}
         color="#ffe0b0"
+        castShadow
+        shadow-mapSize-width={128}
+        shadow-mapSize-height={128}
+        shadow-bias={-0.002}
       />
       <group>
         {/* 상판 (대리석) — XZ 모서리만 100mm 라운딩, 두께 30mm 유지, marble 텍스처 */}

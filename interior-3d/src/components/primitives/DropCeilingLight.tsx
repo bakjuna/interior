@@ -1,8 +1,8 @@
 /**
  * 단일 다운라이트 SpotLight 래퍼.
  * 항상 mount — active 전환은 intensity 로만 제어.
- * 셰이더 패치(shaderPatch.ts)로 intensity=0 light는 RE_Direct 를 건너뛰므로
- * GPU 비용 거의 0 + 셰이더 재컴파일 0.
+ * castShadow 로 벽/문 뒤로 빛이 새지 않음.
+ * shadow map 해상도는 낮게(256) 유지하여 성능 절약.
  */
 
 import { useRef, useEffect } from 'react'
@@ -38,6 +38,17 @@ export function DropCeilingLight({ x, z, ceilingY, active, color = '#ffe0b0', in
     }
   }, [active])
 
+  // shadow map 설정
+  useEffect(() => {
+    if (lightRef.current && lightRef.current.shadow) {
+      lightRef.current.shadow.mapSize.width = 256
+      lightRef.current.shadow.mapSize.height = 256
+      lightRef.current.shadow.camera.near = 0.1
+      lightRef.current.shadow.camera.far = (distance ?? ceilingY) * 2
+      lightRef.current.shadow.bias = -0.002
+    }
+  }, [ceilingY, distance])
+
   return (
     <spotLight
       ref={lightRef}
@@ -48,6 +59,7 @@ export function DropCeilingLight({ x, z, ceilingY, active, color = '#ffe0b0', in
       distance={(distance ?? ceilingY) * 2}
       decay={2}
       color={color}
+      castShadow
     />
   )
 }

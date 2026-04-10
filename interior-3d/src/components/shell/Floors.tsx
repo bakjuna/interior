@@ -59,7 +59,7 @@ export function Floors() {
   return (
     <>
       {mergedFloors.map((floor, i) => (
-        <mesh key={i} geometry={floor.geometry} renderOrder={1}>
+        <mesh key={i} geometry={floor.geometry} renderOrder={1} receiveShadow>
           <meshStandardMaterial
             map={floor.texture}
             roughness={floor.roughness}

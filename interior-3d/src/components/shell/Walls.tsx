@@ -72,5 +72,5 @@ export function Walls() {
 
   if (!mergedGeo) return null
 
-  return <mesh geometry={mergedGeo} material={material} />
+  return <mesh geometry={mergedGeo} material={material} castShadow receiveShadow />
 }

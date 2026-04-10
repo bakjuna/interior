@@ -3,11 +3,10 @@
  * 천장 단내림 + 코브 LED는 shell/Ceilings.tsx 가 처리.
  */
 
-import { useEffect, useMemo, useRef } from 'react'
-import { useThree } from '@react-three/fiber'
+import { useMemo } from 'react'
 import * as THREE from 'three'
 import { TrestleDesk } from '../models/TrestleDesk'
-import { LR_W, right1Z, WALL_THICKNESS, WALL_HEIGHT, babyRightWallX } from '../../data/apartment'
+import { LR_W, right1Z, WALL_THICKNESS, babyRightWallX } from '../../data/apartment'
 import { useKTX2 } from '../../systems/useKTX2'
 
 const T2 = WALL_THICKNESS / 2
@@ -85,14 +84,6 @@ export function WorkRoom({ visible, playerPos, allLightsOn }: WorkRoomProps) {
 
   return (
     <>
-      {/* bookshelf spotlight — outside visible group */}
-      <pointLight
-        position={[LR_W - 0.30, WALL_HEIGHT - 0.02, shelfCenterZ]}
-        intensity={workActive ? 6.0 : 0}
-        distance={6}
-        decay={2}
-        color="#ffe0b0"
-      />
       <group visible={visible}>
       <TrestleDesk position={[cx1, z1]} rotationY={Math.PI / 2} width={w1} />
       <TrestleDesk position={[cx, z2]} rotationY={Math.PI / 2} width={w2} />
@@ -148,67 +139,8 @@ export function WorkRoom({ visible, playerPos, allLightsOn }: WorkRoomProps) {
         })}
       </group>
 
-      {/* === 책장 비추는 spotLight (동측 천장, 동쪽 벽에서 30cm) — 모양은 다운라이트
-           작업실 활성(player 진입 또는 allLightsOn) 시에만 ON */}
-      <BookshelfSpotlight
-        ceilingY={WALL_HEIGHT}
-        spotX={LR_W - 0.30}
-        spotZ={shelfCenterZ}
-        targetX={shelfCenterX}
-        targetY={shelfCenterY}
-        targetZ={shelfCenterZ}
-        active={workActive}
-      />
     </group>
     </>
   )
 }
 
-interface BookshelfSpotlightProps {
-  ceilingY: number
-  spotX: number
-  spotZ: number
-  targetX: number
-  targetY: number
-  targetZ: number
-  active: boolean
-}
-
-function BookshelfSpotlight({ ceilingY, spotX, spotZ, targetX, targetY, targetZ, active }: BookshelfSpotlightProps) {
-  const lightRef = useRef<THREE.SpotLight>(null)
-  const targetRef = useRef<THREE.Object3D | null>(null)
-  const { scene } = useThree()
-
-  useEffect(() => {
-    const target = new THREE.Object3D()
-    target.position.set(targetX, targetY, targetZ)
-    scene.add(target)
-    targetRef.current = target
-    return () => { scene.remove(target) }
-  }, [scene, targetX, targetY, targetZ])
-
-  useEffect(() => {
-    if (lightRef.current && targetRef.current) {
-      lightRef.current.target = targetRef.current
-    }
-  }, [active])
-
-  return (
-    <>
-      {/* 다운라이트 시각: 천장 발광 원판 + 크롬 링 — 활성 시에만 emissive */}
-      <mesh position={[spotX, ceilingY - 0.005, spotZ]} rotation={[Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.035, 16]} />
-        <meshStandardMaterial
-          color={active ? '#fff' : '#888'}
-          emissive={active ? '#ffe0b0' : '#222'}
-          emissiveIntensity={active ? 1.0 : 0.1}
-        />
-      </mesh>
-      <mesh position={[spotX, ceilingY - 0.006, spotZ]} rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.035, 0.045, 16]} />
-        <meshStandardMaterial color="#ccc" metalness={0.6} roughness={0.3} />
-      </mesh>
-      {/* pointLight moved outside visible group in WorkRoom */}
-    </>
-  )
-}

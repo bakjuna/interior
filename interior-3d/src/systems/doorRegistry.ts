@@ -5,7 +5,8 @@
  * (각도 우선, 거리 보조). 선택된 도어만 툴팁 표시 + F 키로 토글.
  */
 
-import type { DoorId } from '../data/sectors'
+import type { DoorId, SectorId } from '../data/sectors'
+import { portals } from '../data/sectors'
 
 export interface DoorEntry {
   id: DoorId
@@ -36,6 +37,43 @@ export const doorRegistry = {
   },
 }
 
+// always-open 포탈로 연결된 sector 그래프 (BFS 확장용)
+const alwaysOpenAdj = new Map<SectorId, Set<SectorId>>()
+for (const p of portals) {
+  if (p.doorId) continue // doorId 없는 포탈만 = always-open
+  if (p.visualOnly) continue // 베란다 창문 등 시각 전용 제외
+  if (!alwaysOpenAdj.has(p.a)) alwaysOpenAdj.set(p.a, new Set())
+  if (!alwaysOpenAdj.has(p.b)) alwaysOpenAdj.set(p.b, new Set())
+  alwaysOpenAdj.get(p.a)!.add(p.b)
+  alwaysOpenAdj.get(p.b)!.add(p.a)
+}
+
+function expandThroughOpenPortals(sectors: Set<SectorId>): Set<SectorId> {
+  const result = new Set(sectors)
+  const queue = [...sectors]
+  while (queue.length) {
+    const cur = queue.pop()!
+    for (const nb of alwaysOpenAdj.get(cur) ?? []) {
+      if (!result.has(nb)) { result.add(nb); queue.push(nb) }
+    }
+  }
+  return result
+}
+
+// doorId → 인터랙션 가능한 sector 집합 (portal 기반 + always-open 확장)
+const doorAllowedSectors = new Map<DoorId, Set<SectorId>>()
+for (const p of portals) {
+  if (!p.doorId) continue
+  let set = doorAllowedSectors.get(p.doorId)
+  if (!set) { set = new Set(); doorAllowedSectors.set(p.doorId, set) }
+  set.add(p.a)
+  set.add(p.b)
+}
+// always-open 포탈을 통해 연결된 sector 도 허용
+for (const [doorId, sectors] of doorAllowedSectors) {
+  doorAllowedSectors.set(doorId, expandThroughOpenPortals(sectors))
+}
+
 // pickActiveDoor 결과 캐시 — 카메라가 거의 안 움직였으면 직전 결과 재사용.
 // FPSController 에서 매 프레임 호출되지만 결과가 바뀌는 빈도는 낮음.
 let _cacheVersion = -1
@@ -45,6 +83,7 @@ let _cacheCamZ = 0
 let _cacheFwdX = 0
 let _cacheFwdY = 0
 let _cacheFwdZ = 0
+let _cacheSector: SectorId | null = null
 let _cacheResult: DoorId | null = null
 const POS_EPS_SQ = 0.01 * 0.01   // 1cm 미만이면 캐시 hit
 const FWD_EPS_SQ = 0.05 * 0.05   // dot product 변화 ~5% 이내 → 약 2.86°
@@ -66,9 +105,10 @@ export function pickActiveDoor(
   fwdY: number = 0,
   maxDist: number = 2.5,
   minDot: number = 0.5,
+  playerSector: SectorId | null = null,
 ): DoorId | null {
   // 캐시 hit: 도어 셋이 동일 + 카메라/시선이 미세하게만 변했으면 재계산 skip
-  if (_cacheVersion === entriesVersion) {
+  if (_cacheVersion === entriesVersion && _cacheSector === playerSector) {
     const dx = camX - _cacheCamX
     const dy = camY - _cacheCamY
     const dz = camZ - _cacheCamZ
@@ -85,6 +125,11 @@ export function pickActiveDoor(
 
   let best: { id: DoorId; score: number } | null = null
   for (const d of entries.values()) {
+    // portal 에 등록된 door 는 인접 sector 에서만 인터랙션 허용
+    if (playerSector) {
+      const allowed = doorAllowedSectors.get(d.id)
+      if (allowed && !allowed.has(playerSector)) continue
+    }
     const dx = d.position[0] - camX
     const dz = d.position[1] - camZ
     const dy = d.y !== undefined ? d.y - camY : 0   // y 미지정 → 2D fallback
@@ -111,6 +156,7 @@ export function pickActiveDoor(
   _cacheFwdX = fwdX
   _cacheFwdY = fwdY
   _cacheFwdZ = fwdZ
+  _cacheSector = playerSector
   _cacheResult = best?.id ?? null
   return _cacheResult
 }

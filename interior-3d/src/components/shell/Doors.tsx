@@ -56,7 +56,7 @@ export function Doors({ activeDoorId, onDoorOpenChange }: DoorsProps) {
   }, [onDoorOpenChange])
 
   // === 중문 (현관 ↔ 복도) — 3-piece (스윙 + 고정 + 헤더) ===
-  const jungX = LR_W - 1.481
+  const jungX = LR_W - 1.481 - 0.016
   const zSouth = -T2 - T2
   const zNorth = -T2 - 1.591 + T2
   const totalW = zSouth - zNorth

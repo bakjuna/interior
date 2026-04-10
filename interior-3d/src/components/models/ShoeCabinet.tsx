@@ -93,6 +93,10 @@ export function ShoeCabinet({ active }: ShoeCabinetProps) {
           distance={1.5}
           decay={2}
           color="#ffe0b0"
+          castShadow
+          shadow-mapSize-width={128}
+          shadow-mapSize-height={128}
+          shadow-bias={-0.002}
         />
       ))}
       <group>
@@ -101,18 +105,22 @@ export function ShoeCabinet({ active }: ShoeCabinetProps) {
         <boxGeometry args={[totalW, cabH, t]} />
         <meshStandardMaterial color={bodyColor} roughness={0.5} />
       </mesh>
+      {/* 서쪽 옆면 */}
       <mesh position={[xLeft - t / 2, topY / 2, zCenter]}>
         <boxGeometry args={[t, topY, depth]} />
         <meshStandardMaterial color={bodyColor} roughness={0.5} />
       </mesh>
+      {/* 동쪽 옆면 */}
       <mesh position={[xLeft + totalW + t / 2, topY / 2, zCenter]}>
         <boxGeometry args={[t, topY, depth]} />
         <meshStandardMaterial color={bodyColor} roughness={0.5} />
       </mesh>
+      {/* 상판 */}
       <mesh position={[xCenter, topY + t / 2, zCenter]}>
         <boxGeometry args={[totalW + t * 2, t, depth]} />
         <meshStandardMaterial color={bodyColor} roughness={0.5} />
       </mesh>
+      {/* 하판 */}
       <mesh position={[xCenter, floorClear - t / 2, zCenter]}>
         <boxGeometry args={[totalW + t * 2, t, depth]} />
         <meshStandardMaterial color={bodyColor} roughness={0.5} />

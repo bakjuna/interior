@@ -6,6 +6,7 @@ import { LR_W, LR_D, MB_W, WALL_THICKNESS, WALL_HEIGHT, babyTop, downlightGroups
 import { moveWithCollision } from '../systems/collision'
 import type { DoorId } from '../data/sectors'
 import { doorRegistry, pickActiveDoor } from '../systems/doorRegistry'
+import { findSector } from '../systems/visibility'
 import { preloadAllKTX2 } from '../systems/useKTX2'
 
 // 전체 이동 범위 — 외벽 바깥 0.5m 마진까지 (집 외부로 빠져나가지 못하게 제한)
@@ -370,10 +371,13 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
     // 변경 시에만 부모에 알림 → 매 프레임 re-render 방지
     {
       camera.getWorldDirection(_scratchFwd)
+      const sector = findSector(camera.position.x, camera.position.z)
       const newActive = pickActiveDoor(
         camera.position.x, camera.position.z,
         _scratchFwd.x, _scratchFwd.z,
         camera.position.y, _scratchFwd.y,
+        2.5, 0.5,
+        sector,
       )
       if (newActive !== lastActiveDoorIdRef.current) {
         lastActiveDoorIdRef.current = newActive

@@ -1,12 +1,9 @@
 /**
  * Three.js 셰이더 패치 — light loop에 early-exit 추가.
- *
- * 원리: 기본 셰이더는 모든 light에 대해 비싼 PBR(RE_Direct) 연산을 무조건 실행.
- * 패치 후: directLight.visible == false (거리 밖 또는 intensity=0) 인 light는
- * RE_Direct를 건너뜀. 뷰 100% 동일, GPU 연산 대폭 감소.
+ * shadow 는 sampler 동적 인덱싱 불가로 지원 불가 → shadow 없이 사용.
+ * 빛 누출 방지는 portal culling + intensity=0 으로 처리.
  *
  * ⚠ 반드시 어떤 material 보다도 먼저 import 되어야 함.
- * ⚠ shadows=false 환경 전용 (shadow map 인덱싱 코드 제거).
  */
 
 import * as THREE from 'three'
@@ -48,7 +45,7 @@ let patchCount = 0
   if (chunk !== before) patchCount++
 }
 
-// --- RectAreaLight: unrolled → dynamic + color==0 체크 (struct에 intensity 없음, color 로 판별) ---
+// --- RectAreaLight: unrolled → dynamic + color==0 skip ---
 {
   const before = chunk
   chunk = chunk.replace(
@@ -67,7 +64,7 @@ let patchCount = 0
 THREE.ShaderChunk['lights_fragment_begin'] = chunk
 
 if (patchCount < 3) {
-  console.warn(`[shaderPatch] ${patchCount}/3 patches applied — some light loops not optimized`)
+  console.warn(`[shaderPatch] ${patchCount}/3 patches applied`)
 } else {
   console.log('[shaderPatch] All 3 light loop patches applied ✓')
 }

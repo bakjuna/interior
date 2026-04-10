@@ -164,7 +164,7 @@ export function FlushDoor({
       {/* 도어 패널 — 힌지 피벗 회전 */}
       <group ref={panelGroupRef} position={[hingeX, 0, 0]}>
         {style === 'flush' ? (
-          <mesh position={[-hingeSign * (width / 2) - 0.001 * hingeSign, height / 2 + 0.005, 0]}>
+          <mesh castShadow position={[-hingeSign * (width / 2) - 0.001 * hingeSign, height / 2 + 0.005, 0]}>
             <boxGeometry args={[width - 0.005, height - 0.010, panelT]} />
             <meshStandardMaterial map={panelTex} color={color} roughness={0.55} metalness={0.05} />
           </mesh>

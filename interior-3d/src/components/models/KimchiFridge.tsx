@@ -14,7 +14,7 @@ interface KimchiFridgeProps {
 }
 
 const W = 0.810
-const D = 0.790
+const D = 0.794
 const H = 1.800
 
 export function KimchiFridge({ frontFaceX, centerZ }: KimchiFridgeProps) {

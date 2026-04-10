@@ -113,12 +113,12 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
   // === 주방 단일 라인 천장 LED ===
   // 북쪽 창문 벽 내측면(kitchenTopInner)에서 100mm 남쪽 → 냉장고장 남쪽 끝까지
   // X: 냉장고장(서벽) 동측면 ~ 우측 하부장 서측면 사이 내측 공간 정중앙
-  const fridgeBottomZ = (babyBottomZ - 0.22 - 0.9) + 0.030  // outerZEnd (= groupZEnd + sideT)
+  const fridgeBottomZ = (babyBottomZ - 0.22 - 0.9) - 0.020 + 0.030  // outerZEnd (20mm 북쪽 이동)
   const lineZstart = kitchenTopInner + 0.1
   const lineZend = fridgeBottomZ
   const lineLen = lineZend - lineZstart
   const lineCenterZ = (lineZstart + lineZend) / 2
-  const fridgeFrontX = kitLeft + Refrigerator.D                     // 냉장고장 동측면(전면)
+  const fridgeFrontX = kitLeft + 0.050 + Refrigerator.D              // 냉장고장 동측면(전면, 벽 50mm gap)
   const lowerCabFrontX = (kitRight - 0.3) - 0.3                     // 우측 하부장 서측면(전면)
   const lineCenterX = (fridgeFrontX + lowerCabFrontX) / 2
   const inductionW = 0.6
@@ -128,9 +128,8 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
   // Z: extStartZ + 2.738 (= drawer 0.5 + cab1 0.4 + sink 0.838 + dish 0.6 + cab2 0.4 → cab2|cab3 boundary)
   const inductionWallGap = 0.05  // 벽에서 50mm
   const inductionGroupX = kitRight - inductionWallGap - 0.5 / 2
-  // 인덕션을 후드 정중앙 아래에 배치 — 50cm cab(extStartZ~+0.5) + 898mm hood 의 중심
-  // = extStartZ + 0.5 + 0.898/2 = extStartZ + 0.949
-  const inductionGroupZ = wall2300Z + T2 + 0.949
+  // 인덕션을 cab2/cab3 경계(남쪽 끝)에 배치
+  const inductionGroupZ = wall2300Z + T2 + 3.502
 
   return (
     <>
@@ -202,28 +201,25 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
         //   sink 북쪽 면 = extStartZ + 1.5 (sinkHalfD 변해도 그대로 유지)
         // 싱크볼: 가로(Z) 838mm, 깊이(X) 500mm, 높이(Y) 400mm.
         // 식기세척기: 싱크 남쪽 면에서 0.05m 갭 후 시작.
-        // 새 컬럼 레이아웃 (N→S, extStartZ 기준):
-        //   drawer N (0.5) | cab1 (0.4) | sink (0.838) | cab2 (0.4) | cab3 (0.4) | dish (0.6) | 짜투리 | drawer S (0.5)
-        //   인덕션은 cab2|cab3 boundary (= extStartZ + 2.138) 위에 배치.
+        // 컬럼 레이아웃 (N→S, extStartZ 기준):
+        // 컬럼 레이아웃 (N→S):
+        //   drawerN(0.5) | cab1(0.4, 단독) | dish(0.6) | sink(0.838) | tiny | drawerS(0.5) | cab(0.8, 페어)
         const sinkHalfD = 0.838 / 2  // = 0.419
         const sinkW = 0.4            // X 깊이 (벽-룸 방향)
         const dishW = 0.6
-        const cabW = 0.4             // 일반 하단장 컬럼 폭
+        const cabW = 0.4             // 일반 하단장 도어 폭
         const drawerColW = 0.5       // 양쪽 drawer 컬럼 폭
-        // 새 N→S: drawer | cab1 | cab2 | dish | sink | cab3 | 짜투리 | drawer S
-        // dish + sink 모두 +400mm 시프트 — cab2 를 dish 북쪽으로 이동.
-        const cab1Z0 = extStartZ + drawerColW            // 0.5
-        const cab2Z0 = cab1Z0 + cabW                     // 0.9 (dish 북쪽)
-        const dishZstart = cab2Z0 + cabW                 // 1.3
-        const dishZend = dishZstart + dishW              // 1.9
-        const sinkZstart = dishZend                      // 1.9 (dish 바로 남쪽)
-        const sinkZend = sinkZstart + sinkHalfD * 2      // 2.738
-        const sinkZpos = sinkZstart + sinkHalfD          // 2.319 (sink 중심)
-        // tiny ↔ cab3 위치 swap: tiny 가 sink 남쪽에 먼저 오고, cab3 가 drawer S 직전
-        const tinyZ0 = sinkZend                          // 2.738 (sink 남쪽)
-        const drawerSZ0 = extEndZ - drawerColW           // 3.402 (= extEndZ - 0.5)
-        const cab3Z0 = drawerSZ0 - cabW                  // 3.002 (drawer S 직전)
-        const tinyLen = cab3Z0 - tinyZ0                  // ≈ 0.264
+        const cab1Z0 = extStartZ + drawerColW            // drawerN 다음
+        const dishZstart = cab1Z0 + cabW                 // cab1(0.4) 다음
+        const dishZend = dishZstart + dishW
+        const sinkZstart = dishZend                      // dish 다음
+        const sinkZend = sinkZstart + sinkHalfD * 2
+        const sinkZpos = sinkZstart + sinkHalfD
+        const tinyZ0 = sinkZend                          // sink 다음
+        const drawerSZ0 = tinyZ0 + (extEndZ - sinkZend - drawerColW - cabW * 2)  // tiny 끝
+        const tinyLen = drawerSZ0 - tinyZ0
+        const cab2Z0 = drawerSZ0 + drawerColW            // drawerS 다음 (cab 페어 0.8)
+        const cab3Z0 = cab2Z0 + cabW                     // cab 후반부
 
         // === 정수기 하단 drawer 슬롯 ===
         // 첫 도어 컬럼(북단 0.5m)을 drawer + 하단 도어로 분할
@@ -261,37 +257,116 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
 
         return (
           <>
-            {/* 하단 솔리드 박스 — extStartZ → dishZstart, Y 0~drawerSplitY (drawer + cab1 + sink lower + cab2 + cab3) */}
-            {mainCabLen > 0.01 && <mesh position={[extCabCenterX, drawerSplitY / 2, mainCabCenterZ]}>
-              <boxGeometry args={[cabExtDepth, drawerSplitY, mainCabLen]} />
-              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-            </mesh>}
-            {/* 상단 박스 A — cab1 (drawerZEnd → sinkZstart) */}
-            {upperALen > 0.01 && <mesh position={[extCabCenterX, upperY, upperACenterZ]}>
-              <boxGeometry args={[cabExtDepth, upperH, upperALen]} />
-              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-            </mesh>}
-            {/* 상단 박스 B — cab2 + cab3 (sinkZend → dishZstart) */}
-            {upperBLen > 0.01 && <mesh position={[extCabCenterX, upperY, upperBCenterZ]}>
-              <boxGeometry args={[cabExtDepth, upperH, upperBLen]} />
-              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-            </mesh>}
-            {/* sink 서측 strip (Y 0.42~0.84): cabWestX → sinkWestEdgeX, sink Z range */}
-            {upperWestStripW > 0.001 && sinkAreaLen > 0.01 && <mesh position={[upperWestStripCenterX, upperY, sinkAreaCenterZ]}>
-              <boxGeometry args={[upperWestStripW, upperH, sinkAreaLen]} />
-              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-            </mesh>}
-            {/* sink 동측 strip (Y 0.42~0.84): sinkEastEdgeX → cabEastX, sink Z range */}
-            {upperEastStripW > 0.001 && sinkAreaLen > 0.01 && <mesh position={[upperEastStripCenterX, upperY, sinkAreaCenterZ]}>
-              <boxGeometry args={[upperEastStripW, upperH, sinkAreaLen]} />
-              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-            </mesh>}
+            {/* === 하부장 중공 본체 — 도어 영역별 뒷판 + 선반 === */}
+            {(() => {
+              const bpT = 0.018  // 뒷판/칸막이 두께
+              const backX = cabEastX - bpT / 2  // 뒷판 X (동측 벽쪽)
+              const shelfDepth = cabExtDepth - bpT
+              const shelfInnerDepth = shelfDepth - 0.030  // 선반 내부 분리판은 동쪽 30mm 축소
+              const shelfCX = cabWestX + shelfDepth / 2
+              const divCX = cabWestX + shelfInnerDepth / 2
+              const shelfT = 0.012
+
+              // --- 북측 drawer 하단 영역 (Y 0~0.42) ---
+              const northLen = drawerZEnd - extStartZ
+              const northCZ = (extStartZ + drawerZEnd) / 2
+              const northShelfYs = [1, 2, 3].map(i => drawerSplitY * i / 4)
+
+              // --- cab1 영역 (단독 0.4, Y 0~0.84) ---
+              const cab1Len = cabW
+              const cab1CZ = cab1Z0 + cabW / 2
+              const cab1ShelfYs = [1, 2, 3].map(i => 0.84 * i / 4)
+
+              // --- sink 영역 (Y 0~0.84, 칸막이 없음) ---
+              const sinkCZ = sinkAreaCenterZ
+              const sinkLen = sinkAreaLen
+
+              // --- cab2+cab3 영역 (페어 0.8, Y 0~0.84) ---
+              const cab23Len = cabW * 2
+              const cab23CZ = cab2Z0 + cabW
+              const cab3ShelfYs = [1, 2, 3].map(i => 0.84 * i / 4)
+
+              return (
+                <>
+                  {/* 북측 drawer 하단 — 뒷판만 (칸막이 없음) */}
+                  <mesh position={[backX, drawerSplitY / 2, northCZ]}>
+                    <boxGeometry args={[bpT, drawerSplitY, northLen]} />
+                    <meshStandardMaterial color="#fff" roughness={0.6} />
+                  </mesh>
+                  {([] as number[]).map((sy, i) => (
+                    <mesh key={`north-shelf-${i}`} position={[shelfCX, sy, northCZ]}>
+                      <boxGeometry args={[shelfInnerDepth, shelfT, northLen]} />
+                      <meshStandardMaterial color="#fff" roughness={0.6} />
+                    </mesh>
+                  ))}
+
+                  {/* cab1 — 뒷판 + 선반 */}
+                  <mesh position={[backX, 0.42, cab1CZ]}>
+                    <boxGeometry args={[bpT, 0.84, cab1Len]} />
+                    <meshStandardMaterial color="#fff" roughness={0.6} />
+                  </mesh>
+                  {cab1ShelfYs.map((sy, i) => (
+                    <mesh key={`cab1-shelf-${i}`} position={[shelfCX, sy, cab1CZ]}>
+                      <boxGeometry args={[shelfInnerDepth, shelfT, cab1Len]} />
+                      <meshStandardMaterial color="#fff" roughness={0.6} />
+                    </mesh>
+                  ))}
+
+                  {/* sink — 뒷판만 (칸막이 없음) */}
+                  <mesh position={[backX, 0.42, sinkCZ]}>
+                    <boxGeometry args={[bpT, 0.84, sinkLen]} />
+                    <meshStandardMaterial color="#fff" roughness={0.6} />
+                  </mesh>
+
+                  {/* cab2+cab3 — 뒷판 + 선반 */}
+                  <mesh position={[backX, 0.42, cab23CZ]}>
+                    <boxGeometry args={[bpT, 0.84, cab23Len]} />
+                    <meshStandardMaterial color="#fff" roughness={0.6} />
+                  </mesh>
+                  {[1, 2, 3].map((i) => (
+                    <mesh key={`cab23-shelf-${i}`} position={[shelfCX, 0.84 * i / 4, cab23CZ]}>
+                      <boxGeometry args={[shelfInnerDepth, shelfT, cab23Len]} />
+                      <meshStandardMaterial color="#fff" roughness={0.6} />
+                    </mesh>
+                  ))}
+
+                  {/* 영역 경계 칸막이 (월넛) */}
+                  {[drawerZEnd, cab1Z0 + cabW, sinkZend, cab2Z0].map((z, i) => (
+                    <mesh key={`lc-div-${i}`} position={[shelfCX, 0.42, z]}>
+                      <boxGeometry args={[shelfDepth, 0.84, bpT]} />
+                      <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+                    </mesh>
+                  ))}
+
+                  {/* 바닥판 — 식기세척기 영역 제외 (2분할) */}
+                  <mesh position={[shelfCX, bpT / 2, (extStartZ + dishZstart) / 2]}>
+                    <boxGeometry args={[shelfDepth, bpT, dishZstart - extStartZ]} />
+                    <meshStandardMaterial color="#fff" roughness={0.6} />
+                  </mesh>
+                  <mesh position={[shelfCX, bpT / 2, (dishZend + drawerSZ0) / 2]}>
+                    <boxGeometry args={[shelfDepth, bpT, drawerSZ0 - dishZend]} />
+                    <meshStandardMaterial color="#fff" roughness={0.6} />
+                  </mesh>
+
+                  {/* 상판 — sink+식기세척기 영역 제외 (2분할) */}
+                  <mesh position={[extCabCenterX, 0.84 - bpT / 2, (extStartZ + dishZstart) / 2]}>
+                    <boxGeometry args={[cabExtDepth, bpT, dishZstart - extStartZ]} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+                  </mesh>
+                  <mesh position={[extCabCenterX, 0.84 - bpT / 2, (sinkZend + drawerSZ0) / 2]}>
+                    <boxGeometry args={[cabExtDepth, bpT, drawerSZ0 - sinkZend]} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+                  </mesh>
+
+                </>
+              )
+            })()}
             {/* drawer 슬롯 좌측(북) 주방장 벽 — 18mm 월넛 패널 */}
             <mesh position={[extCabCenterX, (drawerSplitY + 0.84) / 2, drawerZStart + 0.009]}>
               <boxGeometry args={[cabExtDepth, 0.84 - drawerSplitY, 0.018]} />
               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
-            <mesh position={[extCabCenterX, 0.42, (dishZstart + dishZend) / 2]}>
+            <mesh position={[extCabCenterX - 0.005, 0.42, (dishZstart + dishZend) / 2]}>
               <boxGeometry args={[0.6, 0.84, dishW]} />
               <meshStandardMaterial color="#e0e0e0" metalness={0.4} roughness={0.3} />
             </mesh>
@@ -303,26 +378,12 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
               <boxGeometry args={[0.015, 0.02, 0.4]} />
               <meshStandardMaterial color="#aaa" metalness={0.8} roughness={0.15} />
             </mesh>
-            <mesh position={[extCabCenterX - 0.31, 0.26, (dishZstart + dishZend) / 2]}>
-              <boxGeometry args={[0.005, 0.02, 0.06]} />
-              <meshStandardMaterial color="#888" metalness={0.6} roughness={0.2} />
-            </mesh>
-            {/* sink 하단 박스 (Y 0~drawerSplitY) — sinkZstart → sinkZend (mainCabLen 이 dishZstart 까지만 가니까 별도) */}
-            {sinkAreaLen > 0.01 && <mesh position={[extCabCenterX, drawerSplitY / 2, sinkAreaCenterZ]}>
-              <boxGeometry args={[cabExtDepth, drawerSplitY, sinkAreaLen]} />
-              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-            </mesh>}
-            {/* 짜투리 풀박스는 KitchenRiceCookerDrawer (closedFront) 가 그룹 안에서 직접 렌더 → 별도 정적 박스 없음 */}
-            {/* cab3 본체 — cab3Z0 → drawerSZ0 (drawer S 직전, 40cm cab) */}
-            <mesh position={[extCabCenterX, 0.42, (cab3Z0 + drawerSZ0) / 2]}>
-              <boxGeometry args={[cabExtDepth, 0.84, cabW]} />
-              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-            </mesh>
-            {/* === 마지막 50cm 컬럼 — 빈공간(0~0.15) + 스윙도어 본체(0.15~0.40) + 드로어 슬롯(0.40~0.84) === */}
+            {/* sink/cab3 본체는 중공 구조에 포함됨 */}
+            {/* === drawerS 본체 — 빈공간(0~0.15) + 스윙도어 본체(0.15~0.40) + 드로어 슬롯(0.40~0.84) === */}
             {(() => {
               const lastColLen = 0.5
-              const lastColZStart = extEndZ - lastColLen
-              const lastColZEnd = extEndZ
+              const lastColZStart = drawerSZ0
+              const lastColZEnd = drawerSZ0 + lastColLen
               const lastColCenterZ = (lastColZStart + lastColZEnd) / 2
               const swingBottomY = 0.15
               const swingTopY = 0.40
@@ -365,15 +426,18 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
               const dz = drawerZStart + drawerColLen / 2
               const dw = drawerColLen
               return (<group key="ext-lc-drawerN">
-                {/* 하단 도어 (drawer 아래) */}
-                <mesh position={[extCabCenterX - 0.301, drawerSplitY / 2, dz]} rotation={[0, -Math.PI / 2, 0]}>
-                  <planeGeometry args={[dw - 0.005, drawerSplitY - 0.010]} />
-                  <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-                </mesh>
-                <mesh position={[extCabCenterX - 0.31, drawerSplitY - 0.06, dz]}>
-                  <boxGeometry args={[0.015, 0.08, 0.01]} />
-                  <meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} />
-                </mesh>
+                {/* 하단 도어 (drawer 아래) — F 인터랙션 */}
+                <KitchenLowerDoor
+                  frontX={extCabCenterX - 0.301}
+                  centerY={drawerSplitY / 2}
+                  doorH={drawerSplitY}
+                  zStart={drawerZStart}
+                  doorWidth={dw}
+                  handleY={0.30}
+                  walnutTex={walnutBodyTex}
+                  doorId="kitchen-lc-north"
+                  activeDoorId={activeDoorId}
+                />
                 {/* 캐비닛 슬롯 양쪽 고정 레일 트랙 */}
                 <mesh position={[extCabCenterX, drawerSplitY + 0.008 + 0.001, drawerZStart + 0.018 + 0.005]}>
                   <boxGeometry args={[cabExtDepth - 0.04, 0.014, 0.018]} />
@@ -397,37 +461,44 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
                 />
               </group>)
             })()}
-            {/* cab1, cab2, cab3 — 일반 40cm 도어 (Y 0.42 중심 × 0.8 높이) */}
-            {([
-              { z0: cab1Z0, key: 'cab1' },
-              { z0: cab2Z0, key: 'cab2' },
-              { z0: cab3Z0, key: 'cab3' },
-            ] as const).map(({ z0, key }) => {
-              const dz = z0 + cabW / 2
-              return (
-                <group key={`ext-lc-${key}`}>
-                  <mesh position={[extCabCenterX - 0.301, 0.42, dz]} rotation={[0, -Math.PI / 2, 0]}>
-                    <planeGeometry args={[cabW - 0.005, 0.8]} />
-                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-                  </mesh>
-                  <mesh position={[extCabCenterX - 0.31, 0.42, dz]}>
-                    <boxGeometry args={[0.015, 0.08, 0.01]} />
-                    <meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} />
-                  </mesh>
-                </group>
-              )
-            })}
-            {(() => {
-              const sinkDoorCount = 2
-              const sinkDoorW = (sinkHalfD * 2) / sinkDoorCount
-              return Array.from({ length: sinkDoorCount }).map((_, di) => {
-                const dz = (sinkZpos - sinkHalfD) + sinkDoorW / 2 + di * sinkDoorW
-                  return (<group key={`ext-lc-sink-${di}`}>
-                  <mesh position={[extCabCenterX - 0.301, 0.42, dz]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[sinkDoorW, 0.8]} /><meshStandardMaterial map={walnutBodyTex} roughness={0.45} /></mesh>
-                  <mesh position={[extCabCenterX - 0.31, 0.42, dz]}><boxGeometry args={[0.015, 0.08, 0.01]} /><meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} /></mesh>
-                </group>)
-              })
-            })()}
+            {/* cab1 단독 — F 인터랙션 */}
+            <KitchenLowerDoor
+              frontX={extCabCenterX - 0.301}
+              centerY={0.42}
+              doorH={0.84}
+              zStart={cab1Z0}
+              doorWidth={cabW}
+              handleY={0.76}
+              walnutTex={walnutBodyTex}
+              doorId="kitchen-lc-cab3"
+              activeDoorId={activeDoorId}
+            />
+            {/* cab2+cab3 페어 (남쪽 0.8) — F 인터랙션 */}
+            <KitchenLowerDoor
+              frontX={extCabCenterX - 0.301}
+              centerY={0.42}
+              doorH={0.84}
+              zStart={cab2Z0}
+              doorWidth={cabW}
+              handleY={0.76}
+              pair={true}
+              walnutTex={walnutBodyTex}
+              doorId="kitchen-lc-cab12"
+              activeDoorId={activeDoorId}
+            />
+            {/* 싱크 도어 페어 — F 인터랙션 */}
+            <KitchenLowerDoor
+              frontX={extCabCenterX - 0.301}
+              centerY={0.42}
+              doorH={0.84}
+              zStart={sinkZpos - sinkHalfD}
+              doorWidth={sinkHalfD}
+              handleY={0.76}
+              pair={true}
+              walnutTex={walnutBodyTex}
+              doorId="kitchen-lc-sink"
+              activeDoorId={activeDoorId}
+            />
             {/* 짜투리 thin pull-out drawer — F 키로 전체 풀박스 슬라이드 (closedFront) */}
             {tinyLen > 0.05 && (
               <KitchenRiceCookerDrawer
@@ -444,11 +515,11 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
                 closedFront={true}
               />
             )}
-            {/* 마지막 50cm 컬럼 — 스윙 도어 패널 + 드로어 */}
+            {/* drawerS 50cm 컬럼 (tiny 바로 남쪽) — 스윙 도어 패널 + 드로어 + 로청 */}
             {(() => {
               const lastColLen = 0.5
-              const lastColZStart = extEndZ - lastColLen
-              const lastColZEnd = extEndZ
+              const lastColZStart = drawerSZ0
+              const lastColZEnd = drawerSZ0 + lastColLen
               const swingBottomY = 0.15
               const swingTopY = 0.40
               return (
@@ -605,9 +676,9 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
               const northSlabCenterZ = (northSlabZStart + northSlabZEnd) / 2
               const northSlabCenterX = extWallInner - tileThick / 2 - 0.001
 
-              // 남쪽 슬랩 (벽이 5.5cm 안쪽)
+              // 남쪽 슬랩 (벽이 5.5cm 안쪽) — 상판 끝에 맞춤
               const southSlabZStart = stepZ
-              const southSlabZEnd = extEndZ
+              const southSlabZEnd = extEndZ + 0.05
               const southSlabLen = southSlabZEnd - southSlabZStart
               const southSlabCenterZ = (southSlabZStart + southSlabZEnd) / 2
               const southSlabCenterX = extWallInner + stepDX - tileThick / 2 - 0.001
@@ -658,22 +729,24 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
               const upperXN = extWallInner - upperDepthN / 2
 
               // 슬롯 정의 — extStartZ(=캐비닛 북단) 에서 시작
-              const cab50W = 0.5     // 후드 왼편(정수기 위) 캐비닛 — 50cm
+              // purifier(0.5) | 페어0(0.8) | 페어1(0.8) | 페어2(0.8) | hood(0.898)
+              const cab50W = 0.5     // 정수기 위 캐비닛 — 50cm
               const hoodW = 0.898    // 후드 가로 898mm
               const baseCabW = 0.4
 
               const cab50ZStart = extStartZ
               const cab50ZEnd = cab50ZStart + cab50W
-              const hoodZStart = cab50ZEnd
-              const hoodZEnd = hoodZStart + hoodW
-              const remainStartZ = hoodZEnd
-              const remainEndZ = extEndZ
+              const remainStartZ = cab50ZEnd           // 캐비닛 시작
+              const remainEndZ = extEndZ - hoodW       // 후드 앞까지
               const remainLen = remainEndZ - remainStartZ
               const cabCount = Math.max(1, Math.floor(remainLen / baseCabW))
-              const lastCabW = remainLen - baseCabW * (cabCount - 1)
+              // 후드는 페어2 끝 (1.0 + 0.8 + 0.8 = 2.6) 바로 남쪽
+              const hoodZStart = remainStartZ + 1.0 + 0.8 + 0.8
+              const hoodZEnd = hoodZStart + hoodW
+
 
               const ucDoorIds: DoorId[] = [
-                'kitchen-uc-0', 'kitchen-uc-1', 'kitchen-uc-2', 'kitchen-uc-3', 'kitchen-uc-4',
+                'kitchen-uc-0', 'kitchen-uc-1', 'kitchen-uc-2',
               ]
               // 북쪽 3 = purifier + ext-uc-0 + ext-uc-1 → ext-uc index 0, 1 이 북쪽
               const NORTH_REMAIN_COUNT = 2
@@ -736,28 +809,36 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
                     )
                   })()}
 
-                  {/* 나머지 — 40cm 캐비닛 (마지막은 lastCabW 로 잔여 흡수). 내부 4분할 */}
-                  {Array.from({ length: cabCount }).map((_, i) => {
-                    const w = i === cabCount - 1 ? lastCabW : baseCabW
-                    const zStart = remainStartZ + baseCabW * i
-                    const id = ucDoorIds[Math.min(i, ucDoorIds.length - 1)]
-                    const isNorth = i < NORTH_REMAIN_COUNT  // 북쪽 2개 (purifier 와 합쳐 북쪽 3)
-                    return (
-                      <KitchenUpperCabinet
-                        key={`ext-uc-${i}`}
-                        cabX={isNorth ? upperXN : upperX}
+                  {/* 캐비닛 페어: 페어0(1.0) | 페어1(0.8) | 페어2(0.8) */}
+                  {(() => {
+                    const pairs: Array<{ dw: number; zs: number; depthA: number; depthB: number; id: DoorId }> = []
+                    let z = remainStartZ
+                    // 페어0: doorWidth 0.5 (합 1.0)
+                    pairs.push({ dw: 0.5, zs: z, depthA: upperDepthN, depthB: upperDepthN, id: 'kitchen-uc-0' })
+                    z += 1.0
+                    // 페어1: doorWidth 0.4 (합 0.8)
+                    pairs.push({ dw: baseCabW, zs: z, depthA: upperDepth, depthB: upperDepth, id: 'kitchen-uc-1' })
+                    z += 0.8
+                    // 페어2: doorWidth 0.4 (합 0.8)
+                    pairs.push({ dw: baseCabW, zs: z, depthA: upperDepth, depthB: upperDepth, id: 'kitchen-uc-2' })
+                    return pairs.map((p, pi) => (
+                      <KitchenUpperCabinetPair
+                        key={`ext-uc-pair-${pi}`}
+                        cabX={pi === 0 ? upperXN : upperX}
+                        cabX2={pi === 0 ? upperXN : upperX}
                         cabY={upperY}
-                        zStart={zStart}
-                        width={w}
-                        depth={isNorth ? upperDepthN : upperDepth}
+                        zStart={p.zs}
+                        doorWidth={p.dw}
+                        depth={p.depthA}
+                        depth2={p.depthB}
                         height={upperH}
                         divisions={4}
                         walnutTex={walnutBodyTex}
-                        doorId={id}
+                        doorId={p.id}
                         activeDoorId={activeDoorId}
                       />
-                    )
-                  })}
+                    ))
+                  })()}
                 </>
               )
             })()}
@@ -781,25 +862,26 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
 
         const f2W = KimchiFridge.W
         // 아기방 문을 가리지 않도록 남쪽 끝(groupZEnd)을 babyDoorEnd 에 정렬 → 북쪽으로 밀어 올림.
-        // 김치냉장고가 fridge 보다 남쪽 (groupZEnd 측) 에 위치 — 원본 우측 벽 배치와 동일한 순서 유지.
+        // 냉장고가 김치냉장고보다 남쪽 (groupZEnd 측) 에 위치.
         const babyDoorEndZ = babyBottomZ - 0.22 - 0.9
-        const f2Z = babyDoorEndZ - f2W / 2
-        const fridgeZ = f2Z - (fridgeW / 2 + f2W / 2 + 0.080)
+        const fridgeZ = babyDoorEndZ - fridgeW / 2 - 0.020
+        const f2Z = fridgeZ - (f2W / 2 + fridgeW / 2 + 0.090)  // 간격 90mm (80+10)
 
         const sideT = 0.030
-        const groupZStart = fridgeZ - fridgeW / 2
-        const groupZEnd = f2Z + f2W / 2
+        const groupZStart = f2Z - f2W / 2
+        const groupZEnd = fridgeZ + fridgeW / 2
         const groupLen = groupZEnd - groupZStart
-        const outerZStart = groupZStart - sideT
+        const outerZStart = groupZStart - sideT - 0.002  // 김치냉장고 북쪽에서 2mm 간격
         const outerZEnd = groupZEnd + sideT
         const outerLen = outerZEnd - outerZStart
         const outerCenterZ = (outerZStart + outerZEnd) / 2
         const cabDepth = fridgeD
-        // 캐비닛 박스만 120mm 뒤(-X)로 물러섬. 냉장고/김치냉장고 모델은 그대로 유지.
+        // 냉장고/김치냉장고 뒷면 벽과 50mm 간격
+        const WALL_GAP = 0.050
         const CAB_BACK_OFFSET = 0.12
-        const fridgeModelX = kitLeft + cabDepth / 2                    // 모델 위치 (그대로)
+        const fridgeModelX = kitLeft + WALL_GAP + cabDepth / 2         // 모델 위치 (벽에서 50mm)
         const cabX = fridgeModelX - CAB_BACK_OFFSET                    // 박스 위치 (-X 120mm)
-        const cabBottomY = 1.800 - 0.030
+        const cabBottomY = 1.800 + 0.020
         const cabTopY = WALL_HEIGHT + 0.030 - 0.050   // 천장과의 간섭 방지 -50mm
         const cabH = cabTopY - cabBottomY
         const cabCenterY = (cabBottomY + cabTopY) / 2
@@ -811,28 +893,84 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
           <group>
             {/* 모델은 -X 정면으로 하드코딩 → 180° 회전 그룹으로 +X(룸 인테리어) 정면. 위치 고정. */}
             <group position={[fridgeModelX, 0, fridgeZ]} rotation={[0, Math.PI, 0]}>
-              <Refrigerator position={[0, 0]} />
-              <KimchiFridge frontFaceX={-fridgeD / 2} centerZ={-(f2Z - fridgeZ)} />
+              <Refrigerator position={[0, 0.002]} />
+              <KimchiFridge frontFaceX={-fridgeD / 2} centerZ={-(f2Z - fridgeZ) - 0.002} />
             </group>
 
-            {/* 빌트인 상부장 + 측면 벽 — 박스만 -X 120mm 시프트 */}
-            <mesh position={[cabX, cabCenterY, outerCenterZ]}>
-              <boxGeometry args={[cabDepth, cabH, outerLen]} />
-              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-            </mesh>
-            {Array.from({ length: doorCount }).map((_, di) => {
-              const dz = groupZStart + doorLen * (di + 0.5)
+            {/* 빌트인 상부장 중공 본체 — 박스만 -X 120mm 시프트 */}
+            {(() => {
+              const bpT = 0.018
+              const shelfT = 0.012
+              const cabFrontX = cabX + cabDepth / 2
+              const backX = cabX - cabDepth / 2 + bpT / 2
+              const interiorDepth = cabDepth - bpT
+              const interiorCX = cabX - cabDepth / 2 + bpT + interiorDepth / 2
+              // 4분할 = 2페어, 각 페어 doorWidth = groupLen / 4
+              const pairDoorW = groupLen / 4
+              const pair0ZStart = groupZStart
+              const pair1ZStart = groupZStart + pairDoorW * 2
               return (
-                <mesh
-                  key={`fridge-uc-${di}`}
-                  position={[cabX + cabDepth / 2 + 0.002, cabCenterY, dz]}
-                  rotation={[0, Math.PI / 2, 0]}
-                >
-                  <planeGeometry args={[doorLen - doorGap, cabH - 0.010]} />
-                  <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-                </mesh>
+                <>
+                  {/* 뒷판 (벽에서 20mm 띄움) */}
+                  <mesh position={[backX + 0.07, cabCenterY, outerCenterZ]}>
+                    <boxGeometry args={[bpT, cabH, groupLen]} />
+                    <meshStandardMaterial color="#fff" roughness={0.6} />
+                  </mesh>
+                  {/* 상판 */}
+                  <mesh position={[cabX, cabTopY - bpT / 2, outerCenterZ]}>
+                    <boxGeometry args={[cabDepth, bpT, outerLen]} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+                  </mesh>
+                  {/* 하판 */}
+                  <mesh position={[cabX, cabBottomY + bpT / 2, outerCenterZ]}>
+                    <boxGeometry args={[cabDepth, bpT, outerLen]} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+                  </mesh>
+                  {/* 좌측면 (남, outerZEnd) — 냉장고장 옆면과 동일 40mm */}
+                  <mesh position={[cabX, cabCenterY, outerZEnd - 0.040 / 2]}>
+                    <boxGeometry args={[cabDepth, cabH, 0.040]} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+                  </mesh>
+                  {/* 우측면 (북, outerZStart) — 40mm */}
+                  <mesh position={[cabX, cabCenterY, outerZStart + 0.040 / 2]}>
+                    <boxGeometry args={[cabDepth, cabH, 0.040]} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+                  </mesh>
+                  {/* 수직 2분할 칸막이 (가운데) */}
+                  <mesh position={[interiorCX, cabCenterY, (groupZStart + groupZEnd) / 2]}>
+                    <boxGeometry args={[interiorDepth, cabH - bpT * 2, bpT]} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+                  </mesh>
+                  {/* 인터랙티브 도어 페어 2개 */}
+                  <KitchenLowerDoor
+                    frontX={cabFrontX}
+                    centerY={cabCenterY}
+                    doorH={cabH - 0.010}
+                    zStart={pair0ZStart}
+                    doorWidth={pairDoorW}
+                    handleY={cabBottomY + 0.06}
+                    pair={true}
+                    reverseSwing={true}
+                    walnutTex={walnutBodyTex}
+                    doorId="kitchen-fridge-uc-0"
+                    activeDoorId={activeDoorId}
+                  />
+                  <KitchenLowerDoor
+                    frontX={cabFrontX}
+                    centerY={cabCenterY}
+                    doorH={cabH - 0.010}
+                    zStart={pair1ZStart}
+                    doorWidth={pairDoorW}
+                    handleY={cabBottomY + 0.06}
+                    pair={true}
+                    reverseSwing={true}
+                    walnutTex={walnutBodyTex}
+                    doorId="kitchen-fridge-uc-1"
+                    activeDoorId={activeDoorId}
+                  />
+                </>
               )
-            })}
+            })()}
             <mesh position={[cabX, cabBottomY / 2, outerZStart + sideT / 2]}>
               <boxGeometry args={[cabDepth, cabBottomY, sideT]} />
               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
@@ -841,19 +979,6 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
               <boxGeometry args={[cabDepth, cabBottomY, sideT]} />
               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
-            {(() => {
-              // 김치냉장고가 더 얕음 → 벽 쪽(-X) 빈 공간을 채움. 박스이므로 시프트 적용.
-              const fillerD = fridgeD - KimchiFridge.D
-              const fillerX = (kitLeft + fillerD / 2) - CAB_BACK_OFFSET
-              const kimchiZStart = f2Z - f2W / 2
-              const kimchiZEnd = f2Z + f2W / 2
-              return (
-                <mesh position={[fillerX, 1.800 / 2, (kimchiZStart + kimchiZEnd) / 2]}>
-                  <boxGeometry args={[fillerD, 1.800, f2W]} />
-                  <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-                </mesh>
-              )
-            })()}
           </group>
         )
       })()}
@@ -865,10 +990,10 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
       {(() => {
         const doorThickX = 0.040                                       // 도어 패널 두께(X)
         // 냉장고장/키큰장 모두 -X 120mm 시프트됨 → 전면 평면도 같이 이동
-        const hingeX = kitLeft + Refrigerator.D - 0.12                 // 캐비닛 전면(+X) 평면
+        const hingeX = kitLeft + 0.050 + Refrigerator.D - 0.12          // 캐비닛 전면(+X) 평면
         const tallZEndLocal = babyTop - T2 - 1.119                     // 키큰장 남쪽 끝 (북쪽 경첩)
         const fridgeOuterZStart =
-          (babyBottomZ - 0.22 - 0.9) - KimchiFridge.W - 0.080 - Refrigerator.W - 0.030 // 냉장고장 북쪽 끝 (남쪽 경첩)
+          (babyBottomZ - 0.22 - 0.9) - 0.020 - Refrigerator.W - 0.090 - KimchiFridge.W - 0.032 // 냉장고장 북쪽 끝 (20mm 북쪽 이동)
         const midZ = (tallZEndLocal + fridgeOuterZStart) / 2
         const leafLen = (midZ - tallZEndLocal) - 0.003                 // 각 도어 길이 = 갭/2 - 미세 여유
         const dogGapH = 0.6                                            // 하단 600mm 개방
@@ -909,9 +1034,9 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
       {(() => {
         // 깊이는 4도어 냉장고장과 동일
         const tallDepth = Refrigerator.D
-        // 키큰장 전체를 -X 120mm 뒤로 시프트 (냉장고장과 동일)
+        // 키큰장 전체를 -X 120mm 뒤로 시프트 (냉장고장과 동일), 벽 50mm gap
         const CAB_BACK_OFFSET = 0.12
-        const tallLeft = kitLeft - CAB_BACK_OFFSET                     // 키큰장 -X 끝 (벽 안쪽)
+        const tallLeft = kitLeft + 0.050 - CAB_BACK_OFFSET             // 키큰장 -X 끝 (벽 50mm gap)
         const tallX = tallLeft + tallDepth / 2
         const tallFrontX = tallLeft + tallDepth
         // Z 폭: line 209 의 서벽 솔리드 구간 (wall2300Z ~ babyTop-T2-1.119) 내부 면 길이
@@ -944,11 +1069,26 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
         const drawerSlotZEnd = tallZEnd - 0.005    // face +Z 면 = tallZEnd - 5mm
         const drawerSlotZStart = tallZStart + 0.018  // panelT 만큼 안쪽 (북 측면에 부딪히지 않게)
 
+        const panelT = 0.018
+
         return (
           <group>
-            {/* 본체 — 하단 솔리드 박스 (front 50cm × Y [0, lowerH]). 뒷쪽 drawer 슬롯은 vis 30cm */}
-            <mesh position={[displayCenterX, lowerH / 2, tallZCenter]}>
-              <boxGeometry args={[displayDepthX, lowerH, tallZLen]} />
+            {/* 본체 — 하단 중공 구조 (front 50cm × Y [0, lowerH]) */}
+            {/* 4단 선반 (3칸막이) */}
+            {[1, 2, 3].map(i => (
+              <mesh key={`tall-lower-shelf-${i}`} position={[displayCenterX, lowerH * i / 4, tallZCenter]}>
+                <boxGeometry args={[displayDepthX - 0.030, 0.012, tallZLen - panelT * 2]} />
+                <meshStandardMaterial color="#fff" roughness={0.6} />
+              </mesh>
+            ))}
+            {/* 하단판 */}
+            <mesh position={[displayCenterX, panelT / 2, tallZCenter]}>
+              <boxGeometry args={[displayDepthX, panelT, tallZLen]} />
+              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+            </mesh>
+            {/* 상판 (lowerH에서 20mm 아래) */}
+            <mesh position={[displayCenterX, lowerH - 0.020 - panelT / 2, tallZCenter]}>
+              <boxGeometry args={[displayDepthX, panelT, tallZLen]} />
               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
 
@@ -1046,24 +1186,20 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
               )
             })()}
 
-            {/* 하단 도어 (2분할) */}
-            {[0, 1].map((i) => {
-              const dw = tallZLen / 2
-              const dz = tallZStart + dw * (i + 0.5)
-              return (
-                <group key={`tall-lower-door-${i}`}>
-                  <mesh position={[tallFrontX + 0.001, lowerH / 2, dz]} rotation={[0, Math.PI / 2, 0]}>
-                    <planeGeometry args={[dw - 0.005, lowerH - 0.010]} />
-                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-                  </mesh>
-                  {/* 손잡이 (도어 상단) */}
-                  <mesh position={[tallFrontX + 0.010, lowerH - 0.06, dz]}>
-                    <boxGeometry args={[0.015, 0.08, 0.01]} />
-                    <meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} />
-                  </mesh>
-                </group>
-              )
-            })}
+            {/* 하단 도어 (F 인터랙션 페어, +X swing) */}
+            <KitchenLowerDoor
+              frontX={tallFrontX}
+              centerY={lowerH / 2}
+              doorH={lowerH}
+              zStart={tallZStart}
+              doorWidth={tallZLen / 2}
+              handleY={lowerH - 0.06}
+              pair={true}
+              reverseSwing={true}
+              walnutTex={walnutBodyTex}
+              doorId="kitchen-tall-lower"
+              activeDoorId={activeDoorId}
+            />
 
             {/* 오븐 — 오픈 선반 바닥(lowerH=0.85) 위에 안착. LightWaveOven H=0.330 → centerY=1.015 */}
             <Suspense fallback={null}>
@@ -1073,24 +1209,21 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
               />
             </Suspense>
 
-            {/* 상단 도어 (2분할) */}
-            {[0, 1].map((i) => {
-              const dw = tallZLen / 2
-              const dz = tallZStart + dw * (i + 0.5)
-              return (
-                <group key={`tall-upper-door-${i}`}>
-                  <mesh position={[tallFrontX + 0.001, upperBottomY + upperH / 2, dz]} rotation={[0, Math.PI / 2, 0]}>
-                    <planeGeometry args={[dw - 0.005, upperH - 0.010]} />
-                    <meshStandardMaterial color="#cfe0e6" roughness={0.05} metalness={0.1} transparent opacity={0.3} />
-                  </mesh>
-                  {/* 손잡이 (도어 하단) */}
-                  <mesh position={[tallFrontX + 0.010, upperBottomY + 0.06, dz]}>
-                    <boxGeometry args={[0.015, 0.08, 0.01]} />
-                    <meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} />
-                  </mesh>
-                </group>
-              )
-            })}
+            {/* 상단 유리 도어 (F 인터랙션 페어, +X swing, 동쪽 20mm) */}
+            <KitchenLowerDoor
+              frontX={tallFrontX + 0.020}
+              centerY={upperBottomY + upperH / 2}
+              doorH={upperH}
+              zStart={tallZStart}
+              doorWidth={tallZLen / 2}
+              handleY={upperBottomY + 0.06}
+              pair={true}
+              reverseSwing={true}
+              glass={true}
+              walnutTex={walnutBodyTex}
+              doorId="kitchen-tall-upper"
+              activeDoorId={activeDoorId}
+            />
           </group>
         )
       })()}
@@ -1249,9 +1382,11 @@ function KitchenRiceCookerDrawer({
   useEffect(() => {
     const drawerCenterX = extWallInner - depth / 2
     const drawerCenterZ = (drawerZStart + drawerZEnd) / 2
+    const drawerCenterY = (drawerBottomY + drawerTopY) / 2
     doorRegistry.register({
       id: doorId,
       position: [drawerCenterX, drawerCenterZ],
+      y: drawerCenterY - 0.20,
       toggle: () => toggleRef.current(),
     })
     return () => doorRegistry.unregister(doorId)
@@ -1321,8 +1456,9 @@ function KitchenRiceCookerDrawer({
   const rcY = interiorBottomY + 0.0165
   const rcZ = drawerCenterZ
 
-  // 30mm 림 (개방형 서랍) — 앞/옆은 손잡이 부착·구조용 30mm 만 남김
+  // 림 (개방형 서랍) — 정면 30mm, 옆면/뒷면 10mm
   const lipH = 0.030
+  const sideLipH = 0.010
 
   // 스윙 도어 메쉬 파라미터 (옵션)
   const swingHingeX = extWallInner - depth   // 캐비닛 정면 X (drawer face X 와 동일)
@@ -1366,10 +1502,10 @@ function KitchenRiceCookerDrawer({
               <planeGeometry args={[colW - 0.005, colH - 0.010]} />
               <meshStandardMaterial map={walnutTex} roughness={0.45} />
             </mesh>
-            {/* 손잡이 */}
-            <mesh position={[frontX - 0.01, drawerCenterY, cz]}>
-              <boxGeometry args={[0.015, 0.08, 0.01]} />
-              <meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} />
+            {/* 가로 손잡이 (세로 손잡이 top 0.81 과 맞춤) */}
+            <mesh position={[frontX - 0.01, 0.80, cz]}>
+              <boxGeometry args={[0.018, 0.020, colW * 0.5]} />
+              <meshStandardMaterial color="#bbb" metalness={0.85} roughness={0.15} />
             </mesh>
             {/* 메탈 포스트 (4 코너 수직 바) */}
             {[
@@ -1418,25 +1554,19 @@ function KitchenRiceCookerDrawer({
         <boxGeometry args={[panelT, lipH, interiorLen - 0.005]} />
         <meshStandardMaterial map={walnutTex} roughness={0.45} />
       </mesh>
-      {/* 가로 손잡이 (정면 림 위) */}
-      <mesh position={[frontX, drawerBottomY + panelT + lipH + 0.012, interiorCenterZ]}>
-        <boxGeometry args={[0.018, 0.020, interiorLen - 0.10]} />
-        <meshStandardMaterial color="#bbb" metalness={0.85} roughness={0.15} />
-      </mesh>
-
-      {/* drawer 측면 림 (30mm, 북) — 캐비닛 좌측 벽 안쪽 면에 인접 */}
-      <mesh position={[extWallInner - depth / 2, drawerBottomY + panelT + lipH / 2, interiorZStart + panelT / 2]}>
-        <boxGeometry args={[depth - 0.02, lipH, panelT]} />
+      {/* drawer 측면 림 (10mm, 북) — 캐비닛 좌측 벽 안쪽 면에 인접 */}
+      <mesh position={[extWallInner - depth / 2, drawerBottomY + panelT + sideLipH / 2, interiorZStart + panelT / 2]}>
+        <boxGeometry args={[depth - 0.02, sideLipH, panelT]} />
         <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
       </mesh>
-      {/* drawer 측면 림 (30mm, 남) */}
-      <mesh position={[extWallInner - depth / 2, drawerBottomY + panelT + lipH / 2, interiorZEnd - panelT / 2]}>
-        <boxGeometry args={[depth - 0.02, lipH, panelT]} />
+      {/* drawer 측면 림 (10mm, 남) */}
+      <mesh position={[extWallInner - depth / 2, drawerBottomY + panelT + sideLipH / 2, interiorZEnd - panelT / 2]}>
+        <boxGeometry args={[depth - 0.02, sideLipH, panelT]} />
         <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
       </mesh>
-      {/* drawer 후면 림 (30mm, 동) */}
-      <mesh position={[extWallInner - 0.02, drawerBottomY + panelT + lipH / 2, interiorCenterZ]}>
-        <boxGeometry args={[panelT, lipH, interiorLen - 0.005]} />
+      {/* drawer 후면 림 (10mm, 동) */}
+      <mesh position={[extWallInner - 0.02, drawerBottomY + panelT + sideLipH / 2, interiorCenterZ]}>
+        <boxGeometry args={[panelT, sideLipH, interiorLen - 0.005]} />
         <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
       </mesh>
 
@@ -1505,15 +1635,6 @@ function KitchenRiceCookerDrawer({
         <mesh position={[swingMeshLocalX, swingDoorCenterY, swingMeshLocalZ]}>
           <boxGeometry args={[swingThickX, swingDoorH, swingLeafLen]} />
           <meshStandardMaterial map={walnutTex} roughness={0.45} />
-        </mesh>
-        {/* 손잡이 (스윙 도어 free Z-end 근처) */}
-        <mesh position={[
-          swingMeshLocalX - 0.012,
-          swingDoorBelow.topY - 0.04,
-          swingDoorBelow.hingeZend === 'north' ? swingLeafLen - 0.06 : -swingLeafLen + 0.06,
-        ]}>
-          <boxGeometry args={[0.015, 0.08, 0.01]} />
-          <meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} />
         </mesh>
       </group>
     )}
@@ -1845,6 +1966,116 @@ function KitchenTallBackDrawer({
 }
 
 /**
+ * 주방 하단장 스윙 도어 — 동측 벽 캐비닛, -X 방향으로 swing.
+ * pair=true: 2문짝 동시 개폐 (north/south hinge).
+ */
+interface KitchenLowerDoorProps {
+  frontX: number
+  centerY: number
+  doorH: number
+  zStart: number
+  doorWidth: number
+  handleY: number
+  pair?: boolean
+  glass?: boolean
+  reverseSwing?: boolean  // swing 방향 반전 (+X 방향으로 열림)
+  walnutTex: THREE.Texture
+  doorId: DoorId
+  activeDoorId?: DoorId | null
+}
+
+function KitchenLowerDoor({
+  frontX, centerY, doorH, zStart, doorWidth, handleY, pair = false, glass = false, reverseSwing = false,
+  walnutTex, doorId, activeDoorId,
+}: KitchenLowerDoorProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const pivotARef = useRef<THREE.Group>(null)
+  const pivotBRef = useRef<THREE.Group>(null)
+  const angleARef = useRef(0)
+  const angleBRef = useRef(0)
+  const { invalidate } = useThree()
+
+  const totalWidth = pair ? doorWidth * 2 : doorWidth
+  const zCenter = zStart + totalWidth / 2
+  const zEnd = zStart + totalWidth
+
+  const toggleRef = useRef(() => setIsOpen((o) => !o))
+  toggleRef.current = () => setIsOpen((o) => !o)
+  useEffect(() => {
+    doorRegistry.register({
+      id: doorId,
+      position: [frontX, zCenter],
+      y: handleY,
+      toggle: () => toggleRef.current(),
+    })
+    return () => doorRegistry.unregister(doorId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doorId])
+
+  const TARGET_A = reverseSwing ? Math.PI / 2 : -Math.PI / 2
+  const TARGET_B = reverseSwing ? -Math.PI / 2 : Math.PI / 2
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.05)
+    const tA = isOpen ? TARGET_A : 0
+    const tB = isOpen ? TARGET_B : 0
+    const dA = tA - angleARef.current
+    const dB = pair ? tB - angleBRef.current : 0
+    if (Math.abs(dA) < 0.0005 && Math.abs(dB) < 0.0005) return
+    angleARef.current += dA * Math.min(1, delta * 6)
+    if (pivotARef.current) pivotARef.current.rotation.y = angleARef.current
+    if (pair) {
+      angleBRef.current += dB * Math.min(1, delta * 6)
+      if (pivotBRef.current) pivotBRef.current.rotation.y = angleBRef.current
+    }
+    invalidate()
+  })
+
+  const isActive = activeDoorId === doorId
+  const doorThickX = 0.018
+  const panelW = doorWidth - 0.005
+  const panelH = doorH - 0.010
+
+  return (
+    <group>
+      <group ref={pivotARef} position={[frontX, centerY, zStart + 0.0025]}>
+        <mesh position={[reverseSwing ? -doorThickX / 2 : doorThickX / 2, 0, panelW / 2]}>
+          <boxGeometry args={[doorThickX, panelH, panelW]} />
+          {glass
+            ? <meshStandardMaterial color="#cfe0e6" roughness={0.05} metalness={0.1} transparent opacity={0.3} />
+            : <meshStandardMaterial map={walnutTex} roughness={0.45} />}
+        </mesh>
+        <mesh position={[reverseSwing ? 0.005 : -0.005, handleY - centerY, panelW - 0.020]}>
+          <boxGeometry args={[0.015, 0.1, 0.01]} />
+          <meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} />
+        </mesh>
+      </group>
+      {pair && (
+        <group ref={pivotBRef} position={[frontX, centerY, zEnd - 0.0025]}>
+          <mesh position={[reverseSwing ? -doorThickX / 2 : doorThickX / 2, 0, -panelW / 2]}>
+            <boxGeometry args={[doorThickX, panelH, panelW]} />
+            {glass
+              ? <meshStandardMaterial color="#cfe0e6" roughness={0.05} metalness={0.1} transparent opacity={0.3} />
+              : <meshStandardMaterial map={walnutTex} roughness={0.45} />}
+          </mesh>
+          <mesh position={[reverseSwing ? 0.005 : -0.005, handleY - centerY, -panelW + 0.020]}>
+            <boxGeometry args={[0.015, 0.1, 0.01]} />
+            <meshStandardMaterial color="#888" metalness={0.7} roughness={0.2} />
+          </mesh>
+        </group>
+      )}
+      {isActive && (
+        <Html position={[reverseSwing ? frontX + 0.05 : frontX - 0.05, handleY + 0.15, zCenter]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(20,20,25,0.85)', color: '#fff5e6', padding: '6px 10px', borderRadius: 6, fontSize: 13, fontFamily: 'system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.2)', whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none' }}>
+            <kbd style={{ background: '#fff5e6', color: '#1a1a1a', padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 12, border: '1px solid #888', boxShadow: '0 1px 0 #555' }}>F</kbd>
+            <span>{isOpen ? '도어 닫기' : '도어 열기'}</span>
+          </div>
+        </Html>
+      )}
+    </group>
+  )
+}
+
+/**
  * 주방 동측 상부장 — 본체 + 내부 수직 분할 + F 키 swing 도어.
  *
  * 좌표:
@@ -1997,6 +2228,188 @@ function KitchenUpperCabinet({
       {/* 도어 — 경첩 그룹 */}
       <group ref={pivotRef} position={[cabFrontX, cabY, hingeZ]}>
         <mesh position={[-doorThickX / 2, 0, extendDir * doorPanelW / 2]}>
+          <boxGeometry args={[doorThickX, doorPanelH, doorPanelW]} />
+          <meshStandardMaterial map={walnutTex} roughness={0.45} />
+        </mesh>
+      </group>
+
+      {/* 인터랙션 툴팁 */}
+      {isActive && (
+        <Html position={[cabFrontX - 0.05, cabY + 0.20, zCenter]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'rgba(20, 20, 25, 0.85)',
+              color: '#fff5e6',
+              padding: '6px 10px',
+              borderRadius: 6,
+              fontSize: 13,
+              fontFamily: 'system-ui, sans-serif',
+              border: '1px solid rgba(255,255,255,0.2)',
+              whiteSpace: 'nowrap',
+              userSelect: 'none',
+              pointerEvents: 'none',
+            }}
+          >
+            <kbd
+              style={{
+                background: '#fff5e6',
+                color: '#1a1a1a',
+                padding: '2px 7px',
+                borderRadius: 4,
+                fontWeight: 700,
+                fontSize: 12,
+                border: '1px solid #888',
+                boxShadow: '0 1px 0 #555',
+              }}
+            >
+              F
+            </kbd>
+            <span>{isOpen ? '도어 닫기' : '도어 열기'}</span>
+          </div>
+        </Html>
+      )}
+    </group>
+  )
+}
+
+/**
+ * 주방 상부장 페어 — 2개 도어가 하나의 본체를 공유.
+ * 북쪽 도어(hingeSide=north) + 남쪽 도어(hingeSide=south) 가 동시에 열림.
+ */
+interface KitchenUpperCabinetPairProps {
+  cabX: number
+  cabX2: number
+  cabY: number
+  zStart: number
+  doorWidth: number
+  depth: number
+  depth2: number
+  height: number
+  divisions: number
+  walnutTex: THREE.Texture
+  doorId: DoorId
+  activeDoorId?: DoorId | null
+}
+
+function KitchenUpperCabinetPair({
+  cabX, cabX2, cabY, zStart, doorWidth, depth, depth2, height, divisions,
+  walnutTex, doorId, activeDoorId,
+}: KitchenUpperCabinetPairProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const pivotNorthRef = useRef<THREE.Group>(null)
+  const pivotSouthRef = useRef<THREE.Group>(null)
+  const angleNorthRef = useRef(0)
+  const angleSouthRef = useRef(0)
+  const { invalidate } = useThree()
+
+  const pairWidth = doorWidth * 2
+  const zCenter = zStart + pairWidth / 2
+  const zEnd = zStart + pairWidth
+  const bodyDepth = Math.max(depth, depth2)
+  const bodyCabX = depth >= depth2 ? cabX : cabX2
+  const cabFrontX = bodyCabX - bodyDepth / 2
+  const panelT = 0.018
+  const interiorT = 0.012
+
+  const toggleRef = useRef(() => setIsOpen((o) => !o))
+  toggleRef.current = () => setIsOpen((o) => !o)
+  const posRef = useRef({ x: cabFrontX, y: cabY, z: zCenter })
+  posRef.current = { x: cabFrontX, y: cabY, z: zCenter }
+  useEffect(() => {
+    const p = posRef.current
+    doorRegistry.register({
+      id: doorId,
+      position: [p.x, p.z],
+      y: p.y,
+      toggle: () => toggleRef.current(),
+    })
+    return () => doorRegistry.unregister(doorId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doorId])
+
+  const TARGET_NORTH = -Math.PI / 2
+  const TARGET_SOUTH = Math.PI / 2
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.05)
+    const targetN = isOpen ? TARGET_NORTH : 0
+    const targetS = isOpen ? TARGET_SOUTH : 0
+    const diffN = targetN - angleNorthRef.current
+    const diffS = targetS - angleSouthRef.current
+    if (Math.abs(diffN) < 0.0005 && Math.abs(diffS) < 0.0005) return
+    angleNorthRef.current += diffN * Math.min(1, delta * 6)
+    angleSouthRef.current += diffS * Math.min(1, delta * 6)
+    if (pivotNorthRef.current) pivotNorthRef.current.rotation.y = angleNorthRef.current
+    if (pivotSouthRef.current) pivotSouthRef.current.rotation.y = angleSouthRef.current
+    invalidate()
+  })
+
+  const isActive = activeDoorId === doorId
+  const doorThickX = 0.018
+  const doorPanelW = doorWidth - 0.005
+  const doorPanelH = height - 0.020
+
+  const interiorY0 = cabY - height / 2 + panelT
+  const interiorY1 = cabY + height / 2 - panelT
+  const interiorYHeight = interiorY1 - interiorY0
+
+  const shrink = 0.002
+  const cabBackX = bodyCabX + bodyDepth / 2
+  const cabTopY = cabY + height / 2
+  const cabBottomY = cabY - height / 2
+
+  return (
+    <group>
+      {/* 후면 패널 */}
+      <mesh position={[cabBackX - panelT / 2 - 0.001, cabY, zCenter]}>
+        <boxGeometry args={[panelT, height - shrink * 2 - 0.002, pairWidth - shrink * 2 - 0.002]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.6} />
+      </mesh>
+      {/* 상단 패널 */}
+      <mesh position={[bodyCabX, cabTopY - panelT / 2 - shrink, zCenter]}>
+        <boxGeometry args={[bodyDepth, panelT, pairWidth - shrink * 2]} />
+        <meshStandardMaterial map={walnutTex} roughness={0.45} />
+      </mesh>
+      {/* 하단 패널 */}
+      <mesh position={[bodyCabX, cabBottomY + panelT / 2 + shrink, zCenter]}>
+        <boxGeometry args={[bodyDepth, panelT, pairWidth - shrink * 2]} />
+        <meshStandardMaterial map={walnutTex} roughness={0.45} />
+      </mesh>
+      {/* 좌측면 (북) */}
+      <mesh position={[bodyCabX, cabY, zStart + panelT / 2 + shrink]}>
+        <boxGeometry args={[bodyDepth, height - shrink * 2, panelT]} />
+        <meshStandardMaterial map={walnutTex} roughness={0.45} />
+      </mesh>
+      {/* 우측면 (남) */}
+      <mesh position={[bodyCabX, cabY, zEnd - panelT / 2 - shrink]}>
+        <boxGeometry args={[bodyDepth, height - shrink * 2, panelT]} />
+        <meshStandardMaterial map={walnutTex} roughness={0.45} />
+      </mesh>
+
+      {/* 내부 수평 분할 선반 — 페어 전체 폭 */}
+      {Array.from({ length: divisions - 1 }).map((_, i) => {
+        const dy = interiorY0 + (interiorYHeight / divisions) * (i + 1)
+        return (
+          <mesh key={`uc-shelf-${i}`} position={[bodyCabX, dy, zCenter]}>
+            <boxGeometry args={[bodyDepth - panelT * 2, interiorT, pairWidth - panelT * 2]} />
+            <meshStandardMaterial color="#ffffff" roughness={0.6} />
+          </mesh>
+        )
+      })}
+
+      {/* 북쪽 도어 (hingeSide=north) */}
+      <group ref={pivotNorthRef} position={[cabFrontX, cabY, zStart + 0.0025]}>
+        <mesh position={[-doorThickX / 2, 0, doorPanelW / 2]}>
+          <boxGeometry args={[doorThickX, doorPanelH, doorPanelW]} />
+          <meshStandardMaterial map={walnutTex} roughness={0.45} />
+        </mesh>
+      </group>
+
+      {/* 남쪽 도어 (hingeSide=south) */}
+      <group ref={pivotSouthRef} position={[cabFrontX, cabY, zEnd - 0.0025]}>
+        <mesh position={[-doorThickX / 2, 0, -doorPanelW / 2]}>
           <boxGeometry args={[doorThickX, doorPanelH, doorPanelW]} />
           <meshStandardMaterial map={walnutTex} roughness={0.45} />
         </mesh>
