@@ -708,7 +708,7 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
                     const chimneyW = 0.30
                     const chimneyX = extWallInner + upperEastShift - chimneyDepthX / 2
                     const chimneyBottomY = canopyTopY
-                    const chimneyTopY = WALL_HEIGHT
+                    const chimneyTopY = WALL_HEIGHT - 0.005  // 천장 간섭 방지 -5mm
                     const chimneyCenterY = (chimneyBottomY + chimneyTopY) / 2
                     return (
                       <group key="ext-uc-hood">
@@ -800,7 +800,7 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
         const fridgeModelX = kitLeft + cabDepth / 2                    // 모델 위치 (그대로)
         const cabX = fridgeModelX - CAB_BACK_OFFSET                    // 박스 위치 (-X 120mm)
         const cabBottomY = 1.800 - 0.030
-        const cabTopY = WALL_HEIGHT + 0.030
+        const cabTopY = WALL_HEIGHT + 0.030 - 0.050   // 천장과의 간섭 방지 -50mm
         const cabH = cabTopY - cabBottomY
         const cabCenterY = (cabBottomY + cabTopY) / 2
         const doorCount = Math.max(2, Math.round(groupLen / 0.6))
@@ -920,14 +920,15 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
         const tallZLen = tallZEnd - tallZStart
         const tallZCenter = (tallZStart + tallZEnd) / 2
 
-        // 분할: 하단 도어(0~lowerH) / 오븐 오픈 선반(lowerH~upperBottomY) / 상단 유리장+drawer(upperBottomY~WALL_HEIGHT)
+        // 분할: 하단 도어(0~lowerH) / 오븐 오픈 선반(lowerH~upperBottomY) / 상단 유리장+drawer(upperBottomY~tallTopY)
         // 오픈 선반 H 를 70% 로 줄이고 그만큼 하단장을 연장 (구 0.85→1.03, 오픈 선반 0.6→0.42)
+        const tallTopY = WALL_HEIGHT - 0.050          // 천장과의 간섭 방지 -50mm
         const upperBottomY = 1.45
         const ovenSlotH = 0.42                       // 0.6 × 0.7
         const ovenTopY = upperBottomY                // 1.45
         const ovenBottomY = ovenTopY - ovenSlotH     // 1.03
         const lowerH = ovenBottomY                   // 1.03
-        const upperH = WALL_HEIGHT - upperBottomY
+        const upperH = tallTopY - upperBottomY
 
         // drawer 슬롯은 visible 영역(kitLeft 부터)에서 30cm. 벽 안쪽 12cm 는 dead space.
         // 전면 50cm 가 솔리드 본체/오븐/유리장.
@@ -969,30 +970,28 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
               const interiorZLen = tallZLen - panelT * 2
               return (
                 <>
-                  {/* 디스플레이/drawer 분리 격판 — Y [0, WALL_HEIGHT] 전체 (drawer 슬롯 +X 벽) */}
-                  <mesh position={[dividerX + panelT / 2, WALL_HEIGHT / 2, tallZCenter]}>
-                    <boxGeometry args={[panelT, WALL_HEIGHT, tallZLen]} />
+                  {/* 디스플레이/drawer 분리 격판 — Y [0, tallTopY] 전체 (drawer 슬롯 +X 벽) */}
+                  <mesh position={[dividerX + panelT / 2, tallTopY / 2, tallZCenter]}>
+                    <boxGeometry args={[panelT, tallTopY, tallZLen]} />
                     <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
-                  {/* drawer 슬롯 -X 벽 (벽쪽) — 고정. 서랍이 열려도 벽이 보임.
-                      슬롯 안쪽에 위치(drawerSlotFrontX + panelT/2)해서 룸 wall 메쉬와 z-fight 회피.
-                      drawer body 는 이 패널을 피하기 위해 effectiveSlotFrontX 부터 시작. */}
-                  <mesh position={[drawerSlotFrontX + panelT / 2, WALL_HEIGHT / 2, tallZCenter]}>
-                    <boxGeometry args={[panelT, WALL_HEIGHT, tallZLen]} />
+                  {/* drawer 슬롯 -X 벽 (벽쪽) */}
+                  <mesh position={[drawerSlotFrontX + panelT / 2, tallTopY / 2, tallZCenter]}>
+                    <boxGeometry args={[panelT, tallTopY, tallZLen]} />
                     <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
                   {/* 좌측면 (북) — 전체 깊이, 전체 높이 */}
-                  <mesh position={[tallX, WALL_HEIGHT / 2, tallZStart + panelT / 2]}>
-                    <boxGeometry args={[tallDepth, WALL_HEIGHT, panelT]} />
+                  <mesh position={[tallX, tallTopY / 2, tallZStart + panelT / 2]}>
+                    <boxGeometry args={[tallDepth, tallTopY, panelT]} />
                     <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
-                  {/* 우측면 (남) — 디스플레이 영역(전면 0.50m)만, drawer 영역은 drawer face 가 +Z 막음 */}
-                  <mesh position={[displayCenterX, WALL_HEIGHT / 2, tallZEnd - panelT / 2]}>
-                    <boxGeometry args={[displayDepthX, WALL_HEIGHT, panelT]} />
+                  {/* 우측면 (남) — 디스플레이 영역(전면 0.50m)만 */}
+                  <mesh position={[displayCenterX, tallTopY / 2, tallZEnd - panelT / 2]}>
+                    <boxGeometry args={[displayDepthX, tallTopY, panelT]} />
                     <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
                   {/* 상단면 (천장) — 전체 깊이 */}
-                  <mesh position={[tallX, WALL_HEIGHT - panelT / 2, tallZCenter]}>
+                  <mesh position={[tallX, tallTopY - panelT / 2, tallZCenter]}>
                     <boxGeometry args={[tallDepth, panelT, tallZLen]} />
                     <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
@@ -1951,34 +1950,36 @@ function KitchenUpperCabinet({
   const interiorXCenter = cabX
 
   // Hollow 본체 — 후면(+X 벽쪽, 흰색) + 상/하/좌/우 5면(호두). 전면은 도어가 차지.
+  // z-fighting 방지: 본체 패널을 좌우 2mm, 상하 2mm 축소
+  const shrink = 0.002
   const cabBackX = cabX + depth / 2     // +X 끝 (벽 쪽)
   const cabTopY = cabY + height / 2
   const cabBottomY = cabY - height / 2
   return (
     <group>
-      {/* 후면 패널 (+X, 벽쪽) — 흰색 */}
-      <mesh position={[cabBackX - panelT / 2, cabY, zCenter]}>
-        <boxGeometry args={[panelT, height, width]} />
+      {/* 후면 패널 (+X, 벽쪽) — 흰색. 추가 1mm 축소로 z-fighting 방지 */}
+      <mesh position={[cabBackX - panelT / 2 - 0.001, cabY, zCenter]}>
+        <boxGeometry args={[panelT, height - shrink * 2 - 0.002, width - shrink * 2 - 0.002]} />
         <meshStandardMaterial color="#ffffff" roughness={0.6} />
       </mesh>
       {/* 상단 패널 */}
-      <mesh position={[cabX, cabTopY - panelT / 2, zCenter]}>
-        <boxGeometry args={[depth, panelT, width]} />
+      <mesh position={[cabX, cabTopY - panelT / 2 - shrink, zCenter]}>
+        <boxGeometry args={[depth, panelT, width - shrink * 2]} />
         <meshStandardMaterial map={walnutTex} roughness={0.45} />
       </mesh>
       {/* 하단 패널 */}
-      <mesh position={[cabX, cabBottomY + panelT / 2, zCenter]}>
-        <boxGeometry args={[depth, panelT, width]} />
+      <mesh position={[cabX, cabBottomY + panelT / 2 + shrink, zCenter]}>
+        <boxGeometry args={[depth, panelT, width - shrink * 2]} />
         <meshStandardMaterial map={walnutTex} roughness={0.45} />
       </mesh>
       {/* 좌측면 (북) */}
-      <mesh position={[cabX, cabY, zStart + panelT / 2]}>
-        <boxGeometry args={[depth, height, panelT]} />
+      <mesh position={[cabX, cabY, zStart + panelT / 2 + shrink]}>
+        <boxGeometry args={[depth, height - shrink * 2, panelT]} />
         <meshStandardMaterial map={walnutTex} roughness={0.45} />
       </mesh>
       {/* 우측면 (남) */}
-      <mesh position={[cabX, cabY, zEnd - panelT / 2]}>
-        <boxGeometry args={[depth, height, panelT]} />
+      <mesh position={[cabX, cabY, zEnd - panelT / 2 - shrink]}>
+        <boxGeometry args={[depth, height - shrink * 2, panelT]} />
         <meshStandardMaterial map={walnutTex} roughness={0.45} />
       </mesh>
 

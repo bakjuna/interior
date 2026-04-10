@@ -56,7 +56,8 @@ export function Closets() {
         doors,
         doorH,
         molding: {
-          top: [c.position[0], c.size[1] - 0.01, c.position[2]] as [number, number, number],
+          // 몰딩을 본체 상단면 위에 배치 (본체 top 면과 겹치지 않게)
+          top: [c.position[0], c.size[1] + 0.01, c.position[2]] as [number, number, number],
           base: [c.position[0], 0.04, c.position[2]] as [number, number, number],
           topSize: [c.size[0] + 0.005, 0.02, c.size[2] + 0.005] as [number, number, number],
           baseSize: [c.size[0] + 0.005, 0.08, c.size[2] + 0.005] as [number, number, number],

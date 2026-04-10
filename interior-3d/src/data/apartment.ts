@@ -125,7 +125,7 @@ export const rooms: Room[] = [
   { name: '메인베란다', center: [(mbLeft + 1.340 + 0.870 + 2.000) / 2, (verandaTop + verandaBottom) / 2], size: [0.870 + 2.000 - (mbLeft + 1.340), VERANDA_INNER_D], color: '#e0e0e0', floorTile: 'porcelain' as const, tileSize: 0.3 },
   { name: '실외기실', center: [(0.870 + 2.000 + LR_W) / 2, (verandaTop + verandaBottom) / 2], size: [LR_W - (0.870 + 2.000), VERANDA_INNER_D], color: '#d4d4e0', floorTile: 'porcelain' as const, tileSize: 0.3 },
   // 작업실베란다
-  { name: '작업실베란다', center: [babyRightWallX + 2.500 + 2.673 / 2, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 / 2], size: [2.673, 1.418], color: '#e0e0e0', floorTile: 'porcelain' as const, tileSize: 0.3 },
+  { name: '작업실베란다', center: [babyRightWallX + 2.500 + 2.673 / 2, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 / 2], size: [2.673, 1.418], color: '#e0e0e0', floorY: -0.002, floorTile: 'porcelain' as const, tileSize: 0.3 },
   // 현관 (복도까지 확장)
   { name: '현관', center: [(LR_W - 1.481 + LR_W + T2) / 2, -T2 - 1.591 / 2], size: [1.481 + T2, 1.591], color: '#d4c4a8', floorY: -0.03, floorTile: 'entrance', tileSize: 0.3 },
   // 작업실 (위로 329mm 확장, 아래 200mm 확장)
@@ -547,24 +547,25 @@ export interface Closet {
 
 export const closets: Closet[] = [
   // 안방 좌측 벽 붙박이장 (3066 × 550, 첫 600mm = 화장대 - 화장실 인접)
+  // 높이를 50mm 줄여 천장 plane 과의 z-fighting 방지
   {
     name: '붙박이장',
-    position: [mbLeft + 0.275, WALL_HEIGHT / 2, (0.6 + LR_D) / 2],
-    size: [0.550, WALL_HEIGHT, LR_D - 0.6],
+    position: [mbLeft + 0.275, (WALL_HEIGHT - 0.050) / 2, (0.6 + LR_D) / 2],
+    size: [0.550, WALL_HEIGHT - 0.050, LR_D - 0.6],
     color: '#8B6914',
   },
   // 거실 수납장 — 안방/거실 공유벽, 거실쪽 (3666 × 450)
   {
     name: '수납장',
-    position: [0 + 0.225, WALL_HEIGHT / 2, LR_D / 2],
-    size: [0.450, WALL_HEIGHT, LR_D],
+    position: [0 + 0.225, (WALL_HEIGHT - 0.050) / 2, LR_D / 2],
+    size: [0.450, WALL_HEIGHT - 0.050, LR_D],
     color: '#8B6914',
   },
   // 아기방 좌측 벽 수납장 (2563 × 450, 각 150mm 축소)
   {
     name: '수납장',
-    position: [babyLeft + 0.225, WALL_HEIGHT / 2, (babyBottom + babyTop) / 2],
-    size: [0.450, WALL_HEIGHT, BABY_INNER_D - 0.150],
+    position: [babyLeft + 0.225, (WALL_HEIGHT - 0.050) / 2, (babyBottom + babyTop) / 2],
+    size: [0.450, WALL_HEIGHT - 0.050, BABY_INNER_D - 0.150],
     color: '#8B6914',
   },
 ]
