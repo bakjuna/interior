@@ -14,7 +14,9 @@ import {
 
 export function findSector(x: number, z: number): SectorId | null {
   for (const a of sectorAABBs) {
-    if (x >= a.minX && x <= a.maxX && z >= a.minZ && z <= a.maxZ) return a.sector
+    const zLo = Math.min(a.minZ, a.maxZ)
+    const zHi = Math.max(a.minZ, a.maxZ)
+    if (x >= a.minX && x <= a.maxX && z >= zLo && z <= zHi) return a.sector
   }
   return null
 }

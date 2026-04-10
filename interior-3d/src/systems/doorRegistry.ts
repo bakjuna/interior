@@ -6,7 +6,7 @@
  */
 
 import type { DoorId, SectorId } from '../data/sectors'
-import { portals } from '../data/sectors'
+import { portals, sectorAABBs } from '../data/sectors'
 
 export interface DoorEntry {
   id: DoorId
@@ -60,6 +60,15 @@ function expandThroughOpenPortals(sectors: Set<SectorId>): Set<SectorId> {
   return result
 }
 
+function findDoorSector(x: number, z: number): SectorId | null {
+  for (const a of sectorAABBs) {
+    const zLo = Math.min(a.minZ, a.maxZ)
+    const zHi = Math.max(a.minZ, a.maxZ)
+    if (x >= a.minX && x <= a.maxX && z >= zLo && z <= zHi) return a.sector
+  }
+  return null
+}
+
 // doorId → 인터랙션 가능한 sector 집합 (portal 기반 + always-open 확장)
 const doorAllowedSectors = new Map<DoorId, Set<SectorId>>()
 for (const p of portals) {
@@ -69,10 +78,8 @@ for (const p of portals) {
   set.add(p.a)
   set.add(p.b)
 }
-// always-open 포탈을 통해 연결된 sector 도 허용
-for (const [doorId, sectors] of doorAllowedSectors) {
-  doorAllowedSectors.set(doorId, expandThroughOpenPortals(sectors))
-}
+// 개별 오버라이드: 주방에서 아기방문 열기 가능
+doorAllowedSectors.get('baby-hall')?.add('kitchen')
 
 // pickActiveDoor 결과 캐시 — 카메라가 거의 안 움직였으면 직전 결과 재사용.
 // FPSController 에서 매 프레임 호출되지만 결과가 바뀌는 빈도는 낮음.
@@ -125,10 +132,19 @@ export function pickActiveDoor(
 
   let best: { id: DoorId; score: number } | null = null
   for (const d of entries.values()) {
-    // portal 에 등록된 door 는 인접 sector 에서만 인터랙션 허용
+    // sector 기반 인터랙션 필터
     if (playerSector) {
-      const allowed = doorAllowedSectors.get(d.id)
+      let allowed = doorAllowedSectors.get(d.id)
+      if (!allowed) {
+        // portal 미등록 door → 위치 기반 sector 판별 (확장 없이 자기 sector만)
+        const doorSector = findDoorSector(d.position[0], d.position[1])
+        if (doorSector) {
+          allowed = new Set([doorSector])
+          doorAllowedSectors.set(d.id, allowed)
+        }
+      }
       if (allowed && !allowed.has(playerSector)) continue
+      if (!allowed) continue  // sector 불명 → 접근 불가
     }
     const dx = d.position[0] - camX
     const dz = d.position[1] - camZ

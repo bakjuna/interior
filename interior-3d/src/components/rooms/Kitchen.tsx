@@ -997,7 +997,7 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
         const midZ = (tallZEndLocal + fridgeOuterZStart) / 2
         const leafLen = (midZ - tallZEndLocal) - 0.003                 // 각 도어 길이 = 갭/2 - 미세 여유
         const dogGapH = 0.6                                            // 하단 600mm 개방
-        const doorTopY = WALL_HEIGHT
+        const doorTopY = WALL_HEIGHT + 0.030 - 0.050  // 냉장고장 cabTopY와 동일
         const doorH = doorTopY - dogGapH
         const doorCenterY = (dogGapH + doorTopY) / 2
         return (
@@ -1047,7 +1047,7 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
 
         // 분할: 하단 도어(0~lowerH) / 오븐 오픈 선반(lowerH~upperBottomY) / 상단 유리장+drawer(upperBottomY~tallTopY)
         // 오픈 선반 H 를 70% 로 줄이고 그만큼 하단장을 연장 (구 0.85→1.03, 오픈 선반 0.6→0.42)
-        const tallTopY = WALL_HEIGHT - 0.050          // 천장과의 간섭 방지 -50mm
+        const tallTopY = WALL_HEIGHT + 0.030 - 0.050   // 냉장고장 cabTopY와 동일
         const upperBottomY = 1.45
         const ovenSlotH = 0.42                       // 0.6 × 0.7
         const ovenTopY = upperBottomY                // 1.45

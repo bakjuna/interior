@@ -304,7 +304,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
       <Walls />
       <Windows />
 
-      <Closets activeDoorId={activeDoorId} />
+      <Closets activeDoorId={activeDoorId} playerPos={playerPos} allLightsOn={allLightsOn} />
 
       {/* 다운라이트 — InstancedMesh 로 발광면 + 크롬링 일괄 렌더 */}
       <DownlightInstances

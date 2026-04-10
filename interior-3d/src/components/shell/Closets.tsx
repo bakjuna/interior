@@ -15,9 +15,13 @@ import { useKTX2 } from '../../systems/useKTX2'
 
 interface ClosetsProps {
   activeDoorId?: DoorId | null
+  playerPos?: [number, number]
+  allLightsOn?: boolean
 }
 
-export function Closets({ activeDoorId }: ClosetsProps) {
+export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) {
+  // 거실장 LED 활성: 플레이어가 거실 내 또는 allLightsOn
+  const lrLedActive = !!allLightsOn || (!!playerPos && playerPos[0] >= 0 && playerPos[0] <= 3.972 && playerPos[1] >= 0 && playerPos[1] <= 3.666)
   const closetDoorTex = useKTX2('/textures/walnut-closet-door.ktx2')
   const walnutDoorTex = useKTX2('/textures/walnut_door.ktx2')
 
@@ -482,7 +486,7 @@ export function Closets({ activeDoorId }: ClosetsProps) {
                     : [c.position[0] + innerCenter, ledY, c.position[2] - depth / 2 + panelT + stripDepth / 2 + 0.002]
                   } rotation={[-Math.PI / 2, 0, 0]}>
                     <planeGeometry args={isZlong ? [stripDepth, innerLen] : [innerLen, stripDepth]} />
-                    <meshStandardMaterial color="#fff" emissive="#ffe0b0" emissiveIntensity={3.0} />
+                    <meshStandardMaterial color={lrLedActive ? '#fff' : '#444'} emissive={lrLedActive ? '#ffe0b0' : '#111'} emissiveIntensity={lrLedActive ? 3.0 : 0.1} />
                   </mesh>
                   {/* LED rectAreaLight */}
                   <rectAreaLight
@@ -492,7 +496,7 @@ export function Closets({ activeDoorId }: ClosetsProps) {
                     }
                     width={isZlong ? stripDepth : innerLen}
                     height={isZlong ? innerLen : stripDepth}
-                    intensity={60}
+                    intensity={lrLedActive ? 60 : 0}
                     color="#ffe0b0"
                     rotation={[-Math.PI / 2, 0, 0]}
                   />
