@@ -192,9 +192,16 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
   const euler = useRef(new THREE.Euler(0, 0, 0, 'YXZ'))
   const isLocked = useRef(false)
   const heightRef = useRef(height)
+  const heightSelfDriven = useRef(false)  // Q/E 키로 내부 변경 중 플래그
 
-  // 부모에서 슬라이더로 변경 시 동기화
-  useEffect(() => { heightRef.current = height }, [height])
+  // 부모에서 슬라이더로 변경 시 동기화 (Q/E 키 변경 중에는 skip)
+  useEffect(() => {
+    if (heightSelfDriven.current) {
+      heightSelfDriven.current = false
+      return
+    }
+    heightRef.current = height
+  }, [height])
 
   useEffect(() => {
     camera.position.set(LR_W / 2, height, LR_D / 2)
@@ -348,6 +355,7 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
     if (qHeld || eHeld) {
       const dir = (eHeld ? 1 : 0) - (qHeld ? 1 : 0)
       heightRef.current = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, heightRef.current + dir * HEIGHT_SPEED * delta))
+      heightSelfDriven.current = true
     }
 
     // 벽 충돌 (axis-slide). 도어 상태는 lift된 ref에서 (Phase 2).

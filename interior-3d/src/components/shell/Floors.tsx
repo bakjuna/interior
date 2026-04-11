@@ -8,24 +8,29 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { rooms } from '../../data/apartment'
 import { useKTX2 } from '../../systems/useKTX2'
+import { tileGroutOnBeforeCompile } from '../primitives/bathroomTile'
 
 export function Floors() {
   const floorTex = useKTX2('/textures/walnut-floor.ktx2')
   const porcelainTex = useKTX2('/textures/porcelain-tile.ktx2')
   const entranceTex = useKTX2('/textures/entrance-tile.ktx2')
+  const bathWallTex = useKTX2('/textures/bathroom-wall-tile.ktx2')
 
   const mergedFloors = useMemo(() => {
     const groups: Array<{
       filterFn: (r: (typeof rooms)[number]) => boolean
       baseTex: THREE.Texture
       roughness: number
+      color?: string
+      grout?: boolean
     }> = [
       { filterFn: (r) => !r.floorTile, baseTex: floorTex, roughness: 0.35 },
       { filterFn: (r) => r.floorTile === 'porcelain', baseTex: porcelainTex, roughness: 0.2 },
       { filterFn: (r) => r.floorTile === 'entrance', baseTex: entranceTex, roughness: 0.2 },
+      { filterFn: (r) => r.floorTile === 'bathWall', baseTex: bathWallTex, roughness: 0.2, color: '#d9d9d9', grout: true },
     ]
 
-    return groups.map(({ filterFn, baseTex, roughness }) => {
+    return groups.map(({ filterFn, baseTex, roughness, color, grout }) => {
       const groupRooms = rooms.filter(filterFn)
       if (groupRooms.length === 0) return null
 
@@ -52,9 +57,9 @@ export function Floors() {
       tex.repeat.set(1, 1) // UV에 이미 bake됨
       tex.colorSpace = THREE.SRGBColorSpace
 
-      return { geometry: merged, texture: tex, roughness }
-    }).filter(Boolean) as Array<{ geometry: THREE.BufferGeometry; texture: THREE.Texture; roughness: number }>
-  }, [floorTex, porcelainTex, entranceTex])
+      return { geometry: merged, texture: tex, roughness, color: color ?? '#ffffff', grout: grout ?? false }
+    }).filter(Boolean) as Array<{ geometry: THREE.BufferGeometry; texture: THREE.Texture; roughness: number; color: string; grout: boolean }>
+  }, [floorTex, porcelainTex, entranceTex, bathWallTex])
 
   return (
     <>
@@ -63,8 +68,10 @@ export function Floors() {
           <meshStandardMaterial
             map={floor.texture}
             roughness={floor.roughness}
+            color={floor.color}
             polygonOffset
             polygonOffsetFactor={-1}
+            onBeforeCompile={floor.grout ? tileGroutOnBeforeCompile : undefined}
           />
         </mesh>
       ))}

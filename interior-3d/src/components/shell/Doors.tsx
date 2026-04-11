@@ -30,9 +30,10 @@ const mbLeft = -WALL_THICKNESS - MB_W
 interface DoorsProps {
   activeDoorId?: DoorId | null
   onDoorOpenChange?: (id: DoorId, open: boolean) => void
+  playerPos?: [number, number]
 }
 
-export function Doors({ activeDoorId, onDoorOpenChange }: DoorsProps) {
+export function Doors({ activeDoorId, onDoorOpenChange, playerPos }: DoorsProps) {
   const walnutDoorTex = useKTX2('/textures/walnut_door.ktx2')
 
   // 안정화된 콜백 맵 — 각 도어 인스턴스마다 고정된 callback 참조 보장
@@ -220,6 +221,8 @@ export function Doors({ activeDoorId, onDoorOpenChange }: DoorsProps) {
           topBottomFrame={topBottomFrame}
           color={panelColor}
           glassColor="#eef1f3"
+          mirror
+          playerPos={playerPos}
         />
 
         <JungmunSwingDoor

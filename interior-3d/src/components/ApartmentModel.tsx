@@ -353,16 +353,16 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
       <BabyRoom visible={visibleSectors.has('baby')} />
       <WorkRoom visible={visibleSectors.has('work')} playerPos={playerPos} allLightsOn={allLightsOn} />
       <Hallway visible={visibleSectors.has('hall')} playerPos={playerPos} allLightsOn={allLightsOn} />
-      <MainBath visible={visibleSectors.has('mainBath')} playerPos={playerPos} allLightsOn={allLightsOn} />
-      <MasterBath visible={visibleSectors.has('mbBath')} playerPos={playerPos} allLightsOn={allLightsOn} />
+      <MainBath visible={visibleSectors.has('mainBath')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
+      <MasterBath visible={visibleSectors.has('mbBath')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
       <LivingRoom visible={visibleSectors.has('lr')} />
       <MasterBedroom visible={visibleSectors.has('mb')} />
-      <Entrance visible={visibleSectors.has('entrance')} playerPos={playerPos} allLightsOn={allLightsOn} />
+      <Entrance visible={visibleSectors.has('entrance')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
       <Kitchen visible={visibleSectors.has('kitchen')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
 
 
       {/* 도어는 shell/Doors.tsx 가 일괄 렌더 (Phase 2) */}
-      <Doors activeDoorId={activeDoorId} onDoorOpenChange={onDoorOpenChange} />
+      <Doors activeDoorId={activeDoorId} onDoorOpenChange={onDoorOpenChange} playerPos={playerPos} />
 
     </group>
   )

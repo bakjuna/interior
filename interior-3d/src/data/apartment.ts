@@ -26,6 +26,7 @@ export interface Wall {
   bottomY?: number  // 벽 하단 Y 위치 (기본 0)
   isBathroom?: boolean  // 화장실 벽 (타일)
   isBalcony?: boolean   // 베란다 벽 (콘크리트)
+  tile?: 'bathWall'     // 별도 타일 텍스처
 }
 
 export interface Opening {
@@ -108,8 +109,8 @@ const verandaWallEnd = verandaBottom + T2        // 하단벽 중심
 export const verandaInnerD = VERANDA_INNER_D
 
 export const rooms: Room[] = [
-  { name: '안방욕실', center: [(mbBathLeft + mbBathRight) / 2, (-WALL_THICKNESS + mbBathBottom) / 2], size: [mbBathInnerW, Math.abs(mbBathBottom) - WALL_THICKNESS], color: '#c5dbe8', floorY: -0.03, floorTile: 'porcelain', tileSize: 0.3 },
-  { name: '메인욕실', center: [(bath2Left + bath2Right + 0.2) / 2, (bath2Top + bath2Bottom) / 2], size: [BATH2_INNER_W + 0.2, BATH2_INNER_D], color: '#d4dce8', floorY: -0.03, floorTile: 'porcelain', tileSize: 0.3 },
+  { name: '안방욕실', center: [(mbBathLeft + mbBathRight) / 2, (-WALL_THICKNESS + mbBathBottom) / 2], size: [mbBathInnerW, Math.abs(mbBathBottom) - WALL_THICKNESS], color: '#c5dbe8', floorY: -0.03, floorTile: 'bathWall', tileSize: 0.6 },
+  { name: '메인욕실', center: [(bath2Left + bath2Right + 0.2) / 2 + 0.1, (bath2Top + bath2Bottom) / 2], size: [BATH2_INNER_W + 0.4, BATH2_INNER_D], color: '#d4dce8', floorY: -0.03, floorTile: 'bathWall', tileSize: 0.6 },
   { name: '아기방', center: [(babyLeft + babyRight + 0.2) / 2, (babyBottom + babyTop) / 2], size: [BABY_INNER_W + 0.2, BABY_INNER_D], color: '#f0e0f0' },
   // 세탁실 좌측 (373×747)
   { name: '', center: [(stairLeftX + T2 + stair2X + T2) / 2, (laundryBotZ - T2 + stair1Z + T2) / 2], size: [stair2X + T2 - (stairLeftX + T2), Math.abs((laundryBotZ - T2) - (stair1Z + T2))], color: '#e8e0d4', floorTile: 'porcelain' as const, tileSize: 0.3 },
@@ -275,8 +276,8 @@ export const walls: Wall[] = [
   // === 거실 ===
   // 거실 상단 — 좌측 450mm
   { start: [-T2, -T2], end: [0.450, -T2], thickness: WALL_THICKNESS },
-  // 거실/복도 맞닿는 벽 800mm (하단 100mm 올림, 간접조명용)
-  { start: [LR_W - 1.481 - 0.800, -T2], end: [LR_W - 1.481, -T2], thickness: WALL_THICKNESS, height: WALL_HEIGHT - 0.1, bottomY: 0.1 },
+  // 거실/복도 맞닿는 벽 800mm
+  { start: [LR_W - 1.481 - 0.800, -T2], end: [LR_W - 1.481, -T2], thickness: WALL_THICKNESS },
   // 현관/거실 맞닿는 벽 1481mm (바닥까지)
   { start: [LR_W - 1.481, -T2], end: [LR_W + T2, -T2], thickness: WALL_THICKNESS },
   // 거실 하단 — 창문으로 분할 (왼쪽 내측 870mm, 폭 2000mm, 높이 2000mm)
@@ -318,9 +319,9 @@ export const walls: Wall[] = [
 
   // === 단차벽 (화장실/현관 바닥 30mm 내림 경계, 10mm 두께) ===
   // 안방욕실 문 단차
-  { start: [mbDoorHinge, -T2], end: [mbDoorEnd, -T2], thickness: 0.01, height: 0.03, bottomY: -0.03 },
+  { start: [mbDoorHinge, -T2], end: [mbDoorEnd, -T2], thickness: 0.200, height: 0.03, bottomY: -0.03, tile: 'bathWall' as const },
   // 메인욕실 문 단차
-  { start: [bath2RightWallX, -WALL_THICKNESS - 0.1], end: [bath2RightWallX, -WALL_THICKNESS - 0.1 - 0.9], thickness: 0.01, height: 0.03, bottomY: -0.03 },
+  { start: [bath2RightWallX, -WALL_THICKNESS - 0.1], end: [bath2RightWallX, -WALL_THICKNESS - 0.1 - 0.9], thickness: 0.200, height: 0.03, bottomY: -0.03, tile: 'bathWall' as const },
   // 현관 경계 — 복도와 현관 사이
   { start: [LR_W - 1.481, -WALL_THICKNESS], end: [LR_W - 1.481, -T2 - 1.591 + T2], thickness: 0.01, height: 0.03, bottomY: -0.03 },
   // 현관문 단차

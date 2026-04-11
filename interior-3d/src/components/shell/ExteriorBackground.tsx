@@ -56,7 +56,7 @@ export function ExteriorBackground({ isNight, show = true }: ExteriorBackgroundP
   return (
     <>
       {northTex && (
-        <mesh position={[LR_W / 2, 0, babyTop - 40]}>
+        <mesh position={[LR_W / 2, 0, babyTop - 40]} scale={[1, -1, 1]}>
           <planeGeometry args={[140, 70]} />
           <meshBasicMaterial
             map={northTex}
@@ -67,7 +67,7 @@ export function ExteriorBackground({ isNight, show = true }: ExteriorBackgroundP
         </mesh>
       )}
       {southTex && (
-        <mesh position={[LR_W / 2, 0, LR_D + 40]} rotation={[0, Math.PI, 0]}>
+        <mesh position={[LR_W / 2, 0, LR_D + 40]} rotation={[0, Math.PI, 0]} scale={[1, -1, 1]}>
           <planeGeometry args={[140, 70]} />
           <meshBasicMaterial
             map={southTex}

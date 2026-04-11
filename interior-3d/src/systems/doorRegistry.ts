@@ -80,6 +80,15 @@ for (const p of portals) {
 }
 // 개별 오버라이드: 주방에서 아기방문 열기 가능
 doorAllowedSectors.get('baby-hall')?.add('kitchen')
+// 현관 신발장 — 현관 + 복도에서 열기 가능
+doorAllowedSectors.set('shoe-mirror', new Set(['entrance', 'hall']))
+doorAllowedSectors.set('shoe-doors', new Set(['entrance', 'hall']))
+// 메인욕실 거울 수납장
+doorAllowedSectors.set('bath-mirror-n', new Set(['mainBath']))
+doorAllowedSectors.set('bath-mirror-s', new Set(['mainBath']))
+// 안방욕실 거울 수납장
+doorAllowedSectors.set('mb-bath-mirror-l', new Set(['mbBath']))
+doorAllowedSectors.set('mb-bath-mirror-r', new Set(['mbBath']))
 
 // pickActiveDoor 결과 캐시 — 카메라가 거의 안 움직였으면 직전 결과 재사용.
 // FPSController 에서 매 프레임 호출되지만 결과가 바뀌는 빈도는 낮음.

@@ -142,13 +142,13 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
         color="#ffffff"
         rotation={[Math.PI / 2, 0, 0]}
       />
-      {[0.25, 0.5, 0.75].map((t, i) => (
+      {Array.from({ length: 15 }, (_, i) => (
         <pointLight
           key={`kit-pl-${i}`}
-          position={[lineCenterX, WALL_HEIGHT - 0.02, lineZstart + lineLen * t]}
-          intensity={kitchenActive ? 9.0 : 0}
-          distance={6.0}
-          decay={2}
+          position={[lineCenterX, WALL_HEIGHT - 0.02, lineZstart + lineLen * ((i + 0.5) / 15)]}
+          intensity={kitchenActive ? 1.0 : 0}
+          distance={4.0}
+          decay={1}
           color="#ffffff"
         />
       ))}

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { useThree, useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
+import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import type { DoorId } from '../../data/sectors'
 import { doorRegistry } from '../../systems/doorRegistry'
 
@@ -200,6 +201,8 @@ interface JungmunFixedPanelProps {
   topBottomFrame: number
   color: string
   glassColor: string
+  mirror?: boolean  // true: 유리 대신 거울 (서측, 현관 방향)
+  playerPos?: [number, number]
 }
 
 export function JungmunFixedPanel({
@@ -211,6 +214,8 @@ export function JungmunFixedPanel({
   topBottomFrame,
   color,
   glassColor,
+  mirror = false,
+  playerPos,
 }: JungmunFixedPanelProps) {
   const frameShape = useMemo(
     () => makeGlassDoorFrameShape(width, height, width * 0.8, height - topBottomFrame * 2, borderR),
@@ -221,16 +226,42 @@ export function JungmunFixedPanel({
     [width, height, topBottomFrame, borderR]
   )
 
+  const reflectorObj = useMemo(() => {
+    if (!mirror) return null
+    const glassW = width * 0.8
+    const glassH = height - topBottomFrame * 2
+    const geo = new THREE.PlaneGeometry(glassW, glassH)
+    return new Reflector(geo, {
+      textureWidth: 256,
+      textureHeight: 512,
+      color: 0xc8ccd0,
+      clipBias: 0.003,
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mirror])
+
+  // 3m 이내일 때만 거울 렌더링
+  const nearMirror = mirror && !!playerPos && (
+    Math.hypot(playerPos[0] - centerWorld[0], playerPos[1] - centerWorld[1]) < 3
+  )
+  useEffect(() => {
+    if (reflectorObj) reflectorObj.visible = nearMirror
+  }, [nearMirror, reflectorObj])
+
   return (
     <group position={[centerWorld[0], height / 2, centerWorld[1]]} rotation={[0, Math.PI / 2, 0]}>
       <mesh position={[0, 0, -thickness / 2]}>
         <extrudeGeometry args={[frameShape, { depth: thickness, bevelEnabled: false }]} />
         <meshPhysicalMaterial color={color} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
       </mesh>
-      <mesh>
-        <shapeGeometry args={[glassShape]} />
-        <meshStandardMaterial color={glassColor} transparent opacity={0.92} roughness={1.0} side={THREE.DoubleSide} />
-      </mesh>
+      {mirror && reflectorObj ? (
+        <primitive object={reflectorObj} rotation={[0, Math.PI, 0]} />
+      ) : (
+        <mesh>
+          <shapeGeometry args={[glassShape]} />
+          <meshStandardMaterial color={glassColor} transparent opacity={0.92} roughness={1.0} side={THREE.DoubleSide} />
+        </mesh>
+      )}
     </group>
   )
 }

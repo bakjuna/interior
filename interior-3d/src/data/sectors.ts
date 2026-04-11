@@ -101,6 +101,12 @@ export type DoorId =
   | 'kitchen-uc-0'               // 주방 동측 상부장 페어 #0 (40cm×2, 4분할)
   | 'kitchen-uc-1'               // 주방 동측 상부장 페어 #1
   | 'kitchen-uc-2'               // 주방 동측 상부장 페어 #2
+  | 'shoe-mirror'                // 신발장 좌측 거울 도어
+  | 'shoe-doors'                 // 신발장 일반 도어 (cols 1-3)
+  | 'bath-mirror-n'              // 메인욕실 거울 수납장 좌측(북쪽) 슬라이딩
+  | 'bath-mirror-s'              // 메인욕실 거울 수납장 우측(남쪽) 슬라이딩
+  | 'mb-bath-mirror-l'           // 안방욕실 거울 수납장 좌측 슬라이딩
+  | 'mb-bath-mirror-r'           // 안방욕실 거울 수납장 우측 슬라이딩
 
 export interface SectorAABB {
   sector: SectorId

@@ -16,7 +16,7 @@ export function tileGroutOnBeforeCompile(shader: THREE.Shader) {
     float _gx = 0.005;
     float _gy = 0.0025;
     if (_tuv.x < _gx || _tuv.x > 1.0 - _gx || _tuv.y < _gy || _tuv.y > 1.0 - _gy) {
-      diffuseColor.rgb = vec3(1.0);
+      diffuseColor.rgb = vec3(0.82, 0.78, 0.74);
     }
     `
   )
