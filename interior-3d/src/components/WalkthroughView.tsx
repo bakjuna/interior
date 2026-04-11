@@ -640,24 +640,26 @@ export function WalkthroughView() {
         <Prewarm index={prewarmIndex} active={isPrewarming} onAdvance={advancePrewarm} />
         <FPSUpdater domRef={fpsRef} />
       </Canvas>
-      <div
-        ref={fpsRef}
-        style={{
-          position: 'fixed',
-          top: 8,
-          right: 8,
-          color: '#0f0',
-          background: 'rgba(0,0,0,0.7)',
-          padding: '4px 8px',
-          fontSize: 13,
-          fontFamily: 'monospace',
-          borderRadius: 4,
-          pointerEvents: 'none',
-          zIndex: 99999,
-        }}
-      >
-        -- FPS
-      </div>
+      {!isMobile && (
+        <div
+          ref={fpsRef}
+          style={{
+            position: 'fixed',
+            top: 8,
+            right: 8,
+            color: '#0f0',
+            background: 'rgba(0,0,0,0.7)',
+            padding: '4px 8px',
+            fontSize: 13,
+            fontFamily: 'monospace',
+            borderRadius: 4,
+            pointerEvents: 'none',
+            zIndex: 99999,
+          }}
+        >
+          -- FPS
+        </div>
+      )}
       {isPrewarming && (
         <SplashScreen
           label={currentStage.label}
@@ -733,19 +735,22 @@ export function WalkthroughView() {
       )}
 
       {isMobile && (
-        <MobileControls
-          isNight={isNight}
-          allLightsOn={allLightsOn}
-          onToggleNight={() => setIsNight((n) => !n)}
-          onToggleAllLights={() => setAllLightsOn((v) => (isNight ? !v : false))}
-          onOpenDoor={() => {
-            const id = activeDoorIdRef.current
-            if (id) doorRegistry.get(id)?.toggle()
-          }}
-          onToggleMirror={() => mirrorState.toggle()}
-          mirrorEnabled={mirrorEnabled}
-          holdProps={holdProps}
-        />
+        <>
+          <VirtualJoystick safeBottom="calc(env(safe-area-inset-bottom, 0px) + 20px)" pressKey={pressKey} />
+          <MobileControls
+            isNight={isNight}
+            allLightsOn={allLightsOn}
+            onToggleNight={() => setIsNight((n) => !n)}
+            onToggleAllLights={() => setAllLightsOn((v) => (isNight ? !v : false))}
+            onOpenDoor={() => {
+              const id = activeDoorIdRef.current
+              if (id) doorRegistry.get(id)?.toggle()
+            }}
+            onToggleMirror={() => mirrorState.toggle()}
+            mirrorEnabled={mirrorEnabled}
+            holdProps={holdProps}
+          />
+        </>
       )}
     </>
   )
@@ -818,19 +823,6 @@ function MobileControls({
         pointerEvents: 'none',
       }}
     >
-      {/* 좌하단 — 앞으로 버튼 1개 */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: safeBottom,
-          left: 20,
-          touchAction: 'none',
-          pointerEvents: 'auto',
-        }}
-      >
-        <button {...holdProps('w')} style={{ ...padBtn, width: 72, height: 72, fontSize: 28 }}>↑</button>
-      </div>
-
       {/* 우하단 — 액션 버튼 */}
       <div
         style={{
@@ -878,7 +870,7 @@ function MobileControls({
             background: 'rgba(58, 123, 213, 0.85)',
           }}
         >
-          🚪 문 열기
+          <kbd style={{ background: '#fff5e6', color: '#1a1a1a', padding: '1px 6px', borderRadius: 3, fontWeight: 700, fontSize: 11, border: '1px solid #888', boxShadow: '0 1px 0 #555', marginRight: 4 }}>F</kbd>상호작용
         </button>
         <button
           onClick={onToggleMirror}
@@ -890,6 +882,136 @@ function MobileControls({
           🪞 거울 {mirrorEnabled ? 'ON' : 'OFF'}
         </button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * 가상 조이스틱 — 좌하단, 터치 드래그로 WASD 시뮬레이션.
+ */
+function VirtualJoystick({ safeBottom, pressKey }: { safeBottom: string; pressKey: (k: string, down: boolean) => void }) {
+  const RADIUS = 50
+  const DEAD = 12
+  const baseRef = useRef<HTMLDivElement>(null)
+  const knobRef = useRef<HTMLDivElement>(null)
+  const activeKeys = useRef(new Set<string>())
+  const touchId = useRef<number | null>(null)
+
+  const update = useCallback((dx: number, dy: number) => {
+    // 조이스틱 노브 위치
+    const dist = Math.hypot(dx, dy)
+    const clamped = dist > RADIUS ? RADIUS / dist : 1
+    const cx = dx * clamped
+    const cy = dy * clamped
+    if (knobRef.current) {
+      knobRef.current.style.transform = `translate(${cx}px, ${cy}px)`
+    }
+    // 방향 → WASD
+    const next = new Set<string>()
+    if (dist > DEAD) {
+      const angle = Math.atan2(-dy, dx) // 위 = +, 우 = +
+      if (angle > -Math.PI * 0.625 && angle < Math.PI * 0.625) next.add('d') // 우
+      if (angle > Math.PI * 0.375 || angle < -Math.PI * 0.375) {
+        if (angle > 0) next.add('w') // 위(전진)
+        else next.add('s') // 아래(후진)
+      }
+      if (angle > Math.PI * 0.375 && angle < Math.PI * 0.625) { /* 위+우 이미 처리 */ }
+      if (Math.abs(angle) > Math.PI * 0.375) {
+        // 좌/우 재판정
+      }
+      // 간단한 4방향
+      next.clear()
+      if (dy < -DEAD) next.add('w')
+      if (dy > DEAD) next.add('s')
+      if (dx < -DEAD) next.add('a')
+      if (dx > DEAD) next.add('d')
+    }
+    // 키 이벤트 디스패치
+    for (const k of ['w', 'a', 's', 'd']) {
+      const wasActive = activeKeys.current.has(k)
+      const isActive = next.has(k)
+      if (isActive && !wasActive) pressKey(k, true)
+      if (!isActive && wasActive) pressKey(k, false)
+    }
+    activeKeys.current = next
+  }, [pressKey])
+
+  const reset = useCallback(() => {
+    for (const k of activeKeys.current) pressKey(k, false)
+    activeKeys.current.clear()
+    touchId.current = null
+    if (knobRef.current) knobRef.current.style.transform = 'translate(0px, 0px)'
+  }, [pressKey])
+
+  const handleStart = useCallback((e: React.TouchEvent) => {
+    if (touchId.current !== null) return
+    const t = e.changedTouches[0]
+    touchId.current = t.identifier
+    const rect = baseRef.current!.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    update(t.clientX - cx, t.clientY - cy)
+  }, [update])
+
+  useEffect(() => {
+    const move = (e: TouchEvent) => {
+      if (touchId.current === null) return
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i]
+        if (t.identifier !== touchId.current) continue
+        const rect = baseRef.current!.getBoundingClientRect()
+        const cx = rect.left + rect.width / 2
+        const cy = rect.top + rect.height / 2
+        update(t.clientX - cx, t.clientY - cy)
+      }
+    }
+    const end = (e: TouchEvent) => {
+      if (touchId.current === null) return
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === touchId.current) { reset(); return }
+      }
+    }
+    window.addEventListener('touchmove', move, { passive: true })
+    window.addEventListener('touchend', end)
+    window.addEventListener('touchcancel', end)
+    return () => {
+      window.removeEventListener('touchmove', move)
+      window.removeEventListener('touchend', end)
+      window.removeEventListener('touchcancel', end)
+    }
+  }, [update, reset])
+
+  return (
+    <div
+      ref={baseRef}
+      onTouchStart={handleStart}
+      style={{
+        position: 'absolute',
+        bottom: safeBottom,
+        left: 20,
+        width: RADIUS * 2 + 20,
+        height: RADIUS * 2 + 20,
+        borderRadius: '50%',
+        background: 'rgba(22, 33, 62, 0.4)',
+        border: '2px solid rgba(255,255,255,0.2)',
+        touchAction: 'none',
+        pointerEvents: 'auto',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <div
+        ref={knobRef}
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: '50%',
+          background: 'rgba(255, 245, 230, 0.7)',
+          border: '2px solid rgba(255,255,255,0.5)',
+          transition: 'none',
+        }}
+      />
     </div>
   )
 }

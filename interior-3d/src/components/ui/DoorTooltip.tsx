@@ -1,6 +1,7 @@
 /**
  * F 키 인터랙션 툴팁 — 화면 밖 클램핑 + 거리 무관 고정 크기.
  */
+import { useState, useEffect } from 'react'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 
@@ -73,7 +74,21 @@ interface DoorTooltipProps {
   label: string
 }
 
+const isMobileQuery = typeof window !== 'undefined' && window.matchMedia('(max-width: 800px)')
+function useIsMobile() {
+  const [m, setM] = useState(() => isMobileQuery ? isMobileQuery.matches : false)
+  useEffect(() => {
+    if (!isMobileQuery) return
+    const h = (e: MediaQueryListEvent) => setM(e.matches)
+    isMobileQuery.addEventListener('change', h)
+    return () => isMobileQuery.removeEventListener('change', h)
+  }, [])
+  return m
+}
+
 export function DoorTooltip({ position, label }: DoorTooltipProps) {
+  const mobile = useIsMobile()
+  const s = mobile ? 0.5 : 1  // 모바일 절반 크기
   return (
     <Html
       position={position}
@@ -97,12 +112,12 @@ export function DoorTooltip({ position, label }: DoorTooltipProps) {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
+          gap: 10 * s,
           background: 'rgba(20, 20, 25, 0.85)',
           color: '#fff5e6',
-          padding: '10px 18px',
-          borderRadius: 10,
-          fontSize: 24,
+          padding: `${10 * s}px ${18 * s}px`,
+          borderRadius: 10 * s,
+          fontSize: 24 * s,
           fontFamily: 'system-ui, sans-serif',
           border: '1px solid rgba(255,255,255,0.2)',
           whiteSpace: 'nowrap',
@@ -114,10 +129,10 @@ export function DoorTooltip({ position, label }: DoorTooltipProps) {
           style={{
             background: '#fff5e6',
             color: '#1a1a1a',
-            padding: '4px 12px',
-            borderRadius: 6,
+            padding: `${4 * s}px ${12 * s}px`,
+            borderRadius: 6 * s,
             fontWeight: 700,
-            fontSize: 22,
+            fontSize: 22 * s,
             border: '1px solid #888',
             boxShadow: '0 1px 0 #555',
           }}
