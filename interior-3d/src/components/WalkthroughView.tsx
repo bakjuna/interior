@@ -114,9 +114,13 @@ function SplashScreen({ label, progress }: { label: string; progress: number }) 
   )
 }
 
-/** Canvas 밖에서 호출 가능한 전역 invalidate */
+/** Canvas 밖에서 호출 가능한 전역 invalidate — 즉시 + 지연 2회로 React 리렌더 후에도 보장 */
 const globalInvalidateRef: { current: (() => void) | null } = { current: null }
-export function globalInvalidate() { globalInvalidateRef.current?.() }
+export function globalInvalidate() {
+  globalInvalidateRef.current?.()
+  requestAnimationFrame(() => globalInvalidateRef.current?.())
+  setTimeout(() => globalInvalidateRef.current?.(), 50)
+}
 
 /** 상태 변경 시 R3F invalidate — 모바일에서 버튼 액션 후 리렌더 보장 */
 function Invalidator({ deps }: { deps: string }) {
