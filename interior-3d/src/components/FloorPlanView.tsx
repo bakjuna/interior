@@ -44,7 +44,7 @@ const tallZCenter = ((wall2300Z + T2) + (babyTop - T2 - 1.119)) / 2
 const ITEM_LABELS: { name: string; pos: [number, number] }[] = [
   // === 안방 ===
   { name: '침대', pos: [mbLeft + 1.6 + 1.5, LR_D - 1.15] },
-  { name: '화장대', pos: [mbLeft + 0.3, 1.0] },
+  { name: '화장대', pos: [mbLeft + 0.3, 1.0 - 0.600] },
 
   // === 안방욕실 ===
   { name: '변기', pos: [mbBathLeft + 0.4, mbBathBottom + 0.4] },
@@ -60,13 +60,13 @@ const ITEM_LABELS: { name: string; pos: [number, number] }[] = [
   { name: '옷장', pos: [babyLeft + 0.3, babyTop + 0.5] },
 
   // === 주방 ===
-  { name: '김치냉장고', pos: [kitLeft + 0.46, fridgeBottomZ - 0.46] },
-  { name: '냉장고', pos: [kitLeft + 0.46, fridgeBottomZ - 0.46 - 0.91] },
+  { name: '냉장고', pos: [kitLeft + 0.46, fridgeBottomZ - 0.46] },
+  { name: '김치냉장고', pos: [kitLeft + 0.46, fridgeBottomZ - 0.46 - 0.91] },
   // 인덕션: 후드 정중앙 아래(extStartZ + 0.949)로 이동된 실제 위치 반영
   // 실제 layout: dish (북쪽, +1.6) | sink (남쪽, +2.319) — 이전과 자리 바뀜
-  { name: '인덕션', pos: [kitRight - 0.3, extStartZ + 0.949] },
-  { name: '식기세척기', pos: [extCabCenterX, extStartZ + 1.6] },
-  { name: '싱크', pos: [extCabCenterX, extStartZ + 2.319] },
+  { name: '식기세척기', pos: [kitRight - 0.3, extStartZ + 0.949] },
+  { name: '인덕션', pos: [extCabCenterX, extStartZ + 1.6 + 1.800] },
+  { name: '싱크', pos: [extCabCenterX, extStartZ + 2.319 - 0.400] },
   { name: '식탁', pos: [(kitLeft + kitRight) / 2 - 0.25 + 1.0, extEndZ + 1.0] },
   { name: '정수기/밥솥', pos: [extCabCenterX, extStartZ + 0.25] },
   { name: '광파오븐', pos: [tallX, tallZCenter] },
@@ -193,7 +193,7 @@ function FloorPlanScene() {
       })}
 
       {/* 방 이름 */}
-      {rooms.map((room, ri) => (
+      {rooms.filter(room => room.name && !room.name.startsWith('세탁실좌') && !room.name.startsWith('세탁실우')).map((room, ri) => (
         <Text
           key={`label-${ri}-${room.name}`}
           position={[room.center[0], 0.1, room.center[1] + (room.name === '맹지' ? -0.1 : 0)]}

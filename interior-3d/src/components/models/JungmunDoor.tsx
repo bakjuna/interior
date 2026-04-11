@@ -2,9 +2,11 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { useThree, useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
+import { DoorTooltip } from '../ui/DoorTooltip'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import type { DoorId } from '../../data/sectors'
 import { doorRegistry } from '../../systems/doorRegistry'
+import { mirrorState, useMirrorEnabled } from '../../systems/mirrorToggle'
 
 // --- Shape helpers (중문 유리 패널 전용) ---
 function makeRoundedShape(w: number, h: number, r: number) {
@@ -152,41 +154,7 @@ export function JungmunSwingDoor({
         </group>
       </group>
       {isActive && (
-        <Html position={[0, 1.6, localDoorCenterZ]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'rgba(20, 20, 25, 0.85)',
-              color: '#fff5e6',
-              padding: '6px 10px',
-              borderRadius: 6,
-              fontSize: 13,
-              fontFamily: 'system-ui, sans-serif',
-              border: '1px solid rgba(255,255,255,0.2)',
-              whiteSpace: 'nowrap',
-              userSelect: 'none',
-              pointerEvents: 'none',
-            }}
-          >
-            <kbd
-              style={{
-                background: '#fff5e6',
-                color: '#1a1a1a',
-                padding: '2px 7px',
-                borderRadius: 4,
-                fontWeight: 700,
-                fontSize: 12,
-                border: '1px solid #888',
-                boxShadow: '0 1px 0 #555',
-              }}
-            >
-              F
-            </kbd>
-            <span>{isOpen ? '중문 닫기' : '중문 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[0, 1.6, localDoorCenterZ]} label={isOpen ? '중문 닫기' : '중문 열기'} />
       )}
     </group>
   )
@@ -240,13 +208,14 @@ export function JungmunFixedPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mirror])
 
-  // 3m 이내일 때만 거울 렌더링
+  const mirrorOn = useMirrorEnabled()
   const nearMirror = mirror && !!playerPos && (
     Math.hypot(playerPos[0] - centerWorld[0], playerPos[1] - centerWorld[1]) < 3
   )
+  const showReflector = nearMirror && mirrorOn
   useEffect(() => {
-    if (reflectorObj) reflectorObj.visible = nearMirror
-  }, [nearMirror, reflectorObj])
+    if (reflectorObj) reflectorObj.visible = showReflector
+  }, [showReflector, reflectorObj])
 
   return (
     <group position={[centerWorld[0], height / 2, centerWorld[1]]} rotation={[0, Math.PI / 2, 0]}>
@@ -255,7 +224,15 @@ export function JungmunFixedPanel({
         <meshPhysicalMaterial color={color} roughness={0.15} clearcoat={0.8} clearcoatRoughness={0.1} />
       </mesh>
       {mirror && reflectorObj ? (
-        <primitive object={reflectorObj} rotation={[0, Math.PI, 0]} />
+        <>
+          <primitive object={reflectorObj} rotation={[0, Math.PI, 0]} />
+          {!(showReflector) && (
+            <mesh rotation={[0, Math.PI, 0]}>
+              <planeGeometry args={[width * 0.8, height - topBottomFrame * 2]} />
+              <meshStandardMaterial color="#c8dce8" metalness={0.95} roughness={0.03} />
+            </mesh>
+          )}
+        </>
       ) : (
         <mesh>
           <shapeGeometry args={[glassShape]} />

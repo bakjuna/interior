@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { useThree, useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
+import { DoorTooltip, getDoorLabel } from '../ui/DoorTooltip'
 import { WALL_THICKNESS } from '../../data/apartment'
 import type { DoorId } from '../../data/sectors'
 import { doorRegistry } from '../../systems/doorRegistry'
@@ -318,41 +319,7 @@ export function FlushDoor({
 
       {/* 인터랙션 툴팁 — 카메라가 이 도어를 향할 때만 */}
       {isActive && (
-        <Html position={[0, 1.6, 0]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'rgba(20, 20, 25, 0.85)',
-              color: '#fff5e6',
-              padding: '6px 10px',
-              borderRadius: 6,
-              fontSize: 13,
-              fontFamily: 'system-ui, sans-serif',
-              border: '1px solid rgba(255,255,255,0.2)',
-              whiteSpace: 'nowrap',
-              userSelect: 'none',
-              pointerEvents: 'none',
-            }}
-          >
-            <kbd
-              style={{
-                background: '#fff5e6',
-                color: '#1a1a1a',
-                padding: '2px 7px',
-                borderRadius: 4,
-                fontWeight: 700,
-                fontSize: 12,
-                border: '1px solid #888',
-                boxShadow: '0 1px 0 #555',
-              }}
-            >
-              F
-            </kbd>
-            <span>{isOpen ? '문 닫기' : '문 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[0, 1.6, 0]} label={getDoorLabel(doorId, isOpen)} />
       )}
     </group>
   )

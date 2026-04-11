@@ -6,7 +6,7 @@
 
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
+import { DoorTooltip, getDoorLabel } from '../ui/DoorTooltip'
 import * as THREE from 'three'
 import { closets } from '../../data/apartment'
 import type { DoorId } from '../../data/sectors'
@@ -88,7 +88,7 @@ export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) 
                 const bpT = 0.018
                 const shelfT = 0.012
                 const backX = c.position[0] - shortSide / 2 + bpT / 2
-                const interiorDepth = shortSide - bpT
+                const interiorDepth = c.dividerDepth ?? (shortSide - bpT)
                 const interiorCX = c.position[0] - shortSide / 2 + bpT + interiorDepth / 2
                 const zStart = c.position[2] - longSide / 2
                 const bodyBottom = c.position[1] - bodyH / 2
@@ -276,6 +276,20 @@ export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) 
                     upperCenterY={upperBottomY + upperDoorH / 2}
                     upperDoorH={upperDoorH}
                     upperHandleY={upperBottomY + 0.020}
+                    walnutTex={walnutBodyTex}
+                    doorId={g.doorId}
+                    activeDoorId={activeDoorId}
+                  />
+                ) : g.sliding ? (
+                  // 슬라이딩 도어
+                  <ClosetSlidingDoor
+                    frontX={c.position[0] + frontOffset}
+                    centerY={doorCenterY}
+                    doorH={doorReducedH}
+                    zStart={gZStart}
+                    doorWidth={actualDoorW}
+                    slideDir={g.slideDir ?? 1}
+                    protrude={g.slideDir === -1}
                     walnutTex={walnutBodyTex}
                     doorId={g.doorId}
                     activeDoorId={activeDoorId}
@@ -619,12 +633,7 @@ function ClosetInteractiveDoor({
         </group>
       )}
       {isActive && (
-        <Html position={[frontX + 0.05, centerY + 0.30, zCenter]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(20,20,25,0.85)', color: '#fff5e6', padding: '6px 10px', borderRadius: 6, fontSize: 13, fontFamily: 'system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.2)', whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none' }}>
-            <kbd style={{ background: '#fff5e6', color: '#1a1a1a', padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 12, border: '1px solid #888', boxShadow: '0 1px 0 #555' }}>F</kbd>
-            <span>{isOpen ? '도어 닫기' : '도어 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[frontX + 0.05, centerY + 0.30, zCenter]} label={getDoorLabel(doorId, isOpen)} />
       )}
     </group>
   )
@@ -756,12 +765,102 @@ function ClosetSplitDoorPair({
         </>
       )}
       {isActive && (
-        <Html position={[frontX + 0.05, (lowerCenterY + upperCenterY) / 2, zCenter]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(20,20,25,0.85)', color: '#fff5e6', padding: '6px 10px', borderRadius: 6, fontSize: 13, fontFamily: 'system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.2)', whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none' }}>
-            <kbd style={{ background: '#fff5e6', color: '#1a1a1a', padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 12, border: '1px solid #888', boxShadow: '0 1px 0 #555' }}>F</kbd>
-            <span>{isOpen ? '도어 닫기' : '도어 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[frontX + 0.05, (lowerCenterY + upperCenterY) / 2, zCenter]} label={getDoorLabel(doorId, isOpen)} />
+      )}
+    </group>
+  )
+}
+
+/**
+ * 붙박이장 슬라이딩 도어 — Z 방향 슬라이딩, 90% 이동.
+ * protrude=true: 20mm 돌출 + 옆면/뒷면 생성.
+ */
+interface ClosetSlidingDoorProps {
+  frontX: number
+  centerY: number
+  doorH: number
+  zStart: number
+  doorWidth: number
+  slideDir: number
+  protrude?: boolean
+  walnutTex: THREE.Texture
+  doorId: DoorId
+  activeDoorId?: DoorId | null
+}
+
+function ClosetSlidingDoor({
+  frontX, centerY, doorH, zStart, doorWidth, slideDir, protrude = false,
+  walnutTex, doorId, activeDoorId,
+}: ClosetSlidingDoorProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const slideRef = useRef(0)
+  const groupRef = useRef<THREE.Group>(null)
+  const { invalidate } = useThree()
+
+  const zCenter = zStart + doorWidth / 2
+  const panelW = doorWidth - 0.005
+  const doorThickX = 0.018
+  const protrudeX = protrude ? 0.020 : 0
+
+  const toggleRef = useRef(() => setIsOpen((o) => !o))
+  toggleRef.current = () => setIsOpen((o) => !o)
+  useEffect(() => {
+    doorRegistry.register({
+      id: doorId,
+      position: [frontX, zCenter],
+      toggle: () => toggleRef.current(),
+    })
+    return () => doorRegistry.unregister(doorId)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doorId])
+  useEffect(() => { doorRegistry.setOpenState(doorId, isOpen) }, [doorId, isOpen])
+
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.05)
+    const target = isOpen ? slideDir * doorWidth * 0.9 : 0
+    const diff = target - slideRef.current
+    if (Math.abs(diff) < 0.0005) return
+    slideRef.current += diff * Math.min(1, delta * 6)
+    if (groupRef.current) groupRef.current.position.z = slideRef.current
+    invalidate()
+  })
+
+  const isActive = activeDoorId === doorId
+
+  return (
+    <group>
+      <group ref={groupRef}>
+        <mesh position={[frontX - doorThickX / 2 - protrudeX, centerY, zCenter]}>
+          <boxGeometry args={[doorThickX, doorH, panelW]} />
+          <meshStandardMaterial map={walnutTex} roughness={0.45} />
+        </mesh>
+        {protrude && (
+          <>
+            <mesh position={[frontX - doorThickX - protrudeX + 0.001, centerY, zCenter]} rotation={[0, Math.PI / 2, 0]}>
+              <planeGeometry args={[panelW, doorH]} />
+              <meshStandardMaterial map={walnutTex} roughness={0.45} side={THREE.DoubleSide} />
+            </mesh>
+            <mesh position={[frontX - doorThickX / 2 - protrudeX / 2, centerY, zCenter + panelW / 2]}>
+              <boxGeometry args={[protrudeX, doorH, 0.005]} />
+              <meshStandardMaterial map={walnutTex} roughness={0.45} />
+            </mesh>
+            <mesh position={[frontX - doorThickX / 2 - protrudeX / 2, centerY, zCenter - panelW / 2]}>
+              <boxGeometry args={[protrudeX, doorH, 0.005]} />
+              <meshStandardMaterial map={walnutTex} roughness={0.45} />
+            </mesh>
+            <mesh position={[frontX - doorThickX / 2 - protrudeX / 2, centerY + doorH / 2, zCenter]}>
+              <boxGeometry args={[protrudeX, 0.005, panelW]} />
+              <meshStandardMaterial map={walnutTex} roughness={0.45} />
+            </mesh>
+            <mesh position={[frontX - doorThickX / 2 - protrudeX / 2, centerY - doorH / 2, zCenter]}>
+              <boxGeometry args={[protrudeX, 0.005, panelW]} />
+              <meshStandardMaterial map={walnutTex} roughness={0.45} />
+            </mesh>
+          </>
+        )}
+      </group>
+      {isActive && (
+        <DoorTooltip position={[frontX + 0.05, centerY + 0.30, zCenter]} label={getDoorLabel(doorId, isOpen)} />
       )}
     </group>
   )

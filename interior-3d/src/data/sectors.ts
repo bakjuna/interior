@@ -71,42 +71,44 @@ export type DoorId =
   | 'jungmun'
   | 'cage-mainVeranda'
   | 'outdoor-mainVeranda'
-  | 'entrance'  // 외부 출입문 — visibility/collision 대상 아님, F 인터랙션만
-  | 'kitchen-drawer'  // 주방 정수기 하단 밥솥 drawer — F 로 슬라이드 인/아웃
-  | 'kitchen-drawer-south'  // 주방 ㄱ자 ext 남쪽 끝 drawer — F 로 슬라이드 인/아웃
-  | 'kitchen-tiny'  // 주방 짜투리 thin pull-out drawer — F 로 슬라이드 인/아웃
-  | 'kitchen-pet-pass-n'  // 냉장고장↔키큰장 사이 펫 통로 스윙도어 (북쪽: 키큰장 경첩)
-  | 'kitchen-pet-pass-s'  // 냉장고장↔키큰장 사이 펫 통로 스윙도어 (남쪽: 냉장고장 경첩)
-  | 'kitchen-tall-drawer'        // 키큰장 상단 (유리장 뒷쪽 30cm) drawer — +Z 50cm 슬라이드
-  | 'kitchen-tall-drawer-mid'    // 키큰장 중단 (오븐 뒷쪽 30cm) drawer
-  | 'kitchen-tall-drawer-bot'    // 키큰장 하단 (하부장 뒷쪽 30cm) drawer
-  | 'closet-mb-0'                // 안방 붙박이장 페어 #0
-  | 'closet-mb-1'                // 안방 붙박이장 페어 #1
-  | 'closet-mb-2'                // 안방 붙박이장 단독 (최남측)
-  | 'closet-baby-0'              // 아기방 수납장 페어 #0
-  | 'closet-baby-1'              // 아기방 수납장 페어 #1
-  | 'closet-lr-0'                // 거실 수납장 북측 (단독)
-  | 'closet-lr-1'                // 거실 수납장 오픈선반 페어 #0
-  | 'closet-lr-2'                // 거실 수납장 오픈선반 페어 #1
-  | 'closet-lr-3'                // 거실 수납장 남측 (단독)
-  | 'kitchen-lc-north'           // 주방 하단장 — 북측 정수기 drawer 하단 도어
-  | 'kitchen-lc-cab12'           // 주방 하단장 — cab1+cab2 페어 (인덕션 아래)
-  | 'kitchen-lc-sink'            // 주방 하단장 — 싱크 도어 페어
-  | 'kitchen-lc-cab3'            // 주방 하단장 — cab3 단독
-  | 'kitchen-fridge-uc-0'         // 냉장고 상부장 페어 #0
-  | 'kitchen-fridge-uc-1'         // 냉장고 상부장 페어 #1
-  | 'kitchen-tall-lower'          // 키큰장 하단 도어 페어
-  | 'kitchen-tall-upper'          // 키큰장 상단 유리 도어 페어
-  | 'kitchen-uc-purifier'        // 주방 동측 상부장 — 정수기 위 (50cm, 내부 수직 3분할)
-  | 'kitchen-uc-0'               // 주방 동측 상부장 페어 #0 (40cm×2, 4분할)
-  | 'kitchen-uc-1'               // 주방 동측 상부장 페어 #1
-  | 'kitchen-uc-2'               // 주방 동측 상부장 페어 #2
-  | 'shoe-mirror'                // 신발장 좌측 거울 도어
-  | 'shoe-doors'                 // 신발장 일반 도어 (cols 1-3)
-  | 'bath-mirror-n'              // 메인욕실 거울 수납장 좌측(북쪽) 슬라이딩
-  | 'bath-mirror-s'              // 메인욕실 거울 수납장 우측(남쪽) 슬라이딩
-  | 'mb-bath-mirror-l'           // 안방욕실 거울 수납장 좌측 슬라이딩
-  | 'mb-bath-mirror-r'           // 안방욕실 거울 수납장 우측 슬라이딩
+  | 'entrance'                    // 현관문
+  | 'kitchen-drawer'              // 밥솥 서랍
+  | 'kitchen-drawer-south'        // 남쪽 서랍
+  | 'kitchen-tiny'                // 짜투리 서랍
+  | 'kitchen-pet-pass-n'          // 펫도어 북쪽
+  | 'kitchen-pet-pass-s'          // 펫도어 남쪽
+  | 'kitchen-tall-pantry'         // 팬트리
+  | 'closet-mb-0'                 // 북쪽 안방 붙박이
+  | 'closet-mb-1'                 // 중간 안방 붙박이
+  | 'closet-mb-2'                 // 남쪽 안방 붙박이
+  | 'closet-baby-0'               // 북쪽 아기방 붙박이 오른쪽
+  | 'closet-baby-1'               // 북쪽 아기방 붙박이 왼쪽
+  | 'closet-baby-2'               // 남쪽 아기방 붙박이 오른쪽
+  | 'closet-baby-3'               // 남쪽 아기방 붙박이 왼쪽
+  | 'closet-lr-0'                 // 북쪽 키큰장
+  | 'closet-lr-1'                 // 북쪽 2단 분할
+  | 'closet-lr-2'                 // 남쪽 2단 분할
+  | 'closet-lr-3'                 // 남쪽 키큰장
+  | 'kitchen-lc-north'            // 정수기 하단
+  | 'kitchen-lc-cab12'            // 인덕션 하단
+  | 'kitchen-lc-sink'             // 싱크 하단
+  | 'kitchen-lc-cab3'             // 코너 하단
+  | 'kitchen-fridge-uc-0'         // 냉장고 상부 #1
+  | 'kitchen-fridge-uc-1'         // 냉장고 상부 #2
+  | 'kitchen-tall-lower'          // 키큰장 하단
+  | 'kitchen-tall-upper'          // 키큰장 상단
+  | 'kitchen-uc-purifier'         // 정수기 상부
+  | 'kitchen-uc-0'                // 북쪽 상부장
+  | 'kitchen-uc-1'                // 중간 상부장
+  | 'kitchen-uc-2'                // 남쪽 상부장
+  | 'shoe-mirror'                 // 신발장 거울
+  | 'shoe-doors'                  // 신발장
+  | 'bath-mirror-n'               // 욕실 거울장 좌
+  | 'bath-mirror-s'               // 욕실 거울장 우
+  | 'mb-bath-mirror-l'            // 안방욕실 거울장 좌
+  | 'mb-bath-mirror-r'            // 안방욕실 거울장 우
+  | 'mb-vanity'                   // 화장대 서랍장
+  | 'mb-vanity-mirror'            // 화장대 거울 도어
 
 export interface SectorAABB {
   sector: SectorId

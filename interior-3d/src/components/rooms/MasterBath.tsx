@@ -7,7 +7,7 @@
 import { Suspense, useState, useMemo, useRef, useEffect } from 'react'
 import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
+import { DoorTooltip } from '../ui/DoorTooltip'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { Toilet } from '../models/Toilet'
 import { tileGroutOnBeforeCompile } from '../primitives/bathroomTile'
@@ -24,6 +24,7 @@ import {
   mbDoorHinge,
   mbDoorEnd,
 } from '../../data/apartment'
+import { useMirrorEnabled } from '../../systems/mirrorToggle'
 
 interface MasterBathProps {
   visible: boolean
@@ -134,6 +135,8 @@ export function MasterBath({ visible, playerPos, allLightsOn, activeDoorId }: Ma
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  useEffect(() => { doorRegistry.setOpenState('mb-bath-mirror-l', leftOpen) }, [leftOpen])
+  useEffect(() => { doorRegistry.setOpenState('mb-bath-mirror-r', rightOpen) }, [rightOpen])
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.05)
@@ -170,13 +173,15 @@ export function MasterBath({ visible, playerPos, allLightsOn, activeDoorId }: Ma
       textureWidth: 256, textureHeight: 256, color: 0xc8ccd0, clipBias: 0.003,
     })
   }
+  const mirrorOn = useMirrorEnabled()
   const nearMirror = !!playerPos && (
     Math.hypot(playerPos[0] - mcCX, playerPos[1] - mcZ) < 1.6
   )
+  const showReflector = nearMirror && mirrorOn
   useEffect(() => {
-    if (mirrorA.current) mirrorA.current.visible = nearMirror
-    if (mirrorB.current) mirrorB.current.visible = nearMirror
-  }, [nearMirror])
+    if (mirrorA.current) mirrorA.current.visible = showReflector
+    if (mirrorB.current) mirrorB.current.visible = showReflector
+  }, [showReflector])
 
   const isCabActiveL = activeDoorId === 'mb-bath-mirror-l'
   const isCabActiveR = activeDoorId === 'mb-bath-mirror-r'
@@ -386,7 +391,7 @@ export function MasterBath({ visible, playerPos, allLightsOn, activeDoorId }: Ma
 
         {/* 패널 A (좌측, 우측 인터랙션 시 좌측 슬라이딩) */}
         <group ref={panelARef}>
-          {nearMirror ? (
+          {showReflector ? (
             <primitive object={mirrorA.current!} position={[mcXmin + mcPanelW / 2, mcCY, mcZ + mcD / 2 + 0.001]} />
           ) : (
             <mesh position={[mcXmin + mcPanelW / 2, mcCY, mcZ + mcD / 2 + 0.001]}>
@@ -397,7 +402,7 @@ export function MasterBath({ visible, playerPos, allLightsOn, activeDoorId }: Ma
         </group>
         {/* 패널 B (우측, 15mm 돌출, 좌측 인터랙션 시 우측 슬라이딩) */}
         <group ref={panelBRef}>
-          {nearMirror ? (
+          {showReflector ? (
             <primitive object={mirrorB.current!} position={[mcXmin + mcPanelW + mcPanelW / 2, mcCY, mcZ + mcD / 2 + 0.016]} />
           ) : (
             <mesh position={[mcXmin + mcPanelW + mcPanelW / 2, mcCY, mcZ + mcD / 2 + 0.016]}>
@@ -440,20 +445,10 @@ export function MasterBath({ visible, playerPos, allLightsOn, activeDoorId }: Ma
 
       {/* 수납장 F키 툴팁 */}
       {isCabActiveL && (
-        <Html position={[mcXmin + mcPanelW / 2, mcCY + 0.3, mcZ + mcD / 2 + 0.05]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(20,20,25,0.85)', color: '#fff5e6', padding: '6px 10px', borderRadius: 6, fontSize: 13, fontFamily: 'system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.2)', whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none' }}>
-            <kbd style={{ background: '#fff5e6', color: '#1a1a1a', padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 12, border: '1px solid #888', boxShadow: '0 1px 0 #555' }}>F</kbd>
-            <span>{leftOpen ? '수납장 닫기' : '수납장 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[mcXmin + mcPanelW / 2, mcCY + 0.3, mcZ + mcD / 2 + 0.05]} label={leftOpen ? '안방 거울장 좌 닫기' : '안방 거울장 좌 열기'} />
       )}
       {isCabActiveR && (
-        <Html position={[mcXmin + mcPanelW + mcPanelW / 2, mcCY + 0.3, mcZ + mcD / 2 + 0.05]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(20,20,25,0.85)', color: '#fff5e6', padding: '6px 10px', borderRadius: 6, fontSize: 13, fontFamily: 'system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.2)', whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none' }}>
-            <kbd style={{ background: '#fff5e6', color: '#1a1a1a', padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 12, border: '1px solid #888', boxShadow: '0 1px 0 #555' }}>F</kbd>
-            <span>{rightOpen ? '수납장 닫기' : '수납장 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[mcXmin + mcPanelW + mcPanelW / 2, mcCY + 0.3, mcZ + mcD / 2 + 0.05]} label={rightOpen ? '안방 거울장 우 닫기' : '안방 거울장 우 열기'} />
       )}
     </group>
     </>

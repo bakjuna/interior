@@ -9,6 +9,7 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+import { useKTX2 } from '../../systems/useKTX2'
 import {
   rooms,
   walls,
@@ -29,24 +30,54 @@ import type { SectorId } from '../../data/sectors'
 const T2 = WALL_THICKNESS / 2
 const mbLeft = -WALL_THICKNESS - MB_W
 
+const STUCCO_CEILING_ROOMS = new Set(['작업실베란다', '메인베란다', '세탁실', '세탁실좌', '세탁실우', '새장', '실외기실'])
+
 function MergedCeilings() {
-  const geometry = useMemo(() => {
-    const geos = rooms.map((room) => {
+  const stuccoTex = useKTX2('/textures/stucco-wall.ktx2')
+
+  const { normalGeo, stuccoGeo, stuccoMat } = useMemo(() => {
+    const normalRooms = rooms.filter(r => !STUCCO_CEILING_ROOMS.has(r.name))
+    const stuccoRooms = rooms.filter(r => STUCCO_CEILING_ROOMS.has(r.name))
+
+    const normalGeos = normalRooms.map((room) => {
       const g = new THREE.PlaneGeometry(room.size[0], room.size[1])
       g.rotateX(-Math.PI / 2)
       g.translate(room.center[0], WALL_HEIGHT, room.center[1])
       return g
     })
-    const merged = mergeGeometries(geos, false)
-    geos.forEach(g => g.dispose())
-    return merged
-  }, [])
+    const normalGeo = mergeGeometries(normalGeos, false)
+    normalGeos.forEach(g => g.dispose())
 
-  if (!geometry) return null
+    const stuccoGeos = stuccoRooms.map((room) => {
+      const g = new THREE.PlaneGeometry(room.size[0], room.size[1])
+      g.rotateX(-Math.PI / 2)
+      g.translate(room.center[0], WALL_HEIGHT, room.center[1])
+      return g
+    })
+    const stuccoGeo = stuccoGeos.length > 0 ? mergeGeometries(stuccoGeos, false) : null
+    stuccoGeos.forEach(g => g.dispose())
+
+    const sTex = stuccoTex.clone()
+    sTex.wrapS = THREE.RepeatWrapping
+    sTex.wrapT = THREE.RepeatWrapping
+    sTex.repeat.set(4, 4)
+    sTex.colorSpace = THREE.SRGBColorSpace
+    const stuccoMat = new THREE.MeshStandardMaterial({ map: sTex, roughness: 0.85, metalness: 0, side: THREE.BackSide })
+
+    return { normalGeo, stuccoGeo, stuccoMat }
+  }, [stuccoTex])
+
   return (
-    <mesh geometry={geometry}>
-      <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} side={THREE.BackSide} />
-    </mesh>
+    <>
+      {normalGeo && (
+        <mesh geometry={normalGeo}>
+          <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} side={THREE.BackSide} />
+        </mesh>
+      )}
+      {stuccoGeo && (
+        <mesh geometry={stuccoGeo} material={stuccoMat} />
+      )}
+    </>
   )
 }
 
@@ -110,6 +141,48 @@ export function Ceilings({ showCeiling, playerPos, allLightsOn, visibleSectors }
         color="#ffe0b0"
         rotation={[-Math.PI / 2, 0, 0]}
       />
+
+      {/* 안방 화장대 다운라이트 — 좌상단 300×300mm, 서측 10° 틸트 */}
+      {(() => {
+        const dlX = mbLeft + 0.27   // 화장대 상판 X 중심 (vanityW/2 = 0.27)
+        const dlZ = 0.3            // 화장대 Z 중심 (vanityZ)
+        const tiltRad = -30 * Math.PI / 180
+        const targetX = dlX - Math.tan(tiltRad) * WALL_HEIGHT
+        return (
+          <group>
+            {/* 천장~라이트 사이 실린더 하우징 */}
+            <mesh position={[dlX - 0.014, WALL_HEIGHT + 0.002, dlZ]} rotation={[Math.PI , 0, tiltRad]}>
+              <cylinderGeometry args={[0.045, 0.045, 0.06, 16]} />
+              <meshStandardMaterial color="#222" roughness={0.5} />
+            </mesh>
+            {/* 다운라이트 피팅 — circle + ring */}
+            <mesh position={[dlX, WALL_HEIGHT - 0.025, dlZ]} rotation={[Math.PI / 2, -tiltRad, 0]}>
+              <circleGeometry args={[0.035, 16]} />
+              <meshStandardMaterial toneMapped={false} emissive={mbActive ? '#ffffff' : '#111'} emissiveIntensity={mbActive ? 2.0 : 0.1} color={mbActive ? '#ffffff' : '#222'} />
+            </mesh>
+            <mesh position={[dlX, WALL_HEIGHT - 0.026, dlZ]} rotation={[Math.PI / 2, -tiltRad, 0]}>
+              <ringGeometry args={[0.035, 0.045, 16]} />
+              <meshStandardMaterial color="#ccc" metalness={0.6} roughness={0.3} />
+            </mesh>
+            {/* 동쪽 30° 틸트 스팟라이트 */}
+            <spotLight
+              position={[dlX, WALL_HEIGHT - 0.01, dlZ]}
+              angle={Math.PI / 6}
+              penumbra={0.8}
+              intensity={mbActive ? 15 : 0}
+              color="#ffffff"
+              distance={3}
+              decay={2}
+              ref={(light: THREE.SpotLight | null) => {
+                if (light) {
+                  light.target.position.set(targetX, 0, dlZ)
+                  light.target.updateMatrixWorld()
+                }
+              }}
+            />
+          </group>
+        )
+      })()}
 
       {/* 안방 단내림 천장 */}
       <mesh position={[mbLeft + MB_W / 2, WALL_HEIGHT - 0.075, LR_D - 0.4]}>

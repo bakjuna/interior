@@ -20,8 +20,38 @@ const entries = new Map<DoorId, DoorEntry>()
 // 등록/해제 시 bump → pickActiveDoor 캐시 무효화
 let entriesVersion = 0
 
+/**
+ * 상호 배제 쌍 — 한쪽이 열릴 때 상대쪽이 먼저 닫힘.
+ * 양방향 등록 (A→B, B→A).
+ */
+const mutexPairs = new Map<DoorId, DoorId>()
+function registerMutex(a: DoorId, b: DoorId) {
+  mutexPairs.set(a, b)
+  mutexPairs.set(b, a)
+}
+// 욕실 거울장
+registerMutex('bath-mirror-n', 'bath-mirror-s')
+registerMutex('mb-bath-mirror-l', 'mb-bath-mirror-r')
+// 아기방 붙박이 (북쪽 쌍 / 남쪽 쌍)
+registerMutex('closet-baby-0', 'closet-baby-1')
+registerMutex('closet-baby-2', 'closet-baby-3')
+
 export const doorRegistry = {
   register(entry: DoorEntry) {
+    // mutex 래핑: 원래 toggle 을 감싸서 상대쪽 먼저 닫기
+    const originalToggle = entry.toggle
+    const wrappedToggle = () => {
+      const partner = mutexPairs.get(entry.id)
+      if (partner) {
+        const partnerEntry = entries.get(partner)
+        // 파트너가 열려있으면 먼저 닫기 (toggle 호출)
+        if (partnerEntry && (partnerEntry as DoorEntry & { _isOpen?: boolean })._isOpen) {
+          partnerEntry.toggle()
+        }
+      }
+      originalToggle()
+    }
+    entry.toggle = wrappedToggle
     entries.set(entry.id, entry)
     entriesVersion++
   },
@@ -34,6 +64,11 @@ export const doorRegistry = {
   },
   list(): DoorEntry[] {
     return Array.from(entries.values())
+  },
+  /** 컴포넌트가 isOpen 상태를 레지스트리에 동기화 */
+  setOpenState(id: DoorId, isOpen: boolean) {
+    const entry = entries.get(id) as DoorEntry & { _isOpen?: boolean } | undefined
+    if (entry) entry._isOpen = isOpen
   },
 }
 

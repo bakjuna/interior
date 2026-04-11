@@ -23,8 +23,13 @@ export function Windows() {
 
         const halfW = (ww - mid) / 2
 
+        const doubleGap = 0.070  // 2중창 간격 70mm
+        const offsets = w.double ? [-doubleGap / 2, doubleGap / 2] : [0]
+
         return (
           <group key={`win-${i}`} position={[cx, cy, cz]} rotation={rot}>
+          {offsets.map((dz, oi) => (
+          <group key={`pane-${oi}`} position={[0, 0, dz]}>
             <mesh position={[0, wh / 2 - frame / 2, 0]}>
               <boxGeometry args={[ww, frame, depth]} />
               <meshStandardMaterial color="#f0f0f0" />
@@ -59,7 +64,6 @@ export function Windows() {
                   <mesh position={[-halfW / 2 + pf / 2, 0, 0]}><boxGeometry args={[pf, pH, 0.02]} /><meshStandardMaterial color="#e8e8e8" /></mesh>
                   <mesh position={[halfW / 2 - pf / 2, 0, 0]}><boxGeometry args={[pf, pH, 0.02]} /><meshStandardMaterial color="#e8e8e8" /></mesh>
                   <mesh><planeGeometry args={[glassW, glassH]} /><meshStandardMaterial color="#4477aa" transparent opacity={0.35} side={THREE.DoubleSide} /></mesh>
-                  <mesh position={[halfW / 2 - 0.035, 0, 0.015]}><boxGeometry args={[0.01, 0.07, 0.018]} /><meshStandardMaterial color="#555" /></mesh>
                 </group>
               )
             })()}
@@ -77,10 +81,11 @@ export function Windows() {
                   <mesh position={[-halfW / 2 + pf / 2, 0, 0]}><boxGeometry args={[pf, pH, 0.02]} /><meshStandardMaterial color="#e8e8e8" /></mesh>
                   <mesh position={[halfW / 2 - pf / 2, 0, 0]}><boxGeometry args={[pf, pH, 0.02]} /><meshStandardMaterial color="#e8e8e8" /></mesh>
                   <mesh><planeGeometry args={[glassW, glassH]} /><meshStandardMaterial color="#4477aa" transparent opacity={0.35} side={THREE.DoubleSide} /></mesh>
-                  <mesh position={[-halfW / 2 + 0.035, 0, 0.015]}><boxGeometry args={[0.01, 0.07, 0.018]} /><meshStandardMaterial color="#555" /></mesh>
                 </group>
               )
             })()}
+          </group>
+          ))}
           </group>
         )
       })}

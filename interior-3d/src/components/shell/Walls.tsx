@@ -48,10 +48,12 @@ function buildGeos(wallList: Wall[]) {
 export function Walls() {
   const silkTex = useKTX2('/textures/silk.ktx2')
   const bathWallTex = useKTX2('/textures/bathroom-wall-tile.ktx2')
+  const stuccoTex = useKTX2('/textures/stucco-wall.ktx2')
 
-  const { mergedNormal, normalMat, mergedBath, bathMat } = useMemo(() => {
-    const normalWalls = walls.filter(w => !w.tile)
+  const { mergedNormal, normalMat, mergedBath, bathMat, mergedBalcony, balconyMat } = useMemo(() => {
+    const normalWalls = walls.filter(w => !w.tile && !w.isBalcony)
     const bathTileWalls = walls.filter(w => w.tile === 'bathWall')
+    const balconyWalls = walls.filter(w => w.isBalcony)
 
     const normalGeos = buildGeos(normalWalls)
     const mergedNormal = mergeGeometries(normalGeos, false)
@@ -78,8 +80,22 @@ export function Walls() {
       bathMat = new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.15, metalness: 0.05 })
     }
 
-    return { mergedNormal, normalMat, mergedBath, bathMat }
-  }, [silkTex, bathWallTex])
+    let mergedBalcony: THREE.BufferGeometry | null = null
+    let balconyMat: THREE.MeshStandardMaterial | null = null
+    if (balconyWalls.length > 0) {
+      const balconyGeos = buildGeos(balconyWalls)
+      mergedBalcony = mergeGeometries(balconyGeos, false)
+      balconyGeos.forEach(g => g.dispose())
+      const sTex = stuccoTex.clone()
+      sTex.wrapS = THREE.RepeatWrapping
+      sTex.wrapT = THREE.RepeatWrapping
+      sTex.repeat.set(4, 4)
+      sTex.colorSpace = THREE.SRGBColorSpace
+      balconyMat = new THREE.MeshStandardMaterial({ map: sTex, roughness: 0.85, metalness: 0 })
+    }
+
+    return { mergedNormal, normalMat, mergedBath, bathMat, mergedBalcony, balconyMat }
+  }, [silkTex, bathWallTex, stuccoTex])
 
   if (!mergedNormal) return null
 
@@ -88,6 +104,9 @@ export function Walls() {
       <mesh geometry={mergedNormal} material={normalMat} castShadow receiveShadow />
       {mergedBath && bathMat && (
         <mesh geometry={mergedBath} material={bathMat} castShadow receiveShadow />
+      )}
+      {mergedBalcony && balconyMat && (
+        <mesh geometry={mergedBalcony} material={balconyMat} castShadow receiveShadow />
       )}
     </>
   )

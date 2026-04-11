@@ -6,7 +6,7 @@
 import { Suspense, useState, useMemo, useRef, useEffect } from 'react'
 import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
+import { DoorTooltip } from '../ui/DoorTooltip'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { Toilet } from '../models/Toilet'
 import { tileGroutOnBeforeCompile } from '../primitives/bathroomTile'
@@ -18,6 +18,7 @@ import {
   WALL_HEIGHT,
   mbDoorEnd,
 } from '../../data/apartment'
+import { useMirrorEnabled } from '../../systems/mirrorToggle'
 
 const T2 = WALL_THICKNESS / 2
 
@@ -118,6 +119,8 @@ export function MainBath({ visible, playerPos, allLightsOn, activeDoorId }: Main
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  useEffect(() => { doorRegistry.setOpenState('bath-mirror-n', rightOpen) }, [rightOpen])
+  useEffect(() => { doorRegistry.setOpenState('bath-mirror-s', leftOpen) }, [leftOpen])
 
   // 슬라이딩 애니메이션
   // 좌측 인터랙션: 패널B → 북쪽(-Z) 슬라이딩
@@ -155,13 +158,15 @@ export function MainBath({ visible, playerPos, allLightsOn, activeDoorId }: Main
       textureWidth: 256, textureHeight: 256, color: 0xc8ccd0, clipBias: 0.003,
     })
   }
+  const mirrorOn = useMirrorEnabled()
   const nearMirror = !!playerPos && (
     Math.hypot(playerPos[0] - bL, playerPos[1] - mcZ) < 1.6
   )
+  const showReflector = nearMirror && mirrorOn
   useEffect(() => {
-    if (bathMirrorA.current) bathMirrorA.current.visible = nearMirror
-    if (bathMirrorB.current) bathMirrorB.current.visible = nearMirror
-  }, [nearMirror])
+    if (bathMirrorA.current) bathMirrorA.current.visible = showReflector
+    if (bathMirrorB.current) bathMirrorB.current.visible = showReflector
+  }, [showReflector])
 
   const isBathCabActiveN = activeDoorId === 'bath-mirror-n'
   const isBathCabActiveS = activeDoorId === 'bath-mirror-s'
@@ -396,7 +401,7 @@ export function MainBath({ visible, playerPos, allLightsOn, activeDoorId }: Main
 
         {/* 거울 패널 A (북쪽 반, 우측 인터랙션 시 남쪽 슬라이딩) */}
         <group ref={panelARef}>
-          {nearMirror ? (
+          {showReflector ? (
             <primitive object={bathMirrorA.current!} position={[mcX + mcD / 2 + 0.001, mcCY, mcZmin + mcPanelW / 2]} rotation={[0, Math.PI / 2, 0]} />
           ) : (
             <mesh position={[mcX + mcD / 2 + 0.001, mcCY, mcZmin + mcPanelW / 2]} rotation={[0, Math.PI / 2, 0]}>
@@ -408,7 +413,7 @@ export function MainBath({ visible, playerPos, allLightsOn, activeDoorId }: Main
         {/* 슬라이딩 거울 패널 B (남쪽 반, 15mm 돌출) */}
         <group ref={panelBRef}>
           {/* 거울면 (15mm 돌출) */}
-          {nearMirror ? (
+          {showReflector ? (
             <primitive object={bathMirrorB.current!} position={[mcX + mcD / 2 + 0.016, mcCY, mcZmin + mcPanelW + mcPanelW / 2]} rotation={[0, Math.PI / 2, 0]} />
           ) : (
             <mesh position={[mcX + mcD / 2 + 0.016, mcCY, mcZmin + mcPanelW + mcPanelW / 2]} rotation={[0, Math.PI / 2, 0]}>
@@ -456,21 +461,11 @@ export function MainBath({ visible, playerPos, allLightsOn, activeDoorId }: Main
 
       {/* 거울 수납장 F키 툴팁 — 좌측 */}
       {isBathCabActiveN && (
-        <Html position={[mcX + mcD / 2 + 0.05, mcCY + 0.3, mcZmin + mcPanelW / 2]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(20,20,25,0.85)', color: '#fff5e6', padding: '6px 10px', borderRadius: 6, fontSize: 13, fontFamily: 'system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.2)', whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none' }}>
-            <kbd style={{ background: '#fff5e6', color: '#1a1a1a', padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 12, border: '1px solid #888', boxShadow: '0 1px 0 #555' }}>F</kbd>
-            <span>{leftOpen ? '수납장 닫기' : '수납장 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[mcX + mcD / 2 + 0.05, mcCY + 0.3, mcZmin + mcPanelW / 2]} label={leftOpen ? '욕실 거울장 좌 닫기' : '욕실 거울장 좌 열기'} />
       )}
       {/* 거울 수납장 F키 툴팁 — 우측 */}
       {isBathCabActiveS && (
-        <Html position={[mcX + mcD / 2 + 0.05, mcCY + 0.3, mcZmin + mcPanelW + mcPanelW / 2]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(20,20,25,0.85)', color: '#fff5e6', padding: '6px 10px', borderRadius: 6, fontSize: 13, fontFamily: 'system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.2)', whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none' }}>
-            <kbd style={{ background: '#fff5e6', color: '#1a1a1a', padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 12, border: '1px solid #888', boxShadow: '0 1px 0 #555' }}>F</kbd>
-            <span>{rightOpen ? '수납장 닫기' : '수납장 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[mcX + mcD / 2 + 0.05, mcCY + 0.3, mcZmin + mcPanelW + mcPanelW / 2]} label={rightOpen ? '욕실 거울장 우 닫기' : '욕실 거울장 우 열기'} />
       )}
 
       {/* 샤워부스 */}

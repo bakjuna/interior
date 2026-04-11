@@ -81,6 +81,7 @@ interface ApartmentModelProps {
   doorOpenStates?: Map<DoorId, boolean>  // visibility 용 (Phase 6)
   activeDoorId?: DoorId | null            // 카메라 forward 가 향하는 도어 (툴팁 표시 / F 키 토글 대상)
   onDoorOpenChange?: (id: DoorId, open: boolean) => void  // 도어 상태 lift (워크스루 충돌/visibility용)
+  mirrorEnabled?: boolean        // T 키 토글: Reflector 거울 렌더링 (default off)
 }
 
 // --- DownlightInstances: 다운라이트 발광면 + 크롬링을 InstancedMesh로 일괄 렌더 ---
@@ -132,7 +133,7 @@ function DownlightInstances({ downlightStatic, activeGroupKeys, allLightsOn, vis
       const isActive = inActiveGroup ||
         (!!allLightsOn && (d.sector ? visibleSectors.has(d.sector) : true))
       // 활성: 따뜻한 색 발광, 비활성: 어두운 회색
-      circleRef.current.setColorAt(i, tempColor.set(isActive ? d.color : '#222'))
+      circleRef.current.setColorAt(i, tempColor.set(isActive ? d.color : '#111'))
     }
     if (circleRef.current.instanceColor) circleRef.current.instanceColor.needsUpdate = true
   }, [downlightStatic, activeGroupKeys, allLightsOn, visibleSectors, count, tempColor])
@@ -143,7 +144,7 @@ function DownlightInstances({ downlightStatic, activeGroupKeys, allLightsOn, vis
     <>
       <instancedMesh ref={circleRef} args={[undefined, undefined, count]}>
         <circleGeometry args={[0.035, 16]} />
-        <meshStandardMaterial toneMapped={false} emissive="#ffffff" emissiveIntensity={1.0} />
+        <meshBasicMaterial toneMapped={false} />
       </instancedMesh>
       <instancedMesh ref={ringRef} args={[undefined, undefined, count]}>
         <ringGeometry args={[0.035, 0.045, 16]} />
@@ -161,7 +162,7 @@ const totalW = totalRight - totalLeft
 const centerX = (totalLeft + totalRight) / 2
 const centerZ = LR_D / 2
 
-export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, isNight = true, allLightsOn = false, showCityBackground = true, doorOpenStates, activeDoorId, onDoorOpenChange }: ApartmentModelProps) {
+export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, isNight = true, allLightsOn = false, showCityBackground = true, doorOpenStates, activeDoorId, onDoorOpenChange, mirrorEnabled = false }: ApartmentModelProps) {
   // 도어 인터랙션은 항상 raw 사용. 조명 로직은 야간일 때만 playerPos 사용.
   const playerPos = isNight ? rawPlayerPos : undefined
 
@@ -356,7 +357,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
       <MainBath visible={visibleSectors.has('mainBath')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
       <MasterBath visible={visibleSectors.has('mbBath')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
       <LivingRoom visible={visibleSectors.has('lr')} />
-      <MasterBedroom visible={visibleSectors.has('mb')} />
+      <MasterBedroom visible={visibleSectors.has('mb')} activeDoorId={activeDoorId} playerPos={playerPos} allLightsOn={allLightsOn} />
       <Entrance visible={visibleSectors.has('entrance')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
       <Kitchen visible={visibleSectors.has('kitchen')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
 

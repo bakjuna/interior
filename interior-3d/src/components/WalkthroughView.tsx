@@ -8,6 +8,7 @@ import type { DoorId } from '../data/sectors'
 import { doorRegistry, pickActiveDoor } from '../systems/doorRegistry'
 import { findSector } from '../systems/visibility'
 import { preloadAllKTX2 } from '../systems/useKTX2'
+import { mirrorState, useMirrorEnabled } from '../systems/mirrorToggle'
 
 // 전체 이동 범위 — 외벽 바깥 0.5m 마진까지 (집 외부로 빠져나가지 못하게 제한)
 const totalMinX = -WALL_THICKNESS - MB_W - 0.5
@@ -32,7 +33,7 @@ const DEFAULT_BINDINGS: KeyBindings = {
 // 한글 → 영문 매핑 (한글 입력 상태에서도 동작, 두벌식 표준)
 const KO_TO_EN: Record<string, string> = {
   'ㅈ': 'w', 'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd',
-  'ㅂ': 'q', 'ㄷ': 'e', 'ㄱ': 'r', 'ㄹ': 'f', 'ㅎ': 'g',
+  'ㅂ': 'q', 'ㄷ': 'e', 'ㄱ': 'r', 'ㄹ': 'f', 'ㅎ': 'g', 'ㅅ': 't',
 }
 
 function resolveKey(key: string): string {
@@ -507,6 +508,8 @@ export function WalkthroughView() {
   // 도어 상태:
   //  - 충돌은 ref(매 프레임 즉시 반영)
   //  - visibility (Phase 6)는 state(React 렌더 트리거)
+  const mirrorEnabled = useMirrorEnabled()
+
   const doorOpenStatesRef = useRef<Map<DoorId, boolean>>(new Map())
   const [doorOpenStates, setDoorOpenStates] = useState<Map<DoorId, boolean>>(() => new Map())
 
@@ -581,6 +584,9 @@ export function WalkthroughView() {
       } else if (k === 'g') {
         e.preventDefault()
         setAllLightsOn((v) => (isNight ? !v : false))
+      } else if (k === 't') {
+        e.preventDefault()
+        mirrorState.toggle()
       } else if (k === 'f') {
         e.preventDefault()
         // 카메라가 향하는 도어 1개 토글
@@ -627,7 +633,7 @@ export function WalkthroughView() {
       >
         <ambientLight intensity={isNight ? 0.08 : 0.6} />
         <directionalLight position={[5, 10, 5]} intensity={isNight ? 0 : 0.8} />
-        <ApartmentModel showCeiling={true} playerPos={effectivePlayerPos} isNight={isNight} allLightsOn={effectiveAllLightsOn} doorOpenStates={doorOpenStates} activeDoorId={activeDoorId} onDoorOpenChange={handleDoorOpenChange} />
+        <ApartmentModel showCeiling={true} playerPos={effectivePlayerPos} isNight={isNight} allLightsOn={effectiveAllLightsOn} doorOpenStates={doorOpenStates} activeDoorId={activeDoorId} onDoorOpenChange={handleDoorOpenChange} mirrorEnabled={mirrorEnabled} />
         {!isPrewarming && (
           <FPSController bindings={bindings} height={height} isMobile={isMobile} doorOpenStatesRef={doorOpenStatesRef} onMove={handleMove} onHeightChange={setHeight} onActiveDoorChange={handleActiveDoorChange} />
         )}
@@ -677,6 +683,8 @@ export function WalkthroughView() {
           <kbd>R</kbd> 낮/밤 전환 · <kbd>G</kbd> 전체 불 켜기{!isNight && ' (밤에만)'}
           <br />
           <kbd>F</kbd> 문 열기/닫기 (문 근처에서)
+          <br />
+          <kbd>T</kbd> 거울 반사 {mirrorEnabled ? 'ON' : 'OFF'}
         </div>
       )}
       {!isMobile && (
@@ -731,10 +739,11 @@ export function WalkthroughView() {
           onToggleNight={() => setIsNight((n) => !n)}
           onToggleAllLights={() => setAllLightsOn((v) => (isNight ? !v : false))}
           onOpenDoor={() => {
-            // 모바일도 카메라가 향하는 도어 토글
             const id = activeDoorIdRef.current
             if (id) doorRegistry.get(id)?.toggle()
           }}
+          onToggleMirror={() => mirrorState.toggle()}
+          mirrorEnabled={mirrorEnabled}
           holdProps={holdProps}
         />
       )}
@@ -748,6 +757,8 @@ function MobileControls({
   onToggleNight,
   onToggleAllLights,
   onOpenDoor,
+  onToggleMirror,
+  mirrorEnabled,
   holdProps,
 }: {
   isNight: boolean
@@ -755,6 +766,8 @@ function MobileControls({
   onToggleNight: () => void
   onToggleAllLights: () => void
   onOpenDoor: () => void
+  onToggleMirror: () => void
+  mirrorEnabled: boolean
   holdProps: (k: string) => any
 }) {
   const padBtn: React.CSSProperties = {
@@ -866,6 +879,15 @@ function MobileControls({
           }}
         >
           🚪 문 열기
+        </button>
+        <button
+          onClick={onToggleMirror}
+          style={{
+            ...actionBtn,
+            background: mirrorEnabled ? 'rgba(40, 167, 69, 0.85)' : 'rgba(22, 33, 62, 0.85)',
+          }}
+        >
+          🪞 거울 {mirrorEnabled ? 'ON' : 'OFF'}
         </button>
       </div>
     </div>

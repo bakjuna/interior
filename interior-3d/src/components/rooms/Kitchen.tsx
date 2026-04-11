@@ -8,7 +8,6 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { CuckooWaterPurifier } from '../models/CuckooWaterPurifier'
 import { RiceCooker } from '../models/RiceCooker'
@@ -16,6 +15,7 @@ import { LightWaveOven } from '../models/LightWaveOven'
 import { Refrigerator } from '../models/Refrigerator'
 import { KimchiFridge } from '../models/KimchiFridge'
 import { DiningTable } from '../models/DiningTable'
+import { DoorTooltip, getDoorLabel } from '../ui/DoorTooltip'
 import { doorRegistry } from '../../systems/doorRegistry'
 import type { DoorId } from '../../data/sectors'
 import { useKTX2 } from '../../systems/useKTX2'
@@ -581,10 +581,10 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
               const backStripW  = (0.62 - sinkW) / 2 + ctBackExt    // 0.11 + 0.05 = 0.16
               return (
                 <>
-                  {beforeLen > 0.01 && <mesh position={[ctCenterX, topY, beforeCenterZ]}><boxGeometry args={[ctW, ctH, beforeLen]} /><meshStandardMaterial color="#e8e0d0" roughness={0.3} metalness={0.05} /></mesh>}
-                  {afterLen > 0.01 && <mesh position={[ctCenterX, topY, afterCenterZ]}><boxGeometry args={[ctW, ctH, afterLen]} /><meshStandardMaterial color="#e8e0d0" roughness={0.3} metalness={0.05} /></mesh>}
-                  <mesh position={[extCabCenterX - sinkW / 2 - frontStripW / 2, topY, sinkZ]}><boxGeometry args={[frontStripW, ctH, sinkD]} /><meshStandardMaterial color="#e8e0d0" roughness={0.3} metalness={0.05} /></mesh>
-                  <mesh position={[extCabCenterX + sinkW / 2 + backStripW / 2, topY, sinkZ]}><boxGeometry args={[backStripW, ctH, sinkD]} /><meshStandardMaterial color="#e8e0d0" roughness={0.3} metalness={0.05} /></mesh>
+                  {beforeLen > 0.01 && <mesh position={[ctCenterX, topY, beforeCenterZ]}><boxGeometry args={[ctW, ctH, beforeLen]} /><meshStandardMaterial color="#e8dcc0" roughness={0.3} metalness={0.05} /></mesh>}
+                  {afterLen > 0.01 && <mesh position={[ctCenterX, topY, afterCenterZ]}><boxGeometry args={[ctW, ctH, afterLen]} /><meshStandardMaterial color="#e8dcc0" roughness={0.3} metalness={0.05} /></mesh>}
+                  <mesh position={[extCabCenterX - sinkW / 2 - frontStripW / 2, topY, sinkZ]}><boxGeometry args={[frontStripW, ctH, sinkD]} /><meshStandardMaterial color="#e8dcc0" roughness={0.3} metalness={0.05} /></mesh>
+                  <mesh position={[extCabCenterX + sinkW / 2 + backStripW / 2, topY, sinkZ]}><boxGeometry args={[backStripW, ctH, sinkD]} /><meshStandardMaterial color="#e8dcc0" roughness={0.3} metalness={0.05} /></mesh>
                   <mesh position={[extCabCenterX, topY + 0.005, sinkZ + sinkD / 2 - rim / 2]}>
                     <boxGeometry args={[sinkW, 0.01, rim]} />
                     <meshStandardMaterial color="#ccc" metalness={0.85} roughness={0.08} />
@@ -1083,12 +1083,12 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
             ))}
             {/* 하단판 */}
             <mesh position={[displayCenterX, panelT / 2, tallZCenter]}>
-              <boxGeometry args={[displayDepthX, panelT, tallZLen]} />
+              <boxGeometry args={[displayDepthX, panelT, tallZLen - 0.010]} />
               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
             {/* 상판 (lowerH에서 20mm 아래) */}
             <mesh position={[displayCenterX, lowerH - 0.020 - panelT / 2, tallZCenter]}>
-              <boxGeometry args={[displayDepthX, panelT, tallZLen]} />
+              <boxGeometry args={[displayDepthX, panelT, tallZLen - 0.010]} />
               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
 
@@ -1097,7 +1097,7 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
               const panelT = 0.018
               return (
                 <mesh position={[displayCenterX, upperBottomY - panelT / 2, tallZCenter]}>
-                  <boxGeometry args={[displayDepthX, panelT, tallZLen]} />
+                  <boxGeometry args={[displayDepthX, panelT, tallZLen - 0.010]} />
                   <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                 </mesh>
               )
@@ -1132,7 +1132,7 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
                   </mesh>
                   {/* 상단면 (천장) — 전체 깊이 */}
                   <mesh position={[tallX, tallTopY - panelT / 2, tallZCenter]}>
-                    <boxGeometry args={[tallDepth, panelT, tallZLen]} />
+                    <boxGeometry args={[tallDepth, panelT, tallZLen - 0.010]} />
                     <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
                   {/* 중간 선반 — 상단 유리장 내 */}
@@ -1140,46 +1140,15 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
                     <boxGeometry args={[displayDepthX - 0.04, panelT, interiorZLen - 0.005]} />
                     <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
-                  {/* TOP drawer — 유리장 뒤 (Y [upperBottomY, WALL_HEIGHT]) */}
-                  <KitchenTallBackDrawer
+                  {/* 풀아웃 팬트리 — 전체 높이 (Y [0, tallTopY]), 7단 선반 */}
+                  <KitchenTallPantry
                     slotFrontX={drawerSlotFrontX + panelT}
                     slotBackX={dividerX}
                     slotZStart={drawerSlotZStart}
                     slotZEnd={drawerSlotZEnd}
-                    slotBottomY={upperBottomY}
-                    slotTopY={WALL_HEIGHT}
-                    clearance={drawerClearance}
-                    openDistance={0.50}
+                    slotTopY={tallTopY - 0.030}
                     walnutTex={walnutBodyTex}
-                    doorId="kitchen-tall-drawer"
-                    activeDoorId={activeDoorId}
-                  />
-                  {/* MIDDLE drawer — 오븐 뒤 (Y [lowerH, upperBottomY]) */}
-                  <KitchenTallBackDrawer
-                    slotFrontX={drawerSlotFrontX + panelT}
-                    slotBackX={dividerX}
-                    slotZStart={drawerSlotZStart}
-                    slotZEnd={drawerSlotZEnd}
-                    slotBottomY={lowerH}
-                    slotTopY={upperBottomY}
-                    clearance={drawerClearance}
-                    openDistance={0.50}
-                    walnutTex={walnutBodyTex}
-                    doorId="kitchen-tall-drawer-mid"
-                    activeDoorId={activeDoorId}
-                  />
-                  {/* BOTTOM drawer — 하부장 뒤 (Y [0, lowerH]) */}
-                  <KitchenTallBackDrawer
-                    slotFrontX={drawerSlotFrontX + panelT}
-                    slotBackX={dividerX}
-                    slotZStart={drawerSlotZStart}
-                    slotZEnd={drawerSlotZEnd}
-                    slotBottomY={0}
-                    slotTopY={lowerH}
-                    clearance={drawerClearance}
-                    openDistance={0.50}
-                    walnutTex={walnutBodyTex}
-                    doorId="kitchen-tall-drawer-bot"
+                    doorId="kitchen-tall-pantry"
                     activeDoorId={activeDoorId}
                   />
                 </>
@@ -1592,41 +1561,7 @@ function KitchenRiceCookerDrawer({
 
       {/* 인터랙션 툴팁 */}
       {isActive && (
-        <Html position={[frontX - 0.05, drawerCenterY + 0.2, drawerCenterZ]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'rgba(20, 20, 25, 0.85)',
-              color: '#fff5e6',
-              padding: '6px 10px',
-              borderRadius: 6,
-              fontSize: 13,
-              fontFamily: 'system-ui, sans-serif',
-              border: '1px solid rgba(255,255,255,0.2)',
-              whiteSpace: 'nowrap',
-              userSelect: 'none',
-              pointerEvents: 'none',
-            }}
-          >
-            <kbd
-              style={{
-                background: '#fff5e6',
-                color: '#1a1a1a',
-                padding: '2px 7px',
-                borderRadius: 4,
-                fontWeight: 700,
-                fontSize: 12,
-                border: '1px solid #888',
-                boxShadow: '0 1px 0 #555',
-              }}
-            >
-              F
-            </kbd>
-            <span>{isOpen ? '서랍 닫기' : '서랍 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[frontX - 0.05, drawerCenterY + 0.2, drawerCenterZ]} label={getDoorLabel(doorId, isOpen)} />
       )}
     </group>
     {/* 스윙 도어 — drawer 와 같은 isOpen 으로 회전 (옵션) */}
@@ -1767,201 +1702,171 @@ function KitchenPetPassDoor({
         </mesh>
       </group>
       {isActive && (
-        <Html position={[tipX, tipY, tipZ]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'rgba(20, 20, 25, 0.85)',
-              color: '#fff5e6',
-              padding: '6px 10px',
-              borderRadius: 6,
-              fontSize: 13,
-              fontFamily: 'system-ui, sans-serif',
-              border: '1px solid rgba(255,255,255,0.2)',
-              whiteSpace: 'nowrap',
-              userSelect: 'none',
-              pointerEvents: 'none',
-            }}
-          >
-            <kbd
-              style={{
-                background: '#fff5e6',
-                color: '#1a1a1a',
-                padding: '2px 7px',
-                borderRadius: 4,
-                fontWeight: 700,
-                fontSize: 12,
-                border: '1px solid #888',
-                boxShadow: '0 1px 0 #555',
-              }}
-            >
-              F
-            </kbd>
-            <span>{isOpen ? '도어 닫기' : '도어 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[tipX, tipY, tipZ]} label={getDoorLabel(doorId, isOpen)} />
       )}
     </>
   )
 }
 
 /**
- * 키큰장 유리 상부 뒷쪽 40cm drawer — 세탁실 쪽(-X)으로 슬라이드 인/아웃 (F 키 토글).
- *
- * 좌표계:
- *  - 슬롯 X span = [slotFrontX, slotBackX] (slotFrontX = kitLeft = 세탁실 쪽 면)
- *  - 닫힘: drawer face 가 slotFrontX 에 위치
- *  - 열림: -X 방향으로 OPEN_DIST 만큼 슬라이드 (세탁실 쪽으로 빠짐)
+ * 키큰장 풀아웃 팬트리 — 여닫이 도어 1장 + 7단 슬라이딩 선반.
+ * F 키 토글 시 도어가 열리며(hinge on west edge) 선반 프레임이 +Z(남쪽)으로 슬라이드.
  */
-interface KitchenTallBackDrawerProps {
-  slotFrontX: number      // 슬롯 -X 끝 (벽 쪽 — 보이는 영역에서)
+interface KitchenTallPantryProps {
+  slotFrontX: number      // 슬롯 -X 끝
   slotBackX: number       // 슬롯 +X 끝 (디스플레이 격판)
   slotZStart: number
   slotZEnd: number
-  slotBottomY: number
   slotTopY: number
-  clearance?: number      // 슬롯 내 face 패딩. 기본 0.004 — 5mm gap 원하면 0.0025
-  openDistance?: number   // 슬라이드 거리(+Z); 미지정 시 drawerLenZ/2
   walnutTex: THREE.Texture
   doorId: DoorId
   activeDoorId?: DoorId | null
 }
 
-function KitchenTallBackDrawer({
+function KitchenTallPantry({
   slotFrontX,
   slotBackX,
   slotZStart,
   slotZEnd,
-  slotBottomY,
   slotTopY,
-  clearance = 0.004,
-  openDistance,
   walnutTex,
   doorId,
   activeDoorId,
-}: KitchenTallBackDrawerProps) {
+}: KitchenTallPantryProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const groupRef = useRef<THREE.Group>(null)
-  const offsetRef = useRef(0)
+  const slideRef = useRef<THREE.Group>(null)
+  const doorPivotRef = useRef<THREE.Group>(null)
+  const slideOffsetRef = useRef(0)
+  const doorAngleRef = useRef(0)
   const { invalidate } = useThree()
 
-  // drawer box 공통 치수
   const panelT = 0.018
-  const drawerWidthX = (slotBackX - slotFrontX) - clearance
-  const drawerLenZ = (slotZEnd - slotZStart) - clearance * 2
-  const drawerHeightY = (slotTopY - slotBottomY) - clearance * 2
-  const drawerCenterX = (slotFrontX + slotBackX) / 2
-  const drawerCenterY = (slotBottomY + slotTopY) / 2
-  const drawerCenterZ = (slotZStart + slotZEnd) / 2
+  const shelfT = 0.012
+  const cl = 0.004
 
-  // 레지스트리 등록 — 3 단 vertically stacked drawer 를 picking 하기 위해 Y 도 등록.
-  // 위치는 ref 로 보존, deps 는 doorId 만 → FP 변동으로 매 render unregister/register 방지.
-  const toggleRef = useRef(() => setIsOpen((o) => !o))
-  toggleRef.current = () => setIsOpen((o) => !o)
-  const posRef = useRef({ x: drawerCenterX, y: drawerCenterY, z: drawerCenterZ })
-  posRef.current = { x: drawerCenterX, y: drawerCenterY, z: drawerCenterZ }
+  // 도어: 슬롯 전체 폭 / 선반 프레임: 50mm 축소 + 우측(+X) 밀착
+  const NARROW = 0.050
+  const doorW = (slotBackX - slotFrontX) - cl          // 도어 — 원래 슬롯 전체 폭
+  const pFrontX = slotFrontX + NARROW                   // 선반 프레임 -X 끝
+  const pW = (slotBackX - pFrontX) - cl                 // 선반 프레임 폭
+  const slotZ = slotZEnd - slotZStart
+  const centerX = (pFrontX + slotBackX) / 2
+  const centerZ = (slotZStart + slotZEnd) / 2
+
+  // 레지스트리 등록
+  const toggleRef = useRef(() => setIsOpen(o => !o))
+  toggleRef.current = () => setIsOpen(o => !o)
   useEffect(() => {
-    const p = posRef.current
     doorRegistry.register({
       id: doorId,
-      position: [p.x, p.z],
-      y: p.y,
+      position: [centerX, slotZEnd],
       toggle: () => toggleRef.current(),
     })
     return () => doorRegistry.unregister(doorId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doorId])
 
-  // 슬라이드 거리: 지정값 또는 drawerLenZ/2
-  const OPEN_DIST = openDistance ?? drawerLenZ / 2
+  const SLIDE_DIST = slotZ * 0.85
+  const DOOR_ANGLE = -Math.PI / 2
+
   useFrame((_, rawDelta) => {
-    const delta = Math.min(rawDelta, 0.05)   // demand frameloop idle 후 delta 폭주 방지
-    const target = isOpen ? OPEN_DIST : 0
-    const diff = target - offsetRef.current
-    if (Math.abs(diff) < 0.0005) return
-    offsetRef.current += diff * Math.min(1, delta * 6)
-    if (groupRef.current) groupRef.current.position.z = offsetRef.current
-    invalidate()
+    const delta = Math.min(rawDelta, 0.05)
+    let dirty = false
+
+    const doorFullyOpen = Math.abs(doorAngleRef.current - DOOR_ANGLE) < 0.02
+    const shelvesRetracted = Math.abs(slideOffsetRef.current) < 0.001
+
+    // 도어 스윙 — 열 때: 즉시 / 닫을 때: 선반 복귀 후
+    const dTarget = isOpen ? DOOR_ANGLE : (shelvesRetracted ? 0 : doorAngleRef.current)
+    const dDiff = dTarget - doorAngleRef.current
+    if (Math.abs(dDiff) > 0.001) {
+      doorAngleRef.current += dDiff * Math.min(1, delta * 6)
+      if (doorPivotRef.current) doorPivotRef.current.rotation.y = doorAngleRef.current
+      dirty = true
+    }
+
+    // 선반 슬라이드 — 열 때: 도어 90% 개문 후 / 닫을 때: 즉시
+    const doorEnough = Math.abs(doorAngleRef.current - DOOR_ANGLE) < Math.abs(DOOR_ANGLE) * 0.10
+    const sTarget = isOpen ? (doorEnough ? SLIDE_DIST : 0) : 0
+    const sDiff = sTarget - slideOffsetRef.current
+    if (Math.abs(sDiff) > 0.0005) {
+      slideOffsetRef.current += sDiff * Math.min(1, delta * 6)
+      if (slideRef.current) slideRef.current.position.z = slideOffsetRef.current
+      dirty = true
+    }
+
+    if (dirty) invalidate()
   })
 
   const isActive = activeDoorId === doorId
-  const faceZ = slotZEnd                                          // drawer face Z (남쪽 끝)
-  const lipH = 0.030
+  const SHELF_COUNT = 7
+  const lipH = 0.025
+  const innerZ = slotZ - panelT
+  const shelfW = pW - panelT - 0.010  // 우측 레일 없으므로 panelT*1 만 차감
 
   return (
-    <group ref={groupRef}>
-      {/* 바닥판 */}
-      <mesh position={[drawerCenterX, slotBottomY + clearance + panelT / 2, drawerCenterZ]}>
-        <boxGeometry args={[drawerWidthX, panelT, drawerLenZ]} />
-        <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
-      </mesh>
-      {/* 후면 림 (-Z 끝, 북쪽) */}
-      <mesh position={[drawerCenterX, slotBottomY + clearance + panelT + lipH / 2, slotZStart + clearance + panelT / 2]}>
-        <boxGeometry args={[drawerWidthX, lipH, panelT]} />
-        <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
-      </mesh>
-      {/* 측면 림 (서, -X 끝, 벽쪽) — 30mm */}
-      <mesh position={[slotFrontX + clearance / 2 + panelT / 2, slotBottomY + clearance + panelT + lipH / 2, drawerCenterZ]}>
-        <boxGeometry args={[panelT, lipH, drawerLenZ]} />
-        <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
-      </mesh>
-      {/* 측면 림 (동, +X 끝, 디스플레이 격판쪽) */}
-      <mesh position={[slotBackX - clearance / 2 - panelT / 2, slotBottomY + clearance + panelT + lipH / 2, drawerCenterZ]}>
-        <boxGeometry args={[panelT, lipH, drawerLenZ]} />
-        <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
-      </mesh>
-      {/* 정면 패널 (남쪽 face) — 슬롯 전체 높이/X 폭 */}
-      <mesh position={[drawerCenterX, drawerCenterY, faceZ - panelT / 2]}>
-        <boxGeometry args={[drawerWidthX, drawerHeightY, panelT]} />
-        <meshStandardMaterial map={walnutTex} roughness={0.45} />
-      </mesh>
-      {/* 가로 손잡이 */}
-      <mesh position={[drawerCenterX, drawerCenterY, faceZ + 0.012]}>
-        <boxGeometry args={[Math.min(0.30, drawerWidthX - 0.10), 0.020, 0.018]} />
-        <meshStandardMaterial color="#bbb" metalness={0.85} roughness={0.15} />
-      </mesh>
+    <>
+      {/* === 여닫이 도어 — south face, hinge on west(-X) edge (slotFrontX) === */}
+      <group position={[slotFrontX + cl / 2, 0, slotZEnd]}>
+        <group ref={doorPivotRef}>
+          <mesh position={[doorW / 2, slotTopY / 2, -panelT / 2]}>
+            <boxGeometry args={[doorW, slotTopY - cl * 2, panelT]} />
+            <meshStandardMaterial map={walnutTex} roughness={0.45} />
+          </mesh>
+          {/* 세로 손잡이 — east edge */}
+          <mesh position={[doorW - 0.025, slotTopY / 2, 0.012]}>
+            <boxGeometry args={[0.015, 0.15, 0.018]} />
+            <meshStandardMaterial color="#bbb" metalness={0.85} roughness={0.15} />
+          </mesh>
+        </group>
+      </group>
+
+      {/* === 풀아웃 선반 프레임 === */}
+      <group ref={slideRef}>
+        {/* 7단 선반 */}
+        {Array.from({ length: SHELF_COUNT }, (_, i) => {
+          const y = slotTopY * (i + 1) / (SHELF_COUNT + 1)
+          return (
+            <group key={`pantry-shelf-${i}`}>
+              <mesh position={[centerX, y, centerZ]}>
+                <boxGeometry args={[shelfW, shelfT, innerZ]} />
+                <meshStandardMaterial color="#a29a86" roughness={0.6} />
+              </mesh>
+              {/* 전면 립 (+Z) — 낙하 방지 */}
+              <mesh position={[centerX, y + shelfT / 2 + lipH / 2, slotZEnd - panelT + 0.0055]}>
+                <boxGeometry args={[shelfW, lipH, 0.006]} />
+                <meshStandardMaterial color="#bbb" metalness={0.7} roughness={0.2} />
+              </mesh>
+              {/* 동쪽 옆면 립 (+X) — 남쪽 5mm 축소 */}
+              <mesh position={[centerX + shelfW / 2 - 0.003, y + shelfT / 2 + lipH / 2, centerZ - 0.0025]}>
+                <boxGeometry args={[0.006, lipH, innerZ - 0.005]} />
+                <meshStandardMaterial color="#bbb" metalness={0.7} roughness={0.2} />
+              </mesh>
+            </group>
+          )
+        })}
+        {/* 바닥판 — walnut 텍스처 */}
+        <mesh position={[centerX, cl + shelfT / 2, centerZ]}>
+          <boxGeometry args={[pW, shelfT, innerZ]} />
+          <meshPhysicalMaterial map={walnutTex} roughness={0.45} />
+        </mesh>
+        {/* 서쪽 레일 (-X) — 우측(동쪽)은 개방 */}
+        <mesh position={[pFrontX + cl / 2 + panelT / 2, slotTopY / 2, centerZ]}>
+          <boxGeometry args={[panelT, slotTopY - cl * 2, innerZ]} />
+          <meshStandardMaterial color="#a29a86" roughness={0.6} />
+        </mesh>
+        {/* 후면 가드 (북, -Z) */}
+        <mesh position={[centerX, slotTopY / 2, slotZStart + panelT / 2]}>
+          <boxGeometry args={[pW - panelT, slotTopY - cl * 2, panelT]} />
+          <meshStandardMaterial color="#a29a86" roughness={0.6} />
+        </mesh>
+      </group>
 
       {/* 인터랙션 툴팁 */}
       {isActive && (
-        <Html position={[drawerCenterX, drawerCenterY + 0.20, faceZ + 0.05]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'rgba(20, 20, 25, 0.85)',
-              color: '#fff5e6',
-              padding: '6px 10px',
-              borderRadius: 6,
-              fontSize: 13,
-              fontFamily: 'system-ui, sans-serif',
-              border: '1px solid rgba(255,255,255,0.2)',
-              whiteSpace: 'nowrap',
-              userSelect: 'none',
-              pointerEvents: 'none',
-            }}
-          >
-            <kbd
-              style={{
-                background: '#fff5e6',
-                color: '#1a1a1a',
-                padding: '2px 7px',
-                borderRadius: 4,
-                fontWeight: 700,
-                fontSize: 12,
-                border: '1px solid #888',
-                boxShadow: '0 1px 0 #555',
-              }}
-            >
-              F
-            </kbd>
-            <span>{isOpen ? '서랍 닫기' : '서랍 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[centerX, slotTopY / 2 + 0.20, slotZEnd + 0.05]} label={getDoorLabel(doorId, isOpen)} />
       )}
-    </group>
+    </>
   )
 }
 
@@ -2064,12 +1969,7 @@ function KitchenLowerDoor({
         </group>
       )}
       {isActive && (
-        <Html position={[reverseSwing ? frontX + 0.05 : frontX - 0.05, handleY + 0.15, zCenter]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(20,20,25,0.85)', color: '#fff5e6', padding: '6px 10px', borderRadius: 6, fontSize: 13, fontFamily: 'system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.2)', whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none' }}>
-            <kbd style={{ background: '#fff5e6', color: '#1a1a1a', padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 12, border: '1px solid #888', boxShadow: '0 1px 0 #555' }}>F</kbd>
-            <span>{isOpen ? '도어 닫기' : '도어 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[reverseSwing ? frontX + 0.05 : frontX - 0.05, handleY + 0.15, zCenter]} label={getDoorLabel(doorId, isOpen)} />
       )}
     </group>
   )
@@ -2235,41 +2135,7 @@ function KitchenUpperCabinet({
 
       {/* 인터랙션 툴팁 */}
       {isActive && (
-        <Html position={[cabFrontX - 0.05, cabY + 0.20, zCenter]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'rgba(20, 20, 25, 0.85)',
-              color: '#fff5e6',
-              padding: '6px 10px',
-              borderRadius: 6,
-              fontSize: 13,
-              fontFamily: 'system-ui, sans-serif',
-              border: '1px solid rgba(255,255,255,0.2)',
-              whiteSpace: 'nowrap',
-              userSelect: 'none',
-              pointerEvents: 'none',
-            }}
-          >
-            <kbd
-              style={{
-                background: '#fff5e6',
-                color: '#1a1a1a',
-                padding: '2px 7px',
-                borderRadius: 4,
-                fontWeight: 700,
-                fontSize: 12,
-                border: '1px solid #888',
-                boxShadow: '0 1px 0 #555',
-              }}
-            >
-              F
-            </kbd>
-            <span>{isOpen ? '도어 닫기' : '도어 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[cabFrontX - 0.05, cabY + 0.20, zCenter]} label={getDoorLabel(doorId, isOpen)} />
       )}
     </group>
   )
@@ -2417,41 +2283,7 @@ function KitchenUpperCabinetPair({
 
       {/* 인터랙션 툴팁 */}
       {isActive && (
-        <Html position={[cabFrontX - 0.05, cabY + 0.20, zCenter]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'rgba(20, 20, 25, 0.85)',
-              color: '#fff5e6',
-              padding: '6px 10px',
-              borderRadius: 6,
-              fontSize: 13,
-              fontFamily: 'system-ui, sans-serif',
-              border: '1px solid rgba(255,255,255,0.2)',
-              whiteSpace: 'nowrap',
-              userSelect: 'none',
-              pointerEvents: 'none',
-            }}
-          >
-            <kbd
-              style={{
-                background: '#fff5e6',
-                color: '#1a1a1a',
-                padding: '2px 7px',
-                borderRadius: 4,
-                fontWeight: 700,
-                fontSize: 12,
-                border: '1px solid #888',
-                boxShadow: '0 1px 0 #555',
-              }}
-            >
-              F
-            </kbd>
-            <span>{isOpen ? '도어 닫기' : '도어 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[cabFrontX - 0.05, cabY + 0.20, zCenter]} label={getDoorLabel(doorId, isOpen)} />
       )}
     </group>
   )

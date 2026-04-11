@@ -11,13 +11,14 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
+import { DoorTooltip } from '../ui/DoorTooltip'
 import { LR_W, WALL_THICKNESS } from '../../data/apartment'
 import type { DoorId } from '../../data/sectors'
 import { doorRegistry } from '../../systems/doorRegistry'
 import { useKTX2 } from '../../systems/useKTX2'
+import { mirrorState, useMirrorEnabled } from '../../systems/mirrorToggle'
 
 const T2 = WALL_THICKNESS / 2
 
@@ -80,13 +81,14 @@ export function ShoeCabinet({ active, activeDoorId, playerPos }: ShoeCabinetProp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 현관/복도에 있을 때만 거울 렌더링
+  const mirrorOn = useMirrorEnabled()
   const nearMirror = !!playerPos && (
     Math.hypot(playerPos[0] - (xLeft + colW / 2), playerPos[1] - zFront) < 2
   )
+  const showReflector = nearMirror && mirrorOn
   useEffect(() => {
-    reflectorObj.visible = nearMirror
-  }, [nearMirror, reflectorObj])
+    reflectorObj.visible = showReflector
+  }, [showReflector, reflectorObj])
 
   // ——— 인터랙티브 도어 상태 ———
   const [mirrorOpen, setMirrorOpen] = useState(false)
@@ -416,6 +418,12 @@ export function ShoeCabinet({ active, activeDoorId, playerPos }: ShoeCabinetProp
           <meshStandardMaterial color="#e8e8e8" roughness={0.3} />
         </mesh>
         <primitive object={reflectorObj} position={[colW / 2, 0, -0.009]} rotation={[0, Math.PI, 0]} />
+        {!showReflector && (
+          <mesh position={[colW / 2, 0, -0.009]} rotation={[0, Math.PI, 0]}>
+            <planeGeometry args={[colW - 0.03, cabH - 0.03]} />
+            <meshStandardMaterial color="#c8dce8" metalness={0.95} roughness={0.03} />
+          </mesh>
+        )}
       </group>
 
       {/* 일반 도어 (cols 1-3, 상/하부) */}
@@ -458,20 +466,10 @@ export function ShoeCabinet({ active, activeDoorId, playerPos }: ShoeCabinetProp
 
       {/* 툴팁 */}
       {isMirrorActive && (
-        <Html position={[xLeft + colW / 2, floorClear + cabH / 2 + 0.3, zFront - 0.05]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(20,20,25,0.85)', color: '#fff5e6', padding: '6px 10px', borderRadius: 6, fontSize: 13, fontFamily: 'system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.2)', whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none' }}>
-            <kbd style={{ background: '#fff5e6', color: '#1a1a1a', padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 12, border: '1px solid #888', boxShadow: '0 1px 0 #555' }}>F</kbd>
-            <span>{mirrorOpen ? '도어 닫기' : '도어 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[xLeft + colW / 2, floorClear + cabH / 2 + 0.3, zFront - 0.05]} label={mirrorOpen ? '신발장 거울 닫기' : '신발장 거울 열기'} />
       )}
       {isDoorsActive && (
-        <Html position={[xLeft + colW * 2.5, floorClear + cabH / 2 + 0.3, zFront - 0.05]} center distanceFactor={1.5} zIndexRange={[100, 0]}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(20,20,25,0.85)', color: '#fff5e6', padding: '6px 10px', borderRadius: 6, fontSize: 13, fontFamily: 'system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.2)', whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none' }}>
-            <kbd style={{ background: '#fff5e6', color: '#1a1a1a', padding: '2px 7px', borderRadius: 4, fontWeight: 700, fontSize: 12, border: '1px solid #888', boxShadow: '0 1px 0 #555' }}>F</kbd>
-            <span>{doorsOpen ? '도어 닫기' : '도어 열기'}</span>
-          </div>
-        </Html>
+        <DoorTooltip position={[xLeft + colW * 2.5, floorClear + cabH / 2 + 0.3, zFront - 0.05]} label={doorsOpen ? '신발장 닫기' : '신발장 열기'} />
       )}
     </>
   )

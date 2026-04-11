@@ -25,7 +25,9 @@ import {
   babyBottom,
   babyRightWallX,
   babyTopWallZ,
+  right1Z,
   walls,
+  closets,
 } from '../data/apartment'
 import type { DoorId } from '../data/sectors'
 
@@ -43,6 +45,17 @@ interface DoorBlocker extends Segment {
   id: DoorId
 }
 
+// AABB → 4변 segment 변환
+function aabbToSegments(cx: number, cz: number, hw: number, hd: number): Segment[] {
+  const x0 = cx - hw, x1 = cx + hw, z0 = cz - hd, z1 = cz + hd
+  return [
+    { sx: x0, sz: z0, ex: x1, ez: z0 },  // 북
+    { sx: x0, sz: z1, ex: x1, ez: z1 },  // 남
+    { sx: x0, sz: z0, ex: x0, ez: z1 },  // 서
+    { sx: x1, sz: z0, ex: x1, ez: z1 },  // 동
+  ]
+}
+
 // --- 정적 벽 blocker (한 번만 빌드) ---
 const staticBlockers: Segment[] = (() => {
   const out: Segment[] = []
@@ -54,6 +67,38 @@ const staticBlockers: Segment[] = (() => {
     if (height < 0.5) continue             // 낮은 kerb
     out.push({ sx: w.start[0], sz: w.start[1], ex: w.end[0], ez: w.end[1] })
   }
+
+  // 붙박이장/수납장 AABB blocker
+  for (const c of closets) {
+    out.push(...aabbToSegments(c.position[0], c.position[2], c.size[0] / 2, c.size[2] / 2))
+  }
+
+  // 냉장고장 (Kitchen.tsx 좌표 기반)
+  const kitLeft = babyRightWallX + T2
+  const CAB_BACK_OFFSET = 0.12
+  const fridgeD = 0.920  // Refrigerator.D
+  const fridgeCabLeft = kitLeft + 0.050 - CAB_BACK_OFFSET
+  const fridgeCabFront = fridgeCabLeft + fridgeD
+  const fridgeCabX = (fridgeCabLeft + fridgeCabFront) / 2
+  const fridgeBottomZ = (babyBottom - 0.22 - 0.9) - 0.020 + 0.030
+  const fridgeW = 0.915
+  const kimchiW = 0.600
+  const f2Z = fridgeBottomZ - fridgeW / 2 - 0.060 - kimchiW / 2
+  const groupZStart = f2Z - kimchiW / 2
+  const groupZEnd = fridgeBottomZ
+  const sideT = 0.040
+  const outerZStart = groupZStart - sideT - 0.002
+  const outerZEnd = groupZEnd + sideT
+  out.push(...aabbToSegments(fridgeCabX, (outerZStart + outerZEnd) / 2, fridgeD / 2, (outerZEnd - outerZStart) / 2))
+
+  // 키큰장 (냉장고장과 동일 깊이/X, Z는 2300벽 ~ 1119벽)
+  const wall2300Z = babyTopWallZ - 1.119 - 0.770
+  const tallZStart = wall2300Z + T2
+  const tallZEnd = babyTopWallZ - T2 - 1.119
+  const tallZCenter = (tallZStart + tallZEnd) / 2
+  const tallZLen = tallZEnd - tallZStart
+  out.push(...aabbToSegments(fridgeCabX, tallZCenter, fridgeD / 2, tallZLen / 2))
+
   return out
 })()
 

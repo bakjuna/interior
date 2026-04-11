@@ -45,11 +45,11 @@ export function WorkRoom({ visible, playerPos, allLightsOn }: WorkRoomProps) {
   const deskDepth = 0.720
   const gapBetween = 0.100
   const cx = LR_W - deskDepth / 2 - wallGap
-  const w1 = 1.200
-  const z1 = workTopZ + wallGap + w1 / 2
+  const w1 = 1.540
+  const z1 = workTopZ + wallGap + w1 / 2 - 0.005
   const cx1 = cx - 0.140
-  const w2 = 1.800
-  const z2 = z1 + w1 / 2 + gapBetween + w2 / 2
+  const w2 = 1.600
+  const z2 = -1.591 - 0.005 - w2 / 2 - 0.205    // 남쪽 벽에서 5mm + 북쪽 205mm
 
   // === 정사각형 cubby 책장 — 좌측(서쪽) 벽 ===
   // 좌측 벽 X = 작업실 west wall inner = babyRightWallX + 2.555 + T2
@@ -85,8 +85,8 @@ export function WorkRoom({ visible, playerPos, allLightsOn }: WorkRoomProps) {
   return (
     <>
       <group visible={visible}>
-      <TrestleDesk position={[cx1, z1]} rotationY={Math.PI / 2} width={w1} />
-      <TrestleDesk position={[cx, z2]} rotationY={Math.PI / 2} width={w2} />
+      <TrestleDesk position={[cx1, z1]} rotationY={Math.PI / 2} width={w1} height={0.740} legColor="#ffffff" hideBraces />
+      <TrestleDesk position={[cx1, z2]} rotationY={Math.PI / 2} width={w2} topColor="#1a1a1a" topMap={walnutTex} legColor="#4a4a4d" braceScale={0.5} />
 
       {/* === 책장 본체 — 전부 호두 마감 (외부/후면/내부 구분 모두) === */}
       <group>

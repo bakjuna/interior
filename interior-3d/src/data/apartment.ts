@@ -37,6 +37,7 @@ export interface Opening {
   axis: 'x' | 'z'
   type: 'door' | 'window'
   passable?: boolean   // 워크스루에서 통과 가능 (거실 풀창 등)
+  double?: boolean     // 2중창 구조
 }
 
 export interface Room {
@@ -113,11 +114,11 @@ export const rooms: Room[] = [
   { name: '메인욕실', center: [(bath2Left + bath2Right + 0.2) / 2 + 0.1, (bath2Top + bath2Bottom) / 2], size: [BATH2_INNER_W + 0.4, BATH2_INNER_D], color: '#d4dce8', floorY: -0.03, floorTile: 'bathWall', tileSize: 0.6 },
   { name: '아기방', center: [(babyLeft + babyRight + 0.2) / 2, (babyBottom + babyTop) / 2], size: [BABY_INNER_W + 0.2, BABY_INNER_D], color: '#f0e0f0' },
   // 세탁실 좌측 (373×747)
-  { name: '', center: [(stairLeftX + T2 + stair2X + T2) / 2, (laundryBotZ - T2 + stair1Z + T2) / 2], size: [stair2X + T2 - (stairLeftX + T2), Math.abs((laundryBotZ - T2) - (stair1Z + T2))], color: '#e8e0d4', floorTile: 'porcelain' as const, tileSize: 0.3 },
+  { name: '세탁실좌', center: [(stairLeftX + T2 + stair2X + T2) / 2, (laundryBotZ - T2 + stair1Z + T2) / 2], size: [stair2X + T2 - (stairLeftX + T2), Math.abs((laundryBotZ - T2) - (stair1Z + T2))], color: '#e8e0d4', floorTile: 'porcelain' as const, tileSize: 0.3 },
   // 세탁실 중간 (1574×1233) — 태그 여기
   { name: '세탁실', center: [(stair2X + T2 + stair4endX - T2) / 2, (laundryBotZ - T2 + stair3Z + T2) / 2], size: [stair4endX - T2 - (stair2X + T2), Math.abs((laundryBotZ - T2) - (stair3Z + T2))], color: '#e8e0d4', floorTile: 'porcelain' as const, tileSize: 0.3 },
   // 세탁실 우측 (1117×919, 우측 200mm 확장)
-  { name: '', center: [(rightWallX - 1.217 + rightWallX - T2 + 0.2) / 2, (laundryBotZ - T2 + right1Z + T2) / 2], size: [rightWallX - T2 + 0.2 - (rightWallX - 1.217), Math.abs((laundryBotZ - T2) - (right1Z + T2))], color: '#e8e0d4', floorTile: 'porcelain' as const, tileSize: 0.3 },
+  { name: '세탁실우', center: [(rightWallX - 1.217 + rightWallX - T2 + 0.2) / 2, (laundryBotZ - T2 + right1Z + T2) / 2], size: [rightWallX - T2 + 0.2 - (rightWallX - 1.217), Math.abs((laundryBotZ - T2) - (right1Z + T2))], color: '#e8e0d4', floorTile: 'porcelain' as const, tileSize: 0.3 },
   { name: '맹지', center: [(mbBathLeft + mbBathRight) / 2, (mbBathBottom + bath2Bottom) / 2], size: [mbBathInnerW, Math.abs(bath2Bottom - mbBathBottom)], color: '#999', hatched: true } as Room & { hatched: boolean },
   { name: '안방', center: [mbLeft + MB_W / 2, (-WALL_THICKNESS + LR_D) / 2], size: [MB_W, LR_D + WALL_THICKNESS], color: '#dce8d4' },
   { name: '거실', center: [LR_W / 2, (-WALL_THICKNESS + LR_D) / 2], size: [LR_W, LR_D + WALL_THICKNESS], color: '#f5e6d3' },
@@ -147,15 +148,23 @@ export const walls: Wall[] = [
   { start: [mbDoorEnd, -T2], end: [-WALL_THICKNESS - 0.9 - 0.018, -T2], thickness: WALL_THICKNESS },
   // 안방 상단벽 — 우측 도어 후 (공유벽 접합)
   { start: [-WALL_THICKNESS, -T2], end: [-T2, -T2], thickness: WALL_THICKNESS },
-  // 안방 하단벽 — 창문으로 분할 (내측 1340mm, 폭 2000mm, 높이 750mm, 바닥 1000mm)
-  // 좌측 벽 (전체 높이)
-  { start: [mbLeft - T2, LR_D + T2], end: [mbLeft + 1.340, LR_D + T2], thickness: WALL_THICKNESS },
-  // 우측 벽 (전체 높이)
-  { start: [mbLeft + 1.340 + 2.000, LR_D + T2], end: [-T2, LR_D + T2], thickness: WALL_THICKNESS },
-  // 창문 아래 (1000mm)
-  { start: [mbLeft + 1.340, LR_D + T2], end: [mbLeft + 1.340 + 2.000, LR_D + T2], thickness: WALL_THICKNESS, height: 1.000, bottomY: 0 },
-  // 창문 위 (450mm, y=1750~2200)
-  { start: [mbLeft + 1.340, LR_D + T2], end: [mbLeft + 1.340 + 2.000, LR_D + T2], thickness: WALL_THICKNESS, height: 0.450, bottomY: 1.750 },
+  // 안방 하단벽 — 창문으로 분할 (2장 분리: 남=베란다, 북=실크)
+  // 좌측 벽 — 남면 (베란다)
+  { start: [mbLeft - T2, LR_D + T2 + T2 / 2], end: [mbLeft + 1.340, LR_D + T2 + T2 / 2], thickness: T2, isBalcony: true },
+  // 좌측 벽 — 북면 (실크)
+  { start: [mbLeft - T2, LR_D + T2 - T2 / 2], end: [mbLeft + 1.340, LR_D + T2 - T2 / 2], thickness: T2 },
+  // 우측 벽 — 남면 (베란다)
+  { start: [mbLeft + 1.340 + 2.000, LR_D + T2 + T2 / 2], end: [-T2, LR_D + T2 + T2 / 2], thickness: T2, isBalcony: true },
+  // 우측 벽 — 북면 (실크)
+  { start: [mbLeft + 1.340 + 2.000, LR_D + T2 - T2 / 2], end: [-T2, LR_D + T2 - T2 / 2], thickness: T2 },
+  // 창문 아래 — 남면 (베란다)
+  { start: [mbLeft + 1.340, LR_D + T2 + T2 / 2], end: [mbLeft + 1.340 + 2.000, LR_D + T2 + T2 / 2], thickness: T2, height: 1.000, bottomY: 0, isBalcony: true },
+  // 창문 아래 — 북면 (실크)
+  { start: [mbLeft + 1.340, LR_D + T2 - T2 / 2], end: [mbLeft + 1.340 + 2.000, LR_D + T2 - T2 / 2], thickness: T2, height: 1.000, bottomY: 0 },
+  // 창문 위 — 남면 (베란다)
+  { start: [mbLeft + 1.340, LR_D + T2 + T2 / 2], end: [mbLeft + 1.340 + 2.000, LR_D + T2 + T2 / 2], thickness: T2, height: 0.450, bottomY: 1.750, isBalcony: true },
+  // 창문 위 — 북면 (실크)
+  { start: [mbLeft + 1.340, LR_D + T2 - T2 / 2], end: [mbLeft + 1.340 + 2.000, LR_D + T2 - T2 / 2], thickness: T2, height: 0.450, bottomY: 1.750 },
 
   // 안방욕실 우측벽 (새 공간까지 연장)
   { start: [mbDoorEnd + 0.1, -T2], end: [mbDoorEnd + 0.1, bath2TopWallZ], thickness: WALL_THICKNESS, isBathroom: true },
@@ -172,42 +181,57 @@ export const walls: Wall[] = [
   { start: [bath2RightWallX, babyBottom - 0.22 - 0.9], end: [bath2RightWallX, babyTopWallZ], thickness: WALL_THICKNESS },
   // 맹지/메인욕실 상단벽 (아기방과의 구분)
   { start: [mbLeft - T2, bath2TopWallZ], end: [bath2RightWallX, bath2TopWallZ], thickness: WALL_THICKNESS },
-  // 아기방 상단벽 — 창문으로 분할 (왼쪽 내측 486mm, 폭 1996mm)
-  // 좌측 벽 (전체 높이)
-  { start: [mbLeft - T2, babyTopWallZ], end: [mbLeft + 0.486, babyTopWallZ], thickness: WALL_THICKNESS },
-  // 우측 벽 (전체 높이)
-  { start: [mbLeft + 0.486 + 1.996, babyTopWallZ], end: [babyRightWallX, babyTopWallZ], thickness: WALL_THICKNESS },
-  // 창문 아래 (높이 1040mm)
-  { start: [mbLeft + 0.486, babyTopWallZ], end: [mbLeft + 0.486 + 1.996, babyTopWallZ], thickness: WALL_THICKNESS, height: 1.040, bottomY: 0 },
-  // 창문 위 (높이 450mm, y=1750~2200)
-  { start: [mbLeft + 0.486, babyTopWallZ], end: [mbLeft + 0.486 + 1.996, babyTopWallZ], thickness: WALL_THICKNESS, height: 0.450, bottomY: 1.750 },
+  // 아기방 상단벽 — 창문으로 분할 (2장 분리: 북=세탁실 탄성코트, 남=아기방 실크)
+  // 좌측 벽 — 북면 (세탁실)
+  { start: [mbLeft - T2, babyTopWallZ - T2 / 2], end: [mbLeft + 0.486, babyTopWallZ - T2 / 2], thickness: T2, isBalcony: true },
+  // 좌측 벽 — 남면 (아기방)
+  { start: [mbLeft - T2, babyTopWallZ + T2 / 2], end: [mbLeft + 0.486, babyTopWallZ + T2 / 2], thickness: T2 },
+  // 우측 벽 — 북면 (세탁실)
+  { start: [mbLeft + 0.486 + 1.996, babyTopWallZ - T2 / 2], end: [babyRightWallX, babyTopWallZ - T2 / 2], thickness: T2, isBalcony: true },
+  // 우측 벽 — 남면 (아기방)
+  { start: [mbLeft + 0.486 + 1.996, babyTopWallZ + T2 / 2], end: [babyRightWallX, babyTopWallZ + T2 / 2], thickness: T2 },
+  // 창문 아래 — 북면 (세탁실)
+  { start: [mbLeft + 0.486, babyTopWallZ - T2 / 2], end: [mbLeft + 0.486 + 1.996, babyTopWallZ - T2 / 2], thickness: T2, height: 1.040, bottomY: 0, isBalcony: true },
+  // 창문 아래 — 남면 (아기방)
+  { start: [mbLeft + 0.486, babyTopWallZ + T2 / 2], end: [mbLeft + 0.486 + 1.996, babyTopWallZ + T2 / 2], thickness: T2, height: 1.040, bottomY: 0 },
+  // 창문 위 — 북면 (세탁실)
+  { start: [mbLeft + 0.486, babyTopWallZ - T2 / 2], end: [mbLeft + 0.486 + 1.996, babyTopWallZ - T2 / 2], thickness: T2, height: 0.450, bottomY: 1.750, isBalcony: true },
+  // 창문 위 — 남면 (아기방)
+  { start: [mbLeft + 0.486, babyTopWallZ + T2 / 2], end: [mbLeft + 0.486 + 1.996, babyTopWallZ + T2 / 2], thickness: T2, height: 0.450, bottomY: 1.750 },
 
-  // 아기방 좌상단에서 계단형 벽
+  // 아기방 좌상단에서 계단형 벽 (세탁실 내벽 — 탄성코트)
   // 1) 위로 947mm
-  { start: [mbLeft - T2, babyTopWallZ], end: [mbLeft - T2, babyTopWallZ - 0.947], thickness: WALL_THICKNESS },
+  { start: [mbLeft - T2, babyTopWallZ], end: [mbLeft - T2, babyTopWallZ - 0.947], thickness: WALL_THICKNESS, isBalcony: true },
   // 2) 우측으로 373mm
-  { start: [mbLeft - T2, babyTopWallZ - 0.947], end: [mbLeft - T2 + 0.373, babyTopWallZ - 0.947], thickness: WALL_THICKNESS },
+  { start: [mbLeft - T2, babyTopWallZ - 0.947], end: [mbLeft - T2 + 0.373, babyTopWallZ - 0.947], thickness: WALL_THICKNESS, isBalcony: true },
   // 3) stair1Z+0.1 ~ stair3Z (아래로 100mm 연장)
-  { start: [mbLeft - T2 + 0.373, babyTopWallZ - 0.947 + 0.1], end: [mbLeft - T2 + 0.373, babyTopWallZ - 0.847 - 0.486], thickness: WALL_THICKNESS },
+  { start: [mbLeft - T2 + 0.373, babyTopWallZ - 0.947 + 0.1], end: [mbLeft - T2 + 0.373, babyTopWallZ - 0.847 - 0.486], thickness: WALL_THICKNESS, isBalcony: true },
   // 4) 우측으로 1774mm — 가운데 창문 분할 (1300mm, 바닥 1000, 높이 700)
   // 좌측 벽 (전체 높이)
-  { start: [mbLeft - T2 + 0.373, babyTopWallZ - 0.847 - 0.486], end: [mbLeft + 0.510, babyTopWallZ - 0.847 - 0.486], thickness: WALL_THICKNESS },
+  { start: [mbLeft - T2 + 0.373, babyTopWallZ - 0.847 - 0.486], end: [mbLeft + 0.510, babyTopWallZ - 0.847 - 0.486], thickness: WALL_THICKNESS, isBalcony: true },
   // 우측 벽 (전체 높이)
-  { start: [mbLeft + 0.510 + 1.300, babyTopWallZ - 0.847 - 0.486], end: [mbLeft - T2 + 0.373 + 1.774, babyTopWallZ - 0.847 - 0.486], thickness: WALL_THICKNESS },
+  { start: [mbLeft + 0.510 + 1.300, babyTopWallZ - 0.847 - 0.486], end: [mbLeft - T2 + 0.373 + 1.774, babyTopWallZ - 0.847 - 0.486], thickness: WALL_THICKNESS, isBalcony: true },
   // 창문 아래 (1000mm)
-  { start: [mbLeft + 0.510, babyTopWallZ - 0.847 - 0.486], end: [mbLeft + 0.510 + 1.300, babyTopWallZ - 0.847 - 0.486], thickness: WALL_THICKNESS, height: 1.000, bottomY: 0 },
+  { start: [mbLeft + 0.510, babyTopWallZ - 0.847 - 0.486], end: [mbLeft + 0.510 + 1.300, babyTopWallZ - 0.847 - 0.486], thickness: WALL_THICKNESS, height: 1.000, bottomY: 0, isBalcony: true },
   // 창문 위 (500mm)
-  { start: [mbLeft + 0.510, babyTopWallZ - 0.847 - 0.486], end: [mbLeft + 0.510 + 1.300, babyTopWallZ - 0.847 - 0.486], thickness: WALL_THICKNESS, height: 0.500, bottomY: 1.700 },
+  { start: [mbLeft + 0.510, babyTopWallZ - 0.847 - 0.486], end: [mbLeft + 0.510 + 1.300, babyTopWallZ - 0.847 - 0.486], thickness: WALL_THICKNESS, height: 0.500, bottomY: 1.700, isBalcony: true },
 
-  // 아기방 우측에서 위로 1119mm — 도어로 분할
-  // 하단 (babyTopWallZ ~ 도어 시작): (1119-900)/2 = 109.5mm
-  { start: [babyRightWallX, babyTopWallZ], end: [babyRightWallX, babyTopWallZ - 0.1095], thickness: WALL_THICKNESS },
-  // 상단 (도어 끝 ~ 1119mm): 109.5mm
-  { start: [babyRightWallX, babyTopWallZ - 1.0095], end: [babyRightWallX, babyTopWallZ - 1.119], thickness: WALL_THICKNESS },
-  // 끝점에서 좌측으로 1217mm
-  { start: [babyRightWallX, babyTopWallZ - 1.119], end: [babyRightWallX - 1.217, babyTopWallZ - 1.119], thickness: WALL_THICKNESS },
-  // 919벽 위로 770mm 연장
-  { start: [babyRightWallX, babyTopWallZ - 1.119], end: [babyRightWallX, babyTopWallZ - 1.119 - 0.770], thickness: WALL_THICKNESS },
+  // 아기방 우측에서 위로 1119mm — 도어로 분할 (2장 분리: 서=세탁실 탄성코트, 동=아기방 실크)
+  // 하단 — 서면 (세탁실)
+  { start: [babyRightWallX - T2 / 2, babyTopWallZ], end: [babyRightWallX - T2 / 2, babyTopWallZ - 0.1095], thickness: T2, isBalcony: true },
+  // 하단 — 동면 (아기방)
+  { start: [babyRightWallX + T2 / 2, babyTopWallZ], end: [babyRightWallX + T2 / 2, babyTopWallZ - 0.1095], thickness: T2 },
+  // 상단 — 서면 (세탁실)
+  { start: [babyRightWallX - T2 / 2, babyTopWallZ - 1.0095], end: [babyRightWallX - T2 / 2, babyTopWallZ - 1.119], thickness: T2, isBalcony: true },
+  // 상단 — 동면 (아기방)
+  { start: [babyRightWallX + T2 / 2, babyTopWallZ - 1.0095], end: [babyRightWallX + T2 / 2, babyTopWallZ - 1.119], thickness: T2 },
+  // 끝점에서 좌측으로 1217mm (탄성코트)
+  { start: [babyRightWallX, babyTopWallZ - 1.119], end: [babyRightWallX - 1.217, babyTopWallZ - 1.119], thickness: WALL_THICKNESS, isBalcony: true },
+  // 919벽 위로 770mm 연장 (2장 분리: 서=세탁실 탄성코트, 동=주방 실크)
+  // 서면 (세탁실)
+  { start: [babyRightWallX - T2 / 2, babyTopWallZ - 1.119], end: [babyRightWallX - T2 / 2, babyTopWallZ - 1.119 - 0.770], thickness: T2, isBalcony: true },
+  // 동면 (주방)
+  { start: [babyRightWallX + T2 / 2, babyTopWallZ - 1.119], end: [babyRightWallX + T2 / 2, babyTopWallZ - 1.119 - 0.770], thickness: T2 },
   // 2500mm 벽 — 창문으로 분할 (2300 내측 왼쪽부터 600mm, 폭 1500mm)
   // 좌측 벽 (전체 높이)
   { start: [babyRightWallX, babyTopWallZ - 1.119 - 0.770], end: [babyRightWallX + T2 + 1.000, babyTopWallZ - 1.119 - 0.770], thickness: WALL_THICKNESS },
@@ -228,8 +252,8 @@ export const walls: Wall[] = [
   { start: [babyRightWallX + 2.555 + T2 + 0.236, babyTopWallZ - 1.119 - 0.770 + 0.795], end: [babyRightWallX + 2.555 + T2 + 0.236 + 1.996, babyTopWallZ - 1.119 - 0.770 + 0.795], thickness: WALL_THICKNESS, height: 1.000, bottomY: 0, isBalcony: true },
   // 창문 위 (200mm)
   { start: [babyRightWallX + 2.555 + T2 + 0.236, babyTopWallZ - 1.119 - 0.770 + 0.795], end: [babyRightWallX + 2.555 + T2 + 0.236 + 1.996, babyTopWallZ - 1.119 - 0.770 + 0.795], thickness: WALL_THICKNESS, height: 0.200, bottomY: 2.000, isBalcony: true },
-  // 695벽 끝에서 아래로 1418mm (좌측, 주방/작업실베란다 공유벽 → 실크벽지)
-  { start: [babyRightWallX + 2.500, babyTopWallZ - 1.119 - 0.770 + 0.795], end: [babyRightWallX + 2.500, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418], thickness: WALL_THICKNESS },
+  // 695벽 끝에서 아래로 1418mm (좌측, 주방/작업실베란다 공유벽)
+  { start: [babyRightWallX + 2.500, babyTopWallZ - 1.119 - 0.770 + 0.795], end: [babyRightWallX + 2.500, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418], thickness: WALL_THICKNESS, isBalcony: true },
   // 2673벽 끝에서 아래로 1418mm (우측)
   { start: [babyRightWallX + 2.500 + 2.673, babyTopWallZ - 1.119 - 0.770 + 0.795], end: [babyRightWallX + 2.500 + 2.673, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418], thickness: WALL_THICKNESS, isBalcony: true },
   // 우측 1418벽 끝에서 아래로 429mm (329 내측, 작업실 공유벽 → 실크벽지)
@@ -238,17 +262,23 @@ export const walls: Wall[] = [
   { start: [babyRightWallX + 2.500 + 2.673 - 0.1, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 + 0.429 - 0.1], end: [LR_W + T2, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 + 0.429 - 0.1], thickness: WALL_THICKNESS },
   // 현관 상단벽 ~ 방금 벽 수직 연결
   { start: [LR_W + T2, -T2 - 1.591], end: [LR_W + T2, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 + 0.429 - 0.1], thickness: WALL_THICKNESS },
-  // 1418끼리 하단 연결 — 창문으로 분할 (작업실 왼쪽 내측 236mm, 폭 1996mm, 높이 2000mm)
-  // 좌측 벽 (전체 높이)
-  { start: [babyRightWallX + 2.500, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418], end: [babyRightWallX + 2.555 + T2 + 0.236, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418], thickness: WALL_THICKNESS },
-  // 우측 벽 (전체 높이)
-  { start: [babyRightWallX + 2.555 + T2 + 0.236 + 1.996, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418], end: [babyRightWallX + 2.500 + 2.673, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418], thickness: WALL_THICKNESS },
-  // 창문 위 (200mm, y=2000~2200)
-  { start: [babyRightWallX + 2.555 + T2 + 0.236, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418], end: [babyRightWallX + 2.555 + T2 + 0.236 + 1.996, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418], thickness: WALL_THICKNESS, height: 0.200, bottomY: 2.000 },
+  // 1418끼리 하단 연결 — 창문으로 분할 (2장 분리: 북=베란다 스터코, 남=작업실 실크)
+  // 좌측 벽 — 북면 (베란다)
+  { start: [babyRightWallX + 2.500, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 - T2 / 2], end: [babyRightWallX + 2.555 + T2 + 0.236, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 - T2 / 2], thickness: T2, isBalcony: true },
+  // 좌측 벽 — 남면 (작업실)
+  { start: [babyRightWallX + 2.500, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 + T2 / 2], end: [babyRightWallX + 2.555 + T2 + 0.236, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 + T2 / 2], thickness: T2 },
+  // 우측 벽 — 북면 (베란다)
+  { start: [babyRightWallX + 2.555 + T2 + 0.236 + 1.996, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 - T2 / 2], end: [babyRightWallX + 2.500 + 2.673, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 - T2 / 2], thickness: T2, isBalcony: true },
+  // 우측 벽 — 남면 (작업실)
+  { start: [babyRightWallX + 2.555 + T2 + 0.236 + 1.996, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 + T2 / 2], end: [babyRightWallX + 2.500 + 2.673, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 + T2 / 2], thickness: T2 },
+  // 창문 위 — 북면 (베란다)
+  { start: [babyRightWallX + 2.555 + T2 + 0.236, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 - T2 / 2], end: [babyRightWallX + 2.555 + T2 + 0.236 + 1.996, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 - T2 / 2], thickness: T2, height: 0.200, bottomY: 2.000, isBalcony: true },
+  // 창문 위 — 남면 (작업실)
+  { start: [babyRightWallX + 2.555 + T2 + 0.236, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 + T2 / 2], end: [babyRightWallX + 2.555 + T2 + 0.236 + 1.996, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 + T2 / 2], thickness: T2, height: 0.200, bottomY: 2.000 },
 
-  // 세탁실 연결벽 — 좌측 끝에서 우측 끝으로 (+100mm 우측)
-  { start: [mbLeft - T2 + 0.473 + 1.774, babyTopWallZ - 0.847 - 0.486], end: [babyRightWallX - 1.217 + 0.1, babyTopWallZ - 0.847 - 0.486], thickness: WALL_THICKNESS },
-  { start: [babyRightWallX - 1.217 + 0.1, babyTopWallZ - 0.847 - 0.486], end: [babyRightWallX - 1.217 + 0.1, babyTopWallZ - 1.119], thickness: WALL_THICKNESS },
+  // 세탁실 연결벽 — 좌측 끝에서 우측 끝으로 (+100mm 우측) (탄성코트)
+  { start: [mbLeft - T2 + 0.473 + 1.774, babyTopWallZ - 0.847 - 0.486], end: [babyRightWallX - 1.217 + 0.1, babyTopWallZ - 0.847 - 0.486], thickness: WALL_THICKNESS, isBalcony: true },
+  { start: [babyRightWallX - 1.217 + 0.1, babyTopWallZ - 0.847 - 0.486], end: [babyRightWallX - 1.217 + 0.1, babyTopWallZ - 1.119], thickness: WALL_THICKNESS, isBalcony: true },
 
   // 메인베란다 좌측벽
   { start: [mbLeft - T2, LR_D + T2], end: [mbLeft - T2, verandaWallEnd], thickness: WALL_THICKNESS, isBalcony: true },
@@ -280,13 +310,19 @@ export const walls: Wall[] = [
   { start: [LR_W - 1.481 - 0.800, -T2], end: [LR_W - 1.481, -T2], thickness: WALL_THICKNESS },
   // 현관/거실 맞닿는 벽 1481mm (바닥까지)
   { start: [LR_W - 1.481, -T2], end: [LR_W + T2, -T2], thickness: WALL_THICKNESS },
-  // 거실 하단 — 창문으로 분할 (왼쪽 내측 870mm, 폭 2000mm, 높이 2000mm)
-  // 좌측 벽 (전체 높이)
-  { start: [-T2, LR_D + T2], end: [0.870, LR_D + T2], thickness: WALL_THICKNESS },
-  // 우측 벽 (전체 높이)
-  { start: [0.870 + 2.000, LR_D + T2], end: [LR_W + T2, LR_D + T2], thickness: WALL_THICKNESS },
-  // 창문 위 (200mm, y=2000~2200)
-  { start: [0.870, LR_D + T2], end: [0.870 + 2.000, LR_D + T2], thickness: WALL_THICKNESS, height: 0.200, bottomY: 2.000 },
+  // 거실 하단 — 창문으로 분할 (2장 분리: 남=베란다, 북=실크)
+  // 좌측 벽 — 남면 (베란다)
+  { start: [-T2, LR_D + T2 + T2 / 2], end: [0.870, LR_D + T2 + T2 / 2], thickness: T2, isBalcony: true },
+  // 좌측 벽 — 북면 (실크)
+  { start: [-T2, LR_D + T2 - T2 / 2], end: [0.870, LR_D + T2 - T2 / 2], thickness: T2 },
+  // 우측 벽 — 남면 (베란다)
+  { start: [0.870 + 2.000, LR_D + T2 + T2 / 2], end: [LR_W + T2, LR_D + T2 + T2 / 2], thickness: T2, isBalcony: true },
+  // 우측 벽 — 북면 (실크)
+  { start: [0.870 + 2.000, LR_D + T2 - T2 / 2], end: [LR_W + T2, LR_D + T2 - T2 / 2], thickness: T2 },
+  // 창문 위 — 남면 (베란다)
+  { start: [0.870, LR_D + T2 + T2 / 2], end: [0.870 + 2.000, LR_D + T2 + T2 / 2], thickness: T2, height: 0.200, bottomY: 2.000, isBalcony: true },
+  // 창문 위 — 북면 (실크)
+  { start: [0.870, LR_D + T2 - T2 / 2], end: [0.870 + 2.000, LR_D + T2 - T2 / 2], thickness: T2, height: 0.200, bottomY: 2.000 },
   // 거실 우측벽
   { start: [LR_W + T2, -T2], end: [LR_W + T2, LR_D + T2], thickness: WALL_THICKNESS },
   // 거실 우측벽 위로 1591mm — 문으로 3분할
@@ -310,8 +346,9 @@ export const walls: Wall[] = [
   { start: [bath2RightWallX, babyBottom - 0.22 - 0.9], end: [bath2RightWallX, babyBottom - 0.22], thickness: WALL_THICKNESS, height: 0.1, bottomY: 2.1 },
   // 메인욕실 문
   { start: [bath2RightWallX, -WALL_THICKNESS - 0.1 - 0.9], end: [bath2RightWallX, -WALL_THICKNESS - 0.1], thickness: WALL_THICKNESS, height: 0.1, bottomY: 2.1 },
-  // 세탁실 문
-  { start: [babyRightWallX, babyTopWallZ - 0.1095], end: [babyRightWallX, babyTopWallZ - 1.0095], thickness: WALL_THICKNESS, height: 0.1, bottomY: 2.1 },
+  // 세탁실 문 상단 (2장 분리: 서=세탁실 탄성코트, 동=아기방 실크)
+  { start: [babyRightWallX - T2 / 2, babyTopWallZ - 0.1095], end: [babyRightWallX - T2 / 2, babyTopWallZ - 1.0095], thickness: T2, height: 0.1, bottomY: 2.1, isBalcony: true },
+  { start: [babyRightWallX + T2 / 2, babyTopWallZ - 0.1095], end: [babyRightWallX + T2 / 2, babyTopWallZ - 1.0095], thickness: T2, height: 0.1, bottomY: 2.1 },
   // 현관문
   { start: [LR_W + T2, -T2 - T2 - 0.410], end: [LR_W + T2, -T2 - T2 - 0.410 - 0.900], thickness: WALL_THICKNESS, height: 0.1, bottomY: 2.1 },
   // 복도 상단벽 문
@@ -472,7 +509,7 @@ export const windows: Opening[] = [
     axis: 'x',
     type: 'window',
   },
-  // 작업실/작업실베란다 사이 창문 (1996mm 폭, 2000mm 높이, 바닥에서 0mm)
+  // 작업실/작업실베란다 사이 창문 (1996mm 폭, 2000mm 높이, 바닥에서 0mm) — 2중창
   {
     position: [babyRightWallX + 2.555 + T2 + 0.236 + 0.998, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418],
     width: 1.996,
@@ -480,6 +517,7 @@ export const windows: Opening[] = [
     sillHeight: 0,
     axis: 'x',
     type: 'window',
+    double: true,
   },
   // 거실 하단 창문 (2000mm 폭, 2000mm 높이, 바닥에서 0mm)
   {
@@ -551,7 +589,8 @@ export interface Closet {
     endDoor: number                    // 끝 문짝 인덱스 (exclusive)
   }
   handleFlipDoors?: number[]           // 손잡이 반대방향 문짝 인덱스
-  doorGroups?: Array<{ doorId: import('../data/sectors').DoorId, doors: number[], flipHinge?: boolean, shelfYs?: number[] }>
+  dividerDepth?: number  // 칸막이 깊이 오버라이드
+  doorGroups?: Array<{ doorId: import('../data/sectors').DoorId, doors: number[], flipHinge?: boolean, shelfYs?: number[], sliding?: boolean, slideDir?: number }>
 }
 
 export const closets: Closet[] = [
@@ -585,12 +624,15 @@ export const closets: Closet[] = [
   // 아기방 좌측 벽 수납장 (2563 × 450, 각 150mm 축소)
   {
     name: '수납장',
-    position: [babyLeft + 0.225, (WALL_HEIGHT - 0.050) / 2, (babyBottom + babyTop) / 2],
-    size: [0.450, WALL_HEIGHT - 0.050, BABY_INNER_D - 0.150],
+    position: [babyLeft + 0.250, (WALL_HEIGHT - 0.050) / 2, (babyBottom + babyTop) / 2],
+    size: [0.500, WALL_HEIGHT - 0.050, BABY_INNER_D - 0.150],
     color: '#8B6914',
+    dividerDepth: 0.460,
     doorGroups: [
-      { doorId: 'closet-baby-0', doors: [0, 1] },
-      { doorId: 'closet-baby-1', doors: [2, 3] },
+      { doorId: 'closet-baby-0', doors: [0], sliding: true, slideDir: 1 },   // 남→북 슬라이딩
+      { doorId: 'closet-baby-1', doors: [1], sliding: true, slideDir: -1 },  // 북→남 슬라이딩
+      { doorId: 'closet-baby-2', doors: [2], sliding: true, slideDir: 1 },   // 남→북
+      { doorId: 'closet-baby-3', doors: [3], sliding: true, slideDir: -1 },  // 북→남
     ],
   },
 ]
