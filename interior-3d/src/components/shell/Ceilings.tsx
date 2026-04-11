@@ -60,9 +60,40 @@ function MergedCeilings() {
     const sTex = stuccoTex.clone()
     sTex.wrapS = THREE.RepeatWrapping
     sTex.wrapT = THREE.RepeatWrapping
-    sTex.repeat.set(4, 4)
+    sTex.repeat.set(5, 5)
     sTex.colorSpace = THREE.SRGBColorSpace
     const stuccoMat = new THREE.MeshStandardMaterial({ map: sTex, roughness: 0.85, metalness: 0, side: THREE.BackSide })
+    stuccoMat.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <common>',
+        `#include <common>
+        float stuccoHash(vec2 p) {
+          p = fract(p * vec2(123.34, 456.21));
+          p += dot(p, p + 45.32);
+          return fract(p.x * p.y);
+        }
+        `
+      )
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <map_fragment>',
+        `
+        #ifdef USE_MAP
+          vec2 uv0 = vMapUv;
+          vec2 tile = floor(uv0);
+          float h = stuccoHash(tile);
+          vec2 uvA = uv0 + vec2(h, fract(h * 17.3)) * 0.5;
+          vec4 s1 = texture2D(map, uvA);
+          vec4 s2 = texture2D(map, uv0 * 1.73 + 0.31);
+          vec4 s3 = texture2D(map, uv0 * 0.57 + 0.67);
+          vec2 f = fract(uv0);
+          vec2 w = smoothstep(0.0, 0.15, f) * smoothstep(0.0, 0.15, 1.0 - f);
+          float edgeMix = 1.0 - w.x * w.y;
+          vec4 sampledDiffuseColor = mix(s1, mix(s2, s3, 0.5), edgeMix * 0.6);
+          diffuseColor *= sampledDiffuseColor;
+        #endif
+        `
+      )
+    }
 
     return { normalGeo, stuccoGeo, stuccoMat }
   }, [stuccoTex])
