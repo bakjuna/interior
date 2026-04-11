@@ -157,8 +157,8 @@ export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) 
                             )
                           })()}
                           {(g.shelfYs ?? [bodyH / 2]).map((sy, si) => (
-                            <mesh key={`shelf-${si}`} position={[c.position[0], sy, gCZ]}>
-                              <boxGeometry args={[shortSide, shelfT, gLen - bpT]} />
+                            <mesh key={`shelf-${si}`} position={[interiorCX, sy, gCZ]}>
+                              <boxGeometry args={[interiorDepth, shelfT, gLen - bpT]} />
                               <meshStandardMaterial color="#fff" roughness={0.6} />
                             </mesh>
                           ))}

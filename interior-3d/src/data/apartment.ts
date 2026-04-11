@@ -630,7 +630,7 @@ export const closets: Closet[] = [
     position: [babyLeft + 0.250, (WALL_HEIGHT - 0.050) / 2, (babyBottom + babyTop) / 2],
     size: [0.500, WALL_HEIGHT - 0.050, BABY_INNER_D - 0.150],
     color: '#8B6914',
-    dividerDepth: 0.460,
+    dividerDepth: 0.420,
     doorGroups: [
       { doorId: 'closet-baby-0', doors: [0], sliding: true, slideDir: 1 },   // 남→북 슬라이딩
       { doorId: 'closet-baby-1', doors: [1], sliding: true, slideDir: -1 },  // 북→남 슬라이딩
