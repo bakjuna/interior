@@ -122,6 +122,9 @@ export const rooms: Room[] = [
   { name: '맹지', center: [(mbBathLeft + mbBathRight) / 2, (mbBathBottom + bath2Bottom) / 2], size: [mbBathInnerW, Math.abs(bath2Bottom - mbBathBottom)], color: '#999', hatched: true } as Room & { hatched: boolean },
   { name: '안방', center: [mbLeft + MB_W / 2, (-WALL_THICKNESS + LR_D) / 2], size: [MB_W, LR_D + WALL_THICKNESS], color: '#dce8d4' },
   { name: '거실', center: [LR_W / 2, (-WALL_THICKNESS + LR_D) / 2], size: [LR_W, LR_D + WALL_THICKNESS], color: '#f5e6d3' },
+  // 거실~베란다 사이 벽 바닥 (벽 분리 시 갭 메꿈) — 북반=마루, 남반=타일
+  { name: '', center: [LR_W / 2, LR_D + T2 / 2], size: [LR_W, T2], color: '#f5e6d3' },
+  { name: '', center: [LR_W / 2, LR_D + T2 + T2 / 2], size: [LR_W, T2], color: '#e0e0e0', floorTile: 'porcelain' as const, tileSize: 0.3 },
   // 메인베란다 3분할
   { name: '새장', center: [(mbLeft + mbLeft + 1.340) / 2, (verandaTop + verandaBottom) / 2], size: [1.340, VERANDA_INNER_D], color: '#d4e8d4', floorTile: 'porcelain' as const, tileSize: 0.3 },
   { name: '메인베란다', center: [(mbLeft + 1.340 + 0.870 + 2.000) / 2, (verandaTop + verandaBottom) / 2], size: [0.870 + 2.000 - (mbLeft + 1.340), VERANDA_INNER_D], color: '#e0e0e0', floorTile: 'porcelain' as const, tileSize: 0.3 },

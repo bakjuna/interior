@@ -911,9 +911,9 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
               const pair1ZStart = groupZStart + pairDoorW * 2
               return (
                 <>
-                  {/* 뒷판 (벽에서 20mm 띄움) */}
+                  {/* 뒷판 (벽에서 20mm 띄움, 높이 5mm 축소 z-fighting 방지) */}
                   <mesh position={[backX + 0.07, cabCenterY, outerCenterZ]}>
-                    <boxGeometry args={[bpT, cabH, groupLen]} />
+                    <boxGeometry args={[bpT, cabH - 0.005, groupLen]} />
                     <meshStandardMaterial color="#fff" roughness={0.6} />
                   </mesh>
                   {/* 상판 */}

@@ -327,9 +327,9 @@ function VanityMirrorCabinet({
   return (
     <group>
       {/* 캐비닛 본체 — 뒷판, 상/하판, 좌/우측면 */}
-      {/* 뒷판 */}
+      {/* 뒷판 (높이 5mm 축소 z-fighting 방지) */}
       <mesh position={[cabBackX, cabCY, vanityZ]}>
-        <boxGeometry args={[panelT, cabH, cabW]} />
+        <boxGeometry args={[panelT, cabH - 0.005, cabW]} />
         <meshStandardMaterial color="#e8dcc0" roughness={0.5} />
       </mesh>
       {/* 상판 */}
