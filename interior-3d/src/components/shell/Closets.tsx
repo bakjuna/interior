@@ -96,9 +96,9 @@ export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) 
 
                 return (
                   <>
-                    {/* 뒷판 */}
-                    <mesh position={[backX, c.position[1], c.position[2]]}>
-                      <boxGeometry args={[bpT, bodyH, longSide]} />
+                    {/* 뒷판 (북쪽 5mm 축소 z-fighting 방지) */}
+                    <mesh position={[backX, c.position[1], c.position[2] + 0.0025]}>
+                      <boxGeometry args={[bpT, bodyH, longSide - 0.005]} />
                       <meshStandardMaterial color="#fff" roughness={0.6} />
                     </mesh>
                     {/* 상판 */}
@@ -138,27 +138,27 @@ export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) 
                               const upperH = bodyH - upperStart
                               return (
                                 <>
-                                  <mesh position={[interiorCX, lowerH / 2, gZStart]}>
-                                    <boxGeometry args={[interiorDepth, lowerH, bpT]} />
+                                  <mesh position={[c.position[0], lowerH / 2, gZStart]}>
+                                    <boxGeometry args={[shortSide, lowerH, bpT]} />
                                     <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                                   </mesh>
-                                  <mesh position={[interiorCX, upperStart + upperH / 2, gZStart]}>
-                                    <boxGeometry args={[interiorDepth, upperH, bpT]} />
+                                  <mesh position={[c.position[0], upperStart + upperH / 2, gZStart]}>
+                                    <boxGeometry args={[shortSide, upperH, bpT]} />
                                     <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                                   </mesh>
                                 </>
                               )
                             }
                             return (
-                              <mesh position={[interiorCX, c.position[1], gZStart]}>
-                                <boxGeometry args={[interiorDepth, bodyH - bpT * 2, bpT]} />
+                              <mesh position={[c.position[0], c.position[1], gZStart]}>
+                                <boxGeometry args={[shortSide, bodyH - bpT * 2, bpT]} />
                                 <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                               </mesh>
                             )
                           })()}
                           {(g.shelfYs ?? [bodyH / 2]).map((sy, si) => (
-                            <mesh key={`shelf-${si}`} position={[interiorCX, sy, gCZ]}>
-                              <boxGeometry args={[interiorDepth - 0.030, shelfT, gLen - bpT * 2]} />
+                            <mesh key={`shelf-${si}`} position={[c.position[0], sy, gCZ]}>
+                              <boxGeometry args={[shortSide, shelfT, gLen - bpT]} />
                               <meshStandardMaterial color="#fff" roughness={0.6} />
                             </mesh>
                           ))}
