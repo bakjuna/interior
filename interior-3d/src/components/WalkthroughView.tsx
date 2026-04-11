@@ -42,7 +42,7 @@ function resolveKey(key: string): string {
 }
 
 const MOVE_SPEED = 3.0
-const MOVE_SPEED_MOBILE = 3.2
+const MOVE_SPEED_MOBILE = 1.5
 const MOUSE_SENSITIVITY = 0.002
 const TOUCH_SENSITIVITY = 0.0035
 
@@ -112,6 +112,13 @@ function SplashScreen({ label, progress }: { label: string; progress: number }) 
       <div style={{ fontSize: 12, opacity: 0.7 }}>{label}</div>
     </div>
   )
+}
+
+/** 상태 변경 시 R3F invalidate — 모바일에서 버튼 액션 후 리렌더 보장 */
+function Invalidator({ deps }: { deps: string }) {
+  const { invalidate } = useThree()
+  useEffect(() => { invalidate() }, [deps, invalidate])
+  return null
 }
 
 /** FPS 업데이터 — Canvas 내부에서 useFrame 으로 외부 DOM 엘리먼트 직접 업데이트 */
@@ -638,6 +645,7 @@ export function WalkthroughView() {
           <FPSController bindings={bindings} height={height} isMobile={isMobile} doorOpenStatesRef={doorOpenStatesRef} onMove={handleMove} onHeightChange={setHeight} onActiveDoorChange={handleActiveDoorChange} />
         )}
         <Prewarm index={prewarmIndex} active={isPrewarming} onAdvance={advancePrewarm} />
+        <Invalidator deps={`${isNight}|${allLightsOn}|${mirrorEnabled}|${activeDoorId}`} />
         <FPSUpdater domRef={fpsRef} />
       </Canvas>
       {!isMobile && (
