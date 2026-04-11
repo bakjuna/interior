@@ -114,9 +114,14 @@ function SplashScreen({ label, progress }: { label: string; progress: number }) 
   )
 }
 
+/** Canvas 밖에서 호출 가능한 전역 invalidate */
+const globalInvalidateRef: { current: (() => void) | null } = { current: null }
+export function globalInvalidate() { globalInvalidateRef.current?.() }
+
 /** 상태 변경 시 R3F invalidate — 모바일에서 버튼 액션 후 리렌더 보장 */
 function Invalidator({ deps }: { deps: string }) {
   const { invalidate } = useThree()
+  globalInvalidateRef.current = invalidate
   useEffect(() => { invalidate() }, [deps, invalidate])
   return null
 }
@@ -748,13 +753,14 @@ export function WalkthroughView() {
           <MobileControls
             isNight={isNight}
             allLightsOn={allLightsOn}
-            onToggleNight={() => setIsNight((n) => !n)}
-            onToggleAllLights={() => setAllLightsOn((v) => (isNight ? !v : false))}
+            onToggleNight={() => { setIsNight((n) => !n); globalInvalidate() }}
+            onToggleAllLights={() => { setAllLightsOn((v) => (isNight ? !v : false)); globalInvalidate() }}
             onOpenDoor={() => {
               const id = activeDoorIdRef.current
               if (id) doorRegistry.get(id)?.toggle()
+              globalInvalidate()
             }}
-            onToggleMirror={() => mirrorState.toggle()}
+            onToggleMirror={() => { mirrorState.toggle(); globalInvalidate() }}
             mirrorEnabled={mirrorEnabled}
             holdProps={holdProps}
           />
@@ -804,6 +810,9 @@ function MobileControls({
     minWidth: 64,
     height: 44,
     padding: '0 14px',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    WebkitTouchCallout: 'none',
     borderRadius: 10,
     border: '1px solid rgba(255,255,255,0.25)',
     background: 'rgba(22, 33, 62, 0.85)',
