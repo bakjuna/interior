@@ -109,6 +109,25 @@ export type DoorId =
   | 'mb-bath-mirror-r'            // 안방욕실 거울장 우
   | 'mb-vanity'                   // 화장대 서랍장
   | 'mb-vanity-mirror'            // 화장대 거울 도어
+  | 'mb-bookshelf-lower'          // 하버드 책장 하단 양개 간살 도어
+  | 'mb-nightstand'               // 침대 북쪽 협탁 서랍
+  | 'lr-curtain'                  // 거실 2단 커튼 (쉬어/암막)
+  | 'mb-curtain'                  // 안방 2단 커튼 (쉬어/암막)
+  | 'mv-cabinet'                  // 메인베란다 흰색 양개 캐비닛
+  | 'baby-blind'                  // 아기방 원목 블라인드
+  | 'work-blind'                  // 작업실 원목 블라인드
+  | 'kitchen-chair-nl'            // 주방 의자 북측 좌
+  | 'kitchen-chair-nr'            // 주방 의자 북측 우
+  | 'kitchen-chair-sl'            // 주방 의자 남측 좌
+  | 'kitchen-chair-sr'            // 주방 의자 남측 우
+  | 'fridge-tl'                   // 4도어 냉장고 상단 좌 (냉장)
+  | 'fridge-tr'                   // 4도어 냉장고 상단 우 (냉장)
+  | 'fridge-bl'                   // 4도어 냉장고 하단 좌 (냉동)
+  | 'fridge-br'                   // 4도어 냉장고 하단 우 (냉동)
+  | 'kimchi-tl'                   // 김치냉장고 상단 좌
+  | 'kimchi-tr'                   // 김치냉장고 상단 우
+  | 'kimchi-drawer-mid'           // 김치냉장고 중단 서랍
+  | 'kimchi-drawer-bot'           // 김치냉장고 하단 서랍
 
 export interface SectorAABB {
   sector: SectorId

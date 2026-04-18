@@ -61,6 +61,17 @@ const doorNames: Record<string, string> = {
   'outdoor-mainVeranda': '실외기실 문',
   'mb-vanity': '화장대 서랍장',
   'mb-vanity-mirror': '화장대 거울',
+  'mb-bookshelf-lower': '책장 하단장',
+  'mb-nightstand': '협탁 서랍',
+  'mv-cabinet': '베란다 선반 캐비닛',
+  'fridge-tl': '냉장실 좌',
+  'fridge-tr': '냉장실 우',
+  'fridge-bl': '냉동실 좌',
+  'fridge-br': '냉동실 우',
+  'kimchi-tl': '김치냉장고 상 좌',
+  'kimchi-tr': '김치냉장고 상 우',
+  'kimchi-drawer-mid': '김치냉장고 중단 서랍',
+  'kimchi-drawer-bot': '김치냉장고 하단 서랍',
 }
 
 export function getDoorLabel(doorId: string | undefined, isOpen: boolean): string {

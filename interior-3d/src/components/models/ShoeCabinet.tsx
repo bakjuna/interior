@@ -18,7 +18,7 @@ import { LR_W, WALL_THICKNESS } from '../../data/apartment'
 import type { DoorId } from '../../data/sectors'
 import { doorRegistry } from '../../systems/doorRegistry'
 import { useKTX2 } from '../../systems/useKTX2'
-import { mirrorState, useMirrorEnabled } from '../../systems/mirrorToggle'
+import { useMirrorActive, makeNonRecursiveReflector, isReflectorVisible } from '../../systems/mirrorToggle'
 
 const T2 = WALL_THICKNESS / 2
 
@@ -72,23 +72,21 @@ export function ShoeCabinet({ active, activeDoorId, playerPos }: ShoeCabinetProp
   // Reflector 거울 — 실제 씬 반사
   const reflectorObj = useMemo(() => {
     const geo = new THREE.PlaneGeometry(colW - 0.03, cabH - 0.03)
-    return new Reflector(geo, {
-      textureWidth: 256,
+    return makeNonRecursiveReflector(new Reflector(geo, {
+      textureWidth: 512,
       textureHeight: 512,
       color: 0xc8ccd0,
       clipBias: 0.003,
-    })
+    }))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const mirrorOn = useMirrorEnabled()
-  const nearMirror = !!playerPos && (
-    Math.hypot(playerPos[0] - (xLeft + colW / 2), playerPos[1] - zFront) < 2
-  )
-  const showReflector = nearMirror && mirrorOn
-  useEffect(() => {
-    reflectorObj.visible = showReflector
-  }, [showReflector, reflectorObj])
+  const sectorActive = useMirrorActive('shoeCabinet', playerPos)
+  const showReflector = sectorActive
+  useFrame(({ camera }) => {
+    const v = sectorActive && isReflectorVisible(reflectorObj, camera)
+    if (reflectorObj.visible !== v) reflectorObj.visible = v
+  })
 
   // ——— 인터랙티브 도어 상태 ———
   const [mirrorOpen, setMirrorOpen] = useState(false)

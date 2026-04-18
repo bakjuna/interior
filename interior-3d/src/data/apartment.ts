@@ -127,10 +127,10 @@ export const rooms: Room[] = [
   { name: '', center: [LR_W / 2, LR_D + T2 + T2 / 2], size: [LR_W, T2], color: '#e0e0e0', floorTile: 'porcelain' as const, tileSize: 0.3 },
   // 메인베란다 3분할
   { name: '새장', center: [(mbLeft + mbLeft + 1.340) / 2, (verandaTop + verandaBottom) / 2], size: [1.340, VERANDA_INNER_D], color: '#d4e8d4', floorTile: 'porcelain' as const, tileSize: 0.3 },
-  { name: '메인베란다', center: [(mbLeft + 1.340 + 0.870 + 2.000) / 2, (verandaTop + verandaBottom) / 2], size: [0.870 + 2.000 - (mbLeft + 1.340), VERANDA_INNER_D], color: '#e0e0e0', floorTile: 'porcelain' as const, tileSize: 0.3 },
+  { name: '메인베란다', center: [(mbLeft + 1.340 + 0.870 + 2.000) / 2, (verandaTop + verandaBottom) / 2], size: [0.870 + 2.000 - (mbLeft + 1.340), VERANDA_INNER_D], color: '#e0e0e0', floorTile: 'entrance', tileSize: 0.3 },
   { name: '실외기실', center: [(0.870 + 2.000 + LR_W) / 2, (verandaTop + verandaBottom) / 2], size: [LR_W - (0.870 + 2.000), VERANDA_INNER_D], color: '#d4d4e0', floorTile: 'porcelain' as const, tileSize: 0.3 },
   // 작업실베란다
-  { name: '작업실베란다', center: [babyRightWallX + 2.500 + 2.673 / 2, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 / 2], size: [2.673, 1.418], color: '#e0e0e0', floorY: -0.002, floorTile: 'porcelain' as const, tileSize: 0.3 },
+  { name: '작업실베란다', center: [babyRightWallX + 2.500 + 2.673 / 2, babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418 / 2], size: [2.673, 1.418], color: '#e0e0e0', floorY: -0.002, floorTile: 'entrance', tileSize: 0.3 },
   // 현관 (복도까지 확장)
   { name: '현관', center: [(LR_W - 1.481 + LR_W + T2) / 2, -T2 - 1.591 / 2], size: [1.481 + T2, 1.591], color: '#d4c4a8', floorY: -0.03, floorTile: 'entrance', tileSize: 0.3 },
   // 작업실 (위로 329mm 확장, 아래 200mm 확장)
@@ -597,12 +597,12 @@ export interface Closet {
 }
 
 export const closets: Closet[] = [
-  // 안방 좌측 벽 붙박이장 (3066 × 550, 첫 600mm = 화장대 - 화장실 인접)
+  // 안방 좌측 벽 붙박이장 (2866 × 550, 첫 600mm = 화장대 - 화장실 인접, 남쪽 200mm 공간 남김)
   // 높이를 50mm 줄여 천장 plane 과의 z-fighting 방지
   {
     name: '붙박이장',
-    position: [mbLeft + 0.275, (WALL_HEIGHT - 0.050) / 2, (0.6 + LR_D) / 2],
-    size: [0.550, WALL_HEIGHT - 0.050, LR_D - 0.6],
+    position: [mbLeft + 0.275, (WALL_HEIGHT - 0.050) / 2, (0.6 + LR_D - 0.2) / 2],
+    size: [0.550, WALL_HEIGHT - 0.050, LR_D - 0.6 - 0.2],
     color: '#8B6914',
     doorGroups: [
       { doorId: 'closet-mb-0', doors: [0, 1] },
@@ -610,11 +610,11 @@ export const closets: Closet[] = [
       { doorId: 'closet-mb-2', doors: [4], flipHinge: true },
     ],
   },
-  // 거실 수납장 — 안방/거실 공유벽, 거실쪽 (3666 × 450)
+  // 거실 수납장 — 안방/거실 공유벽, 거실쪽 (남측 200mm 축소 — 커튼박스 soffit 와 flush)
   {
     name: '수납장',
-    position: [0 + 0.225, (WALL_HEIGHT - 0.050) / 2, LR_D / 2],
-    size: [0.450, WALL_HEIGHT - 0.050, LR_D],
+    position: [0 + 0.225, (WALL_HEIGHT - 0.050) / 2, (LR_D - 0.2) / 2],
+    size: [0.450, WALL_HEIGHT - 0.050, LR_D - 0.2],
     color: '#8B6914',
     openShelf: { bottomY: 0.84, topY: 1.34, startDoor: 1, endDoor: 5 },
     doorGroups: [
@@ -677,23 +677,18 @@ export const downlightGroups: DownlightGroup[] = [
   { bounds: { leftX: mbLeft, rightX: -WALL_THICKNESS, topZ: 0, bottomZ: LR_D },
     lights: (() => {
       // 안방 가장 좌측 컬럼: 붙박이장 문(mbLeft + 0.550)과 가벽 중심(mbLeft + 1.476)의 중간점
-      // 가벽 오른쪽 컬럼: 가벽 중심 기준 좌측 컬럼과 동일 거리로 대칭
-      // 방 우측 컬럼: 공유벽(-WALL_THICKNESS)에서 300mm 안쪽 (변경 없음)
+      // 방 우측 컬럼: 공유벽(-WALL_THICKNESS)에서 300mm 안쪽
+      // (중간 컬럼 4개 제거 — 가벽+침대 배치로 불필요)
       const closetFaceX = mbLeft + 0.550
       const partitionX = mbLeft + 1.476
       const leftColX = (closetFaceX + partitionX) / 2          // = mbLeft + 1.013
-      const rightColX = partitionX + (partitionX - leftColX)   // = mbLeft + 1.939
       const farRightColX = -WALL_THICKNESS - 0.3
-      // Z 위치는 generateDownlights와 동일한 규칙 사용
       const t1 = 0 + 0.3, t2 = 0 + 0.6
       const b1 = LR_D - 0.3, b2 = LR_D - 0.6
       return [
         // 가장 좌측 컬럼 (붙박이장 문 ↔ 가벽 중간)
         [leftColX, t1], [leftColX, t2],
         [leftColX, b1], [leftColX, b2],
-        // 가벽 오른쪽 컬럼 (가벽 중심 기준 대칭)
-        [rightColX, t1], [rightColX, t2],
-        [rightColX, b1], [rightColX, b2],
         // 방 우측(공유벽쪽) 컬럼
         [farRightColX, t1], [farRightColX, t2],
         [farRightColX, b1], [farRightColX, b2],

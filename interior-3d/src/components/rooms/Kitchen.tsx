@@ -15,6 +15,7 @@ import { LightWaveOven } from '../models/LightWaveOven'
 import { Refrigerator } from '../models/Refrigerator'
 import { KimchiFridge } from '../models/KimchiFridge'
 import { DiningTable } from '../models/DiningTable'
+import { DiningChair } from '../models/DiningChair'
 import { DoorTooltip, getDoorLabel } from '../ui/DoorTooltip'
 import { doorRegistry } from '../../systems/doorRegistry'
 import type { DoorId } from '../../data/sectors'
@@ -39,6 +40,16 @@ interface KitchenProps {
 export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: KitchenProps) {
   const closetDoorTex = useKTX2('/textures/walnut-closet-door.ktx2')
   const kitchenTileTex = useKTX2('/textures/kitchen-tile.ktx2')
+  const stoneTex = useKTX2('/textures/engineered-stone.ktx2')
+
+  const countertopTex = useMemo(() => {
+    const t = stoneTex.clone()
+    t.wrapS = THREE.RepeatWrapping
+    t.wrapT = THREE.RepeatWrapping
+    t.colorSpace = THREE.SRGBColorSpace
+    t.needsUpdate = true
+    return t
+  }, [stoneTex])
 
   // 백스플래시 타일 — 한 이미지 ≈ 1.95m × 0.9m
   // 동측 벽이 Z=-5.062 에서 X=kitRight → X=kitRight+0.055 로 5.5cm 들어가는 step 있음 (apartment.ts 231/301)
@@ -138,7 +149,7 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
         position={[lineCenterX, lightY - 0.005, lineCenterZ]}
         width={wLight}
         height={lineLen}
-        intensity={kitchenActive ? 225 : 0}
+        intensity={kitchenActive ? 158 : 0}
         color="#ffffff"
         rotation={[Math.PI / 2, 0, 0]}
       />
@@ -146,7 +157,7 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
         <pointLight
           key={`kit-pl-${i}`}
           position={[lineCenterX, WALL_HEIGHT - 0.02, lineZstart + lineLen * ((i + 0.5) / 15)]}
-          intensity={kitchenActive ? 1.0 : 0}
+          intensity={kitchenActive ? 0.7 : 0}
           distance={4.0}
           decay={1}
           color="#ffffff"
@@ -581,10 +592,10 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
               const backStripW  = (0.62 - sinkW) / 2 + ctBackExt    // 0.11 + 0.05 = 0.16
               return (
                 <>
-                  {beforeLen > 0.01 && <mesh position={[ctCenterX, topY, beforeCenterZ]}><boxGeometry args={[ctW, ctH, beforeLen]} /><meshStandardMaterial color="#e8dcc0" roughness={0.3} metalness={0.05} /></mesh>}
-                  {afterLen > 0.01 && <mesh position={[ctCenterX, topY, afterCenterZ]}><boxGeometry args={[ctW, ctH, afterLen]} /><meshStandardMaterial color="#e8dcc0" roughness={0.3} metalness={0.05} /></mesh>}
-                  <mesh position={[extCabCenterX - sinkW / 2 - frontStripW / 2, topY, sinkZ]}><boxGeometry args={[frontStripW, ctH, sinkD]} /><meshStandardMaterial color="#e8dcc0" roughness={0.3} metalness={0.05} /></mesh>
-                  <mesh position={[extCabCenterX + sinkW / 2 + backStripW / 2, topY, sinkZ]}><boxGeometry args={[backStripW, ctH, sinkD]} /><meshStandardMaterial color="#e8dcc0" roughness={0.3} metalness={0.05} /></mesh>
+                  {beforeLen > 0.01 && <mesh position={[ctCenterX, topY, beforeCenterZ]}><boxGeometry args={[ctW, ctH, beforeLen]} /><meshStandardMaterial map={countertopTex} roughness={0.3} metalness={0.05} /></mesh>}
+                  {afterLen > 0.01 && <mesh position={[ctCenterX, topY, afterCenterZ]}><boxGeometry args={[ctW, ctH, afterLen]} /><meshStandardMaterial map={countertopTex} roughness={0.3} metalness={0.05} /></mesh>}
+                  <mesh position={[extCabCenterX - sinkW / 2 - frontStripW / 2, topY, sinkZ]}><boxGeometry args={[frontStripW, ctH, sinkD]} /><meshStandardMaterial map={countertopTex} roughness={0.3} metalness={0.05} /></mesh>
+                  <mesh position={[extCabCenterX + sinkW / 2 + backStripW / 2, topY, sinkZ]}><boxGeometry args={[backStripW, ctH, sinkD]} /><meshStandardMaterial map={countertopTex} roughness={0.3} metalness={0.05} /></mesh>
                   <mesh position={[extCabCenterX, topY + 0.005, sinkZ + sinkD / 2 - rim / 2]}>
                     <boxGeometry args={[sinkW, 0.01, rim]} />
                     <meshStandardMaterial color="#ccc" metalness={0.85} roughness={0.08} />
@@ -893,8 +904,8 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
           <group>
             {/* 모델은 -X 정면으로 하드코딩 → 180° 회전 그룹으로 +X(룸 인테리어) 정면. 위치 고정. */}
             <group position={[fridgeModelX, 0, fridgeZ]} rotation={[0, Math.PI, 0]}>
-              <Refrigerator position={[0, 0.002]} />
-              <KimchiFridge frontFaceX={-fridgeD / 2} centerZ={-(f2Z - fridgeZ) - 0.002} />
+              <Refrigerator position={[0, 0.002]} activeDoorId={activeDoorId} />
+              <KimchiFridge frontFaceX={-fridgeD / 2} centerZ={-(f2Z - fridgeZ) - 0.002} activeDoorId={activeDoorId} />
             </group>
 
             {/* 빌트인 상부장 중공 본체 — 박스만 -X 120mm 시프트 */}
@@ -1205,60 +1216,6 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
         const tableCenterX = kitRight - 0.85             // 주방 X 가운데
         const tableCenterZ = extEndZ_ + 0.75 + 0.45       // 빈 공간 Z 가운데 ≈ -2.432
 
-        const woodColor = '#5a3018'
-        const cushionColor = '#1a1a1a'
-
-        // 의자 1개 렌더 — local +X = 정면, rotY 로 방향 회전
-        const renderChair = (cx: number, cz: number, rotY: number, key: string) => (
-          <group key={key} position={[cx, 0, cz]} rotation={[0, rotY, 0]}>
-            <mesh position={[0, 0.42, 0]}>
-              <boxGeometry args={[0.46, 0.04, 0.46]} />
-              <meshStandardMaterial color={woodColor} roughness={0.55} />
-            </mesh>
-            <mesh position={[0, 0.46, 0]}>
-              <boxGeometry args={[0.42, 0.05, 0.42]} />
-              <meshStandardMaterial color={cushionColor} roughness={0.85} />
-            </mesh>
-            {[
-              [-0.20, -0.20],
-              [-0.20, +0.20],
-              [+0.20, -0.20],
-              [+0.20, +0.20],
-            ].map(([lx, lz], i) => (
-              <mesh key={`leg-${i}`} position={[lx, 0.20, lz]}>
-                <boxGeometry args={[0.035, 0.40, 0.035]} />
-                <meshStandardMaterial color={woodColor} roughness={0.55} />
-              </mesh>
-            ))}
-            {[-0.20, +0.20].map((pz, i) => (
-              <mesh key={`back-post-${i}`} position={[-0.21, 0.62, pz]}>
-                <boxGeometry args={[0.035, 0.46, 0.035]} />
-                <meshStandardMaterial color={woodColor} roughness={0.55} />
-              </mesh>
-            ))}
-            <mesh position={[-0.21, 0.84, 0]}>
-              <boxGeometry args={[0.035, 0.035, 0.42]} />
-              <meshStandardMaterial color={woodColor} roughness={0.55} />
-            </mesh>
-            <mesh position={[-0.18, 0.66, 0]}>
-              <boxGeometry args={[0.06, 0.36, 0.40]} />
-              <meshStandardMaterial color={cushionColor} roughness={0.85} />
-            </mesh>
-            {[-0.20, +0.20].map((az, i) => (
-              <mesh key={`arm-${i}`} position={[-0.05, 0.62, az]}>
-                <boxGeometry args={[0.34, 0.025, 0.05]} />
-                <meshStandardMaterial color={woodColor} roughness={0.55} />
-              </mesh>
-            ))}
-            {[-0.20, +0.20].map((az, i) => (
-              <mesh key={`arm-support-${i}`} position={[+0.10, 0.53, az]}>
-                <boxGeometry args={[0.025, 0.20, 0.025]} />
-                <meshStandardMaterial color={woodColor} roughness={0.55} />
-              </mesh>
-            ))}
-          </group>
-        )
-
         // 의자 4개 — 2개 북측(+ S 향함, rot -π/2), 2개 남측(N 향함, rot +π/2)
         // 식탁 안쪽으로 200mm tucked: chair Z = tableCenterZ ± (0.45 + 0.23 - 0.20) = ±0.48
         const nChairZ = tableCenterZ - 0.48
@@ -1274,12 +1231,12 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
             <DiningTable position={[tableCenterX, tableCenterZ]} active={kitchenActive} />
 
             {/* 북측 의자 2개 (남쪽 향함, rot -π/2 → local +X = world +Z) */}
-            {renderChair(leftChairX, nChairZ, -Math.PI / 2, 'chair-n-l')}
-            {renderChair(rightChairX, nChairZ, -Math.PI / 2, 'chair-n-r')}
+            <DiningChair position={[leftChairX, nChairZ]} rotationY={-Math.PI / 2} doorId="kitchen-chair-nl" activeDoorId={activeDoorId} />
+            <DiningChair position={[rightChairX, nChairZ]} rotationY={-Math.PI / 2} doorId="kitchen-chair-nr" activeDoorId={activeDoorId} />
 
             {/* 남측 의자 2개 (북쪽 향함, rot +π/2 → local +X = world -Z) */}
-            {renderChair(leftChairX, sChairZ, Math.PI / 2, 'chair-s-l')}
-            {renderChair(rightChairX, sChairZ, Math.PI / 2, 'chair-s-r')}
+            <DiningChair position={[leftChairX, sChairZ]} rotationY={Math.PI / 2} doorId="kitchen-chair-sl" activeDoorId={activeDoorId} />
+            <DiningChair position={[rightChairX, sChairZ]} rotationY={Math.PI / 2} doorId="kitchen-chair-sr" activeDoorId={activeDoorId} />
           </>
         )
       })()}

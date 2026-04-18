@@ -131,7 +131,7 @@ export function Doors({ activeDoorId, onDoorOpenChange, playerPos }: DoorsProps)
         onOpenChange={handlers['baby-hall']}
       />
 
-      {/* 세탁실 문 — 경첩=하단(아기방 상단벽쪽), 세탁실 내측(-X)으로 열림 */}
+      {/* 세탁실 문 — 경첩=하단(아기방 상단벽쪽), 세탁실 내측(-X)으로 열림, 하단 펫도어 2XL */}
       <FlushDoor
         position={[babyRightWallX, babyTopWallZ - 0.5595]}
         axis="z"
@@ -143,6 +143,13 @@ export function Doors({ activeDoorId, onDoorOpenChange, playerPos }: DoorsProps)
         activeDoorId={activeDoorId}
         doorId="laundry-kitchen"
         onOpenChange={handlers['laundry-kitchen']}
+        petDoor={{
+          width: 0.280,        // 외곽 280mm
+          height: 0.340,       // 외곽 340mm
+          innerWidth: 0.227,   // 개구부 227mm
+          innerHeight: 0.287,  // 개구부 287mm
+          bottomY: 0.040,      // 바닥에서 40mm
+        }}
       />
 
       {/* 작업실 문 */}

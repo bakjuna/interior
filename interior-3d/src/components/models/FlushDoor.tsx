@@ -7,6 +7,14 @@ import { WALL_THICKNESS } from '../../data/apartment'
 import type { DoorId } from '../../data/sectors'
 import { doorRegistry } from '../../systems/doorRegistry'
 
+interface PetDoorConfig {
+  width: number         // 외곽 프레임 폭 (m)
+  height: number        // 외곽 프레임 높이 (m)
+  innerWidth: number    // 내측 개구부 폭 (m) — 문 구멍 사이즈
+  innerHeight: number   // 내측 개구부 높이 (m)
+  bottomY: number       // 바닥에서 외곽 프레임 하단까지 높이 (m)
+}
+
 interface FlushDoorProps {
   position: [number, number]
   axis: 'x' | 'z'
@@ -23,6 +31,7 @@ interface FlushDoorProps {
   doorId?: DoorId
   activeDoorId?: DoorId | null
   onOpenChange?: (open: boolean) => void
+  petDoor?: PetDoorConfig  // 펫도어 (중간 하단 개구부)
 }
 
 export function FlushDoor({
@@ -41,6 +50,7 @@ export function FlushDoor({
   doorId,
   activeDoorId,
   onOpenChange,
+  petDoor,
 }: FlushDoorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const panelGroupRef = useRef<THREE.Group>(null)
@@ -104,6 +114,47 @@ export function FlushDoor({
   const casing = 0.009
   const wallHalf = wallThickness / 2
 
+  // 펫도어 — 패널에 구멍 뚫고 플라스틱 프레임 + 플랩 배치
+  const panelW = width - 0.005
+  const panelH = height - 0.010
+  const panelCenterY = height / 2 + 0.005
+  const petDoorGeo = useMemo(() => {
+    if (!petDoor) return null
+    const pdCYLocal = petDoor.bottomY + petDoor.height / 2 - panelCenterY  // 패널 mesh 로컬 Y
+    const shape = new THREE.Shape()
+    shape.moveTo(-panelW / 2, -panelH / 2)
+    shape.lineTo(panelW / 2, -panelH / 2)
+    shape.lineTo(panelW / 2, panelH / 2)
+    shape.lineTo(-panelW / 2, panelH / 2)
+    shape.lineTo(-panelW / 2, -panelH / 2)
+    const hole = new THREE.Path()
+    hole.moveTo(-petDoor.innerWidth / 2, pdCYLocal - petDoor.innerHeight / 2)
+    hole.lineTo(petDoor.innerWidth / 2, pdCYLocal - petDoor.innerHeight / 2)
+    hole.lineTo(petDoor.innerWidth / 2, pdCYLocal + petDoor.innerHeight / 2)
+    hole.lineTo(-petDoor.innerWidth / 2, pdCYLocal + petDoor.innerHeight / 2)
+    hole.lineTo(-petDoor.innerWidth / 2, pdCYLocal - petDoor.innerHeight / 2)
+    shape.holes.push(hole)
+    // 커스텀 UVGenerator — 앞/뒤 면 UV 를 패널 전체 [0,1] 로 정규화 (기본 UV는 shape 좌표 그대로라 텍스처 망가짐)
+    const uvGen = {
+      generateTopUV: (_g: THREE.ExtrudeGeometry, verts: number[], iA: number, iB: number, iC: number) => {
+        const toUV = (i: number) => new THREE.Vector2(
+          (verts[i * 3] + panelW / 2) / panelW,
+          (verts[i * 3 + 1] + panelH / 2) / panelH,
+        )
+        return [toUV(iA), toUV(iB), toUV(iC)]
+      },
+      generateSideWallUV: (_g: THREE.ExtrudeGeometry, _verts: number[], _iA: number, _iB: number, _iC: number, _iD: number) => [
+        new THREE.Vector2(0, 0),
+        new THREE.Vector2(1, 0),
+        new THREE.Vector2(1, 1),
+        new THREE.Vector2(0, 1),
+      ],
+    }
+    const g = new THREE.ExtrudeGeometry(shape, { depth: panelT, bevelEnabled: false, UVGenerator: uvGen })
+    g.translate(0, 0, -panelT / 2)  // depth 중앙 정렬 (ExtrudeGeometry 는 z=0 부터 시작)
+    return g
+  }, [petDoor, panelW, panelH, panelCenterY, panelT])
+
   const groupRotY = axis === 'x' ? 0 : Math.PI / 2
 
   const hingeSign = hinge === 'left' ? -1 : 1
@@ -165,10 +216,20 @@ export function FlushDoor({
       {/* 도어 패널 — 힌지 피벗 회전 */}
       <group ref={panelGroupRef} position={[hingeX, 0, 0]}>
         {style === 'flush' ? (
-          <mesh castShadow position={[-hingeSign * (width / 2) - 0.001 * hingeSign, height / 2 + 0.005, 0]}>
-            <boxGeometry args={[width - 0.005, height - 0.010, panelT]} />
-            <meshStandardMaterial map={panelTex} color={color} roughness={0.55} metalness={0.05} />
-          </mesh>
+          petDoor && petDoorGeo ? (
+            <mesh
+              castShadow
+              position={[-hingeSign * (width / 2) - 0.001 * hingeSign, height / 2 + 0.005, 0]}
+              geometry={petDoorGeo}
+            >
+              <meshStandardMaterial map={panelTex} color={color} roughness={0.55} metalness={0.05} />
+            </mesh>
+          ) : (
+            <mesh castShadow position={[-hingeSign * (width / 2) - 0.001 * hingeSign, height / 2 + 0.005, 0]}>
+              <boxGeometry args={[width - 0.005, height - 0.010, panelT]} />
+              <meshStandardMaterial map={panelTex} color={color} roughness={0.55} metalness={0.05} />
+            </mesh>
+          )
         ) : (
           <group position={[-hingeSign * (width / 2) - 0.001 * hingeSign, height / 2 + 0.005, 0]}>
             {(() => {
@@ -315,6 +376,89 @@ export function FlushDoor({
             <meshStandardMaterial color="#1a1a1a" metalness={0.7} roughness={0.3} />
           </mesh>
         ))}
+
+        {/* 펫도어 — 화이트 플라스틱 프레임 + 플랩 */}
+        {petDoor && (() => {
+          const pdCX = -hingeSign * (width / 2) - 0.001 * hingeSign   // 패널 x 중심
+          const pdCY = petDoor.bottomY + petDoor.height / 2
+          const pdW = petDoor.width
+          const pdH = petDoor.height
+          const pdIW = petDoor.innerWidth
+          const pdIH = petDoor.innerHeight
+          const flangeT = 0.006                            // 양면 플랜지 두께
+          const frameTB = (pdH - pdIH) / 2                 // 상/하 플랜지 폭
+          const frameLR = (pdW - pdIW) / 2                 // 좌/우 플랜지 폭
+          return (
+            <group position={[pdCX, pdCY, 0]}>
+              {/* 양면 플랜지 (±Z) — 4변 */}
+              {[-1, 1].map((side) => {
+                const faceZ = side * (panelT / 2 + flangeT / 2)
+                return (
+                  <group key={`pd-flange-${side}`}>
+                    <mesh position={[0, pdH / 2 - frameTB / 2, faceZ]}>
+                      <boxGeometry args={[pdW, frameTB, flangeT]} />
+                      <meshStandardMaterial color="#f5f5f5" roughness={0.35} metalness={0.05} />
+                    </mesh>
+                    <mesh position={[0, -pdH / 2 + frameTB / 2, faceZ]}>
+                      <boxGeometry args={[pdW, frameTB, flangeT]} />
+                      <meshStandardMaterial color="#f5f5f5" roughness={0.35} metalness={0.05} />
+                    </mesh>
+                    <mesh position={[-pdW / 2 + frameLR / 2, 0, faceZ]}>
+                      <boxGeometry args={[frameLR, pdIH, flangeT]} />
+                      <meshStandardMaterial color="#f5f5f5" roughness={0.35} metalness={0.05} />
+                    </mesh>
+                    <mesh position={[pdW / 2 - frameLR / 2, 0, faceZ]}>
+                      <boxGeometry args={[frameLR, pdIH, flangeT]} />
+                      <meshStandardMaterial color="#f5f5f5" roughness={0.35} metalness={0.05} />
+                    </mesh>
+                  </group>
+                )
+              })}
+              {/* 내측 튜브 — 개구부 4변 안쪽, 앞/뒤 플랜지 연결 */}
+              {(() => {
+                const tubeT = 0.008
+                return (
+                  <>
+                    <mesh position={[0, pdIH / 2 - tubeT / 2, 0]}>
+                      <boxGeometry args={[pdIW, tubeT, panelT]} />
+                      <meshStandardMaterial color="#f0f0f0" roughness={0.4} metalness={0.05} />
+                    </mesh>
+                    <mesh position={[0, -pdIH / 2 + tubeT / 2, 0]}>
+                      <boxGeometry args={[pdIW, tubeT, panelT]} />
+                      <meshStandardMaterial color="#f0f0f0" roughness={0.4} metalness={0.05} />
+                    </mesh>
+                    <mesh position={[-pdIW / 2 + tubeT / 2, 0, 0]}>
+                      <boxGeometry args={[tubeT, pdIH - tubeT * 2, panelT]} />
+                      <meshStandardMaterial color="#f0f0f0" roughness={0.4} metalness={0.05} />
+                    </mesh>
+                    <mesh position={[pdIW / 2 - tubeT / 2, 0, 0]}>
+                      <boxGeometry args={[tubeT, pdIH - tubeT * 2, panelT]} />
+                      <meshStandardMaterial color="#f0f0f0" roughness={0.4} metalness={0.05} />
+                    </mesh>
+                  </>
+                )
+              })()}
+              {/* 플랩 — 중앙에 세미투명 메쉬 (문 두께 중앙) */}
+              <mesh position={[0, 0, 0]}>
+                <planeGeometry args={[pdIW - 0.012, pdIH - 0.012]} />
+                <meshStandardMaterial
+                  color="#2e2e30"
+                  roughness={0.85}
+                  metalness={0}
+                  transparent
+                  opacity={0.45}
+                  side={THREE.DoubleSide}
+                  depthWrite={false}
+                />
+              </mesh>
+              {/* 하단 자석/래치 바 */}
+              <mesh position={[0, -pdIH / 2 + 0.012, 0]}>
+                <boxGeometry args={[pdIW * 0.45, 0.012, panelT + flangeT * 1.5]} />
+                <meshStandardMaterial color="#d8d8d8" roughness={0.4} metalness={0.3} />
+              </mesh>
+            </group>
+          )
+        })()}
       </group>
 
       {/* 인터랙션 툴팁 — 카메라가 이 도어를 향할 때만 */}

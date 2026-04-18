@@ -4,7 +4,7 @@
  * openShelf 지정 시 해당 영역은 문짝 대신 오픈 선반 + LED.
  */
 
-import { useMemo, useState, useRef, useEffect } from 'react'
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { DoorTooltip, getDoorLabel } from '../ui/DoorTooltip'
 import * as THREE from 'three'
@@ -17,11 +17,24 @@ interface ClosetsProps {
   activeDoorId?: DoorId | null
   playerPos?: [number, number]
   allLightsOn?: boolean
+  doorOpenStates?: Map<DoorId, boolean>
 }
 
-export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) {
+export function Closets({ activeDoorId, playerPos, allLightsOn, doorOpenStates }: ClosetsProps) {
+  void doorOpenStates
   // 거실장 LED 활성: 플레이어가 거실 내 또는 allLightsOn
   const lrLedActive = !!allLightsOn || (!!playerPos && playerPos[0] >= 0 && playerPos[0] <= 3.972 && playerPos[1] >= 0 && playerPos[1] <= 3.666)
+
+  // 붙박이 도어 개폐 상태 — 로컬 state (closet 전용). 내부 톤 분기용.
+  const [closetOpen, setClosetOpen] = useState<Map<DoorId, boolean>>(() => new Map())
+  const handleClosetOpenChange = useCallback((id: DoorId, open: boolean) => {
+    setClosetOpen((prev) => {
+      if (prev.get(id) === open) return prev
+      const next = new Map(prev)
+      next.set(id, open)
+      return next
+    })
+  }, [])
   const closetDoorTex = useKTX2('/textures/walnut-closet-door.ktx2')
   const walnutDoorTex = useKTX2('/textures/walnut_door.ktx2')
 
@@ -60,7 +73,7 @@ export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) 
         const bodyH = c.size[1]
         const doorCount = Math.max(2, Math.round(longSide / 0.6))
         const actualDoorW = longSide / doorCount
-        const gap = 0.002
+        const gap = 0.0004
         const panelT = 0.018
         const os = c.openShelf
         const frontOffset = (isZlong ? c.size[0] : c.size[2]) / 2 + 0.002
@@ -96,11 +109,6 @@ export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) 
 
                 return (
                   <>
-                    {/* 뒷판 (북쪽 5mm 축소 z-fighting 방지) */}
-                    <mesh position={[backX, c.position[1], c.position[2] + 0.0025]}>
-                      <boxGeometry args={[bpT, bodyH, longSide - 0.005]} />
-                      <meshStandardMaterial color="#fff" roughness={0.6} />
-                    </mesh>
                     {/* 상판 */}
                     <mesh position={[c.position[0], bodyTop - bpT / 2, c.position[2]]}>
                       <boxGeometry args={[shortSide, bpT, longSide]} />
@@ -121,14 +129,23 @@ export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) 
                       <boxGeometry args={[shortSide, bodyH, bpT]} />
                       <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                     </mesh>
-                    {/* 그룹 경계 칸막이 + 선반 */}
+                    {/* 그룹 경계 칸막이 + 선반 + 그룹별 뒷판 (문 열림 여부에 따라 내부 톤 분기) */}
                     {c.doorGroups!.map((g, gi) => {
                       const gZStart = zStart + actualDoorW * g.doors[0]
                       const gZEnd = zStart + actualDoorW * (g.doors[g.doors.length - 1] + 1)
                       const gCZ = (gZStart + gZEnd) / 2
                       const gLen = gZEnd - gZStart
+                      // 그룹 내 문 중 하나라도 열려 있으면 내부를 밝게, 전부 닫히면 다크
+                      const groupOpen = closetOpen.get(g.doorId) === true
+                      const interiorColor = groupOpen ? '#fff' : '#1a1410'
+                      const interiorRoughness = groupOpen ? 0.6 : 1.0
                       return (
                         <group key={`cg-${gi}`}>
+                          {/* 그룹 뒷판 */}
+                          <mesh position={[backX, c.position[1], gCZ]}>
+                            <boxGeometry args={[bpT, bodyH, gLen - 0.001]} />
+                            <meshStandardMaterial color={interiorColor} roughness={interiorRoughness} />
+                          </mesh>
                           {gi > 0 && (() => {
                             // 오픈선반 영역의 그룹 경계 → 칸막이를 상/하 분할 (오픈선반 구간 제외)
                             const isOpenShelfBoundary = os && g.doors.some(di => di >= os.startDoor && di < os.endDoor)
@@ -159,7 +176,7 @@ export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) 
                           {(g.shelfYs ?? [bodyH / 2]).map((sy, si) => (
                             <mesh key={`shelf-${si}`} position={[interiorCX, sy, gCZ]}>
                               <boxGeometry args={[interiorDepth, shelfT, gLen - bpT]} />
-                              <meshStandardMaterial color="#fff" roughness={0.6} />
+                              <meshStandardMaterial color={interiorColor} roughness={interiorRoughness} />
                             </mesh>
                           ))}
                         </group>
@@ -279,6 +296,7 @@ export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) 
                     walnutTex={walnutBodyTex}
                     doorId={g.doorId}
                     activeDoorId={activeDoorId}
+                    onOpenChange={handleClosetOpenChange}
                   />
                 ) : g.sliding ? (
                   // 슬라이딩 도어
@@ -293,6 +311,7 @@ export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) 
                     walnutTex={walnutBodyTex}
                     doorId={g.doorId}
                     activeDoorId={activeDoorId}
+                    onOpenChange={handleClosetOpenChange}
                   />
                 ) : (
                   // 전체 높이 도어
@@ -308,6 +327,7 @@ export function Closets({ activeDoorId, playerPos, allLightsOn }: ClosetsProps) 
                     walnutTex={walnutBodyTex}
                     doorId={g.doorId}
                     activeDoorId={activeDoorId}
+                    onOpenChange={handleClosetOpenChange}
                   />
                 )}
                 {/* 상단 패널 (단내림 + 20mm, 문짝 대비 2mm 안쪽) */}
@@ -551,11 +571,12 @@ interface ClosetInteractiveDoorProps {
   walnutTex: THREE.Texture
   doorId: DoorId
   activeDoorId?: DoorId | null
+  onOpenChange?: (id: DoorId, open: boolean) => void
 }
 
 function ClosetInteractiveDoor({
   frontX, centerY, doorH, zStart, doorWidth, handleY, pair = false, flipHinge = false,
-  walnutTex, doorId, activeDoorId,
+  walnutTex, doorId, activeDoorId, onOpenChange,
 }: ClosetInteractiveDoorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const pivotARef = useRef<THREE.Group>(null)
@@ -579,6 +600,14 @@ function ClosetInteractiveDoor({
     return () => doorRegistry.unregister(doorId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doorId])
+  // 열 때 즉시, 닫을 때는 모션 완료 후 리포트
+  const reportedOpenRef = useRef(false)
+  useEffect(() => {
+    if (isOpen && !reportedOpenRef.current) {
+      reportedOpenRef.current = true
+      onOpenChange?.(doorId, true)
+    }
+  }, [isOpen, doorId, onOpenChange])
 
   // +X 방향으로 swing (주방과 반대)
   // 북쪽 hinge: free end(남) → +X → rotation +π/2
@@ -591,6 +620,17 @@ function ClosetInteractiveDoor({
     const tB = isOpen ? TARGET_B : 0
     const dA = tA - angleARef.current
     const dB = pair ? tB - angleBRef.current : 0
+
+    // 닫는 중 90% 도달 시 다크로 리포트 (|현재 각도| ≤ |OPEN 각도| × 10%)
+    if (!isOpen && reportedOpenRef.current) {
+      const closedA = Math.abs(angleARef.current) <= Math.abs(TARGET_A) * 0.1
+      const closedB = !pair || Math.abs(angleBRef.current) <= Math.abs(TARGET_B) * 0.1
+      if (closedA && closedB) {
+        reportedOpenRef.current = false
+        onOpenChange?.(doorId, false)
+      }
+    }
+
     if (Math.abs(dA) < 0.0005 && Math.abs(dB) < 0.0005) return
     angleARef.current += dA * Math.min(1, delta * 6)
     if (pivotARef.current) pivotARef.current.rotation.y = angleARef.current
@@ -657,13 +697,14 @@ interface ClosetSplitDoorPairProps {
   walnutTex: THREE.Texture
   doorId: DoorId
   activeDoorId?: DoorId | null
+  onOpenChange?: (id: DoorId, open: boolean) => void
 }
 
 function ClosetSplitDoorPair({
   frontX, zStart, doorWidth, pair = false,
   lowerCenterY, lowerDoorH, lowerHandleY,
   upperCenterY, upperDoorH, upperHandleY,
-  walnutTex, doorId, activeDoorId,
+  walnutTex, doorId, activeDoorId, onOpenChange,
 }: ClosetSplitDoorPairProps) {
   const [isOpen, setIsOpen] = useState(false)
   // 북 hinge refs (상/하)
@@ -690,6 +731,14 @@ function ClosetSplitDoorPair({
     return () => doorRegistry.unregister(doorId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doorId])
+  // 열 때 즉시, 닫을 때는 모션 완료 후 리포트
+  const reportedOpenRef = useRef(false)
+  useEffect(() => {
+    if (isOpen && !reportedOpenRef.current) {
+      reportedOpenRef.current = true
+      onOpenChange?.(doorId, true)
+    }
+  }, [isOpen, doorId, onOpenChange])
 
   const TARGET_N = Math.PI / 2   // north hinge → +X swing
   const TARGET_S = -Math.PI / 2  // south hinge → +X swing
@@ -707,6 +756,17 @@ function ClosetSplitDoorPair({
       anglesRef.current[i] += d * Math.min(1, delta * 6)
       if (refs[i].current) refs[i].current!.rotation.y = anglesRef.current[i]
       moved = true
+    }
+    // 닫는 중 모든 pivot이 90% 닫히면 다크로 리포트
+    if (!isOpen && reportedOpenRef.current) {
+      let allClosed = true
+      for (let i = 0; i < count; i++) {
+        if (Math.abs(anglesRef.current[i]) > Math.abs(targets[i]) * 0.1) { allClosed = false; break }
+      }
+      if (allClosed) {
+        reportedOpenRef.current = false
+        onOpenChange?.(doorId, false)
+      }
     }
     if (moved) invalidate()
   })
@@ -786,11 +846,12 @@ interface ClosetSlidingDoorProps {
   walnutTex: THREE.Texture
   doorId: DoorId
   activeDoorId?: DoorId | null
+  onOpenChange?: (id: DoorId, open: boolean) => void
 }
 
 function ClosetSlidingDoor({
   frontX, centerY, doorH, zStart, doorWidth, slideDir, protrude = false,
-  walnutTex, doorId, activeDoorId,
+  walnutTex, doorId, activeDoorId, onOpenChange,
 }: ClosetSlidingDoorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const slideRef = useRef(0)
@@ -814,11 +875,27 @@ function ClosetSlidingDoor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doorId])
   useEffect(() => { doorRegistry.setOpenState(doorId, isOpen) }, [doorId, isOpen])
+  // 열 때 즉시, 닫을 때는 슬라이드 완료 후 리포트
+  const reportedOpenRef = useRef(false)
+  useEffect(() => {
+    if (isOpen && !reportedOpenRef.current) {
+      reportedOpenRef.current = true
+      onOpenChange?.(doorId, true)
+    }
+  }, [isOpen, doorId, onOpenChange])
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.05)
-    const target = isOpen ? slideDir * doorWidth * 0.9 : 0
+    const fullOpen = slideDir * doorWidth * 0.9
+    const target = isOpen ? fullOpen : 0
     const diff = target - slideRef.current
+
+    // 닫는 중 90% 도달 시 다크로 리포트 (|현재 슬라이드| ≤ |풀오픈 슬라이드| × 10%)
+    if (!isOpen && reportedOpenRef.current && Math.abs(slideRef.current) <= Math.abs(fullOpen) * 0.1) {
+      reportedOpenRef.current = false
+      onOpenChange?.(doorId, false)
+    }
+
     if (Math.abs(diff) < 0.0005) return
     slideRef.current += diff * Math.min(1, delta * 6)
     if (groupRef.current) groupRef.current.position.z = slideRef.current

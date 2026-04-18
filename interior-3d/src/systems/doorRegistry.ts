@@ -21,35 +21,64 @@ const entries = new Map<DoorId, DoorEntry>()
 let entriesVersion = 0
 
 /**
- * 상호 배제 쌍 — 한쪽이 열릴 때 상대쪽이 먼저 닫힘.
- * 양방향 등록 (A→B, B→A).
+ * 상호 배제 — 한 도어가 열리려 할 때 mutex 파트너들이 먼저 닫힘.
+ * 닫힘 애니메이션 후 새 도어가 열림 (순차).
+ * 다중 파트너 지원: Map<DoorId, Set<DoorId>>
  */
-const mutexPairs = new Map<DoorId, DoorId>()
+const mutexPartners = new Map<DoorId, Set<DoorId>>()
 function registerMutex(a: DoorId, b: DoorId) {
-  mutexPairs.set(a, b)
-  mutexPairs.set(b, a)
+  if (!mutexPartners.has(a)) mutexPartners.set(a, new Set())
+  if (!mutexPartners.has(b)) mutexPartners.set(b, new Set())
+  mutexPartners.get(a)!.add(b)
+  mutexPartners.get(b)!.add(a)
 }
+const MUTEX_CLOSE_DELAY_MS = 800   // 닫힘 애니메이션 여유 시간
 // 욕실 거울장
 registerMutex('bath-mirror-n', 'bath-mirror-s')
 registerMutex('mb-bath-mirror-l', 'mb-bath-mirror-r')
 // 아기방 붙박이 (북쪽 쌍 / 남쪽 쌍)
 registerMutex('closet-baby-0', 'closet-baby-1')
 registerMutex('closet-baby-2', 'closet-baby-3')
+// 냉장고/김냉 상호배제
+// Group A: 냉동실 우 ↔ 김냉 중단 서랍 ↔ 김냉 하단 서랍 (3-way mutex)
+registerMutex('fridge-br', 'kimchi-drawer-mid')
+registerMutex('fridge-br', 'kimchi-drawer-bot')
+registerMutex('kimchi-drawer-mid', 'kimchi-drawer-bot')
+// Group B: 냉장실 우 ↔ 김냉 상 좌
+registerMutex('fridge-tr', 'kimchi-tl')
+// Group C: 냉동실 우 ↔ 김냉 상 좌
+registerMutex('fridge-br', 'kimchi-tl')
 
 export const doorRegistry = {
   register(entry: DoorEntry) {
-    // mutex 래핑: 원래 toggle 을 감싸서 상대쪽 먼저 닫기
+    // mutex 래핑: self 가 OPEN 되는 경우에만 파트너 닫기 → 닫힘 모션 후 self 열기
     const originalToggle = entry.toggle
     const wrappedToggle = () => {
-      const partner = mutexPairs.get(entry.id)
-      if (partner) {
-        const partnerEntry = entries.get(partner)
-        // 파트너가 열려있으면 먼저 닫기 (toggle 호출)
-        if (partnerEntry && (partnerEntry as DoorEntry & { _isOpen?: boolean })._isOpen) {
-          partnerEntry.toggle()
+      const self = entry as DoorEntry & { _isOpen?: boolean }
+      const selfIsOpen = self._isOpen === true
+      // self 가 닫히는 경우 (이미 열려있었음) — 그냥 닫기
+      if (selfIsOpen) {
+        originalToggle()
+        return
+      }
+      // self 가 열리는 경우 — mutex 파트너 중 열려있는 것들 모두 닫기
+      const partners = mutexPartners.get(entry.id)
+      let anyPartnerClosing = false
+      if (partners) {
+        for (const pid of partners) {
+          const partnerEntry = entries.get(pid) as (DoorEntry & { _isOpen?: boolean }) | undefined
+          if (partnerEntry && partnerEntry._isOpen) {
+            partnerEntry.toggle()
+            anyPartnerClosing = true
+          }
         }
       }
-      originalToggle()
+      if (anyPartnerClosing) {
+        // 닫힘 모션 여유 후 self 열기
+        setTimeout(() => originalToggle(), MUTEX_CLOSE_DELAY_MS)
+      } else {
+        originalToggle()
+      }
     }
     entry.toggle = wrappedToggle
     entries.set(entry.id, entry)
@@ -124,6 +153,21 @@ doorAllowedSectors.set('bath-mirror-s', new Set(['mainBath']))
 // 안방욕실 거울 수납장
 doorAllowedSectors.set('mb-bath-mirror-l', new Set(['mbBath']))
 doorAllowedSectors.set('mb-bath-mirror-r', new Set(['mbBath']))
+// 주방 식탁 의자 — 복도에서도 빼기/넣기 가능 (예외)
+doorAllowedSectors.set('kitchen-chair-nl', new Set(['kitchen', 'hall']))
+doorAllowedSectors.set('kitchen-chair-nr', new Set(['kitchen', 'hall']))
+doorAllowedSectors.set('kitchen-chair-sl', new Set(['kitchen', 'hall']))
+doorAllowedSectors.set('kitchen-chair-sr', new Set(['kitchen', 'hall']))
+// 4도어 냉장고 — 주방에서만
+doorAllowedSectors.set('fridge-tl', new Set(['kitchen']))
+doorAllowedSectors.set('fridge-tr', new Set(['kitchen']))
+doorAllowedSectors.set('fridge-bl', new Set(['kitchen']))
+doorAllowedSectors.set('fridge-br', new Set(['kitchen']))
+// 김치냉장고 상단 2도어 + 중/하단 서랍
+doorAllowedSectors.set('kimchi-tl', new Set(['kitchen']))
+doorAllowedSectors.set('kimchi-tr', new Set(['kitchen']))
+doorAllowedSectors.set('kimchi-drawer-mid', new Set(['kitchen']))
+doorAllowedSectors.set('kimchi-drawer-bot', new Set(['kitchen']))
 
 // pickActiveDoor 결과 캐시 — 카메라가 거의 안 움직였으면 직전 결과 재사용.
 // FPSController 에서 매 프레임 호출되지만 결과가 바뀌는 빈도는 낮음.

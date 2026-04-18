@@ -6,7 +6,7 @@ import { DoorTooltip } from '../ui/DoorTooltip'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import type { DoorId } from '../../data/sectors'
 import { doorRegistry } from '../../systems/doorRegistry'
-import { mirrorState, useMirrorEnabled } from '../../systems/mirrorToggle'
+import { useMirrorActive, makeNonRecursiveReflector, isReflectorVisible } from '../../systems/mirrorToggle'
 
 // --- Shape helpers (중문 유리 패널 전용) ---
 function makeRoundedShape(w: number, h: number, r: number) {
@@ -199,23 +199,22 @@ export function JungmunFixedPanel({
     const glassW = width * 0.8
     const glassH = height - topBottomFrame * 2
     const geo = new THREE.PlaneGeometry(glassW, glassH)
-    return new Reflector(geo, {
-      textureWidth: 256,
+    return makeNonRecursiveReflector(new Reflector(geo, {
+      textureWidth: 512,
       textureHeight: 512,
       color: 0xc8ccd0,
       clipBias: 0.003,
-    })
+    }))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mirror])
 
-  const mirrorOn = useMirrorEnabled()
-  const nearMirror = mirror && !!playerPos && (
-    Math.hypot(playerPos[0] - centerWorld[0], playerPos[1] - centerWorld[1]) < 3
-  )
-  const showReflector = nearMirror && mirrorOn
-  useEffect(() => {
-    if (reflectorObj) reflectorObj.visible = showReflector
-  }, [showReflector, reflectorObj])
+  const mirrorActive = useMirrorActive('jungmun', playerPos)
+  const showReflector = !!mirror && mirrorActive
+  useFrame(({ camera }) => {
+    if (!reflectorObj) return
+    const v = showReflector && isReflectorVisible(reflectorObj, camera)
+    if (reflectorObj.visible !== v) reflectorObj.visible = v
+  })
 
   return (
     <group position={[centerWorld[0], height / 2, centerWorld[1]]} rotation={[0, Math.PI / 2, 0]}>

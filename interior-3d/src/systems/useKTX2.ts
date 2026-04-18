@@ -50,6 +50,7 @@ export const ALL_KTX2_URLS = [
   '/textures/silk.ktx2',
   '/textures/kitchen-tile.ktx2',
   '/textures/marble-table.ktx2',
+  '/textures/oak-wood.ktx2',
 ] as const
 
 export function preloadAllKTX2(gl: WebGLRenderer) {

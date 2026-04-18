@@ -305,7 +305,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
       <Walls />
       <Windows />
 
-      <Closets activeDoorId={activeDoorId} playerPos={playerPos} allLightsOn={allLightsOn} />
+      <Closets activeDoorId={activeDoorId} playerPos={playerPos} allLightsOn={allLightsOn} doorOpenStates={doorOpenStates} />
 
       {/* 다운라이트 — InstancedMesh 로 발광면 + 크롬링 일괄 렌더 */}
       <DownlightInstances
@@ -343,7 +343,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
           Three.js 레벨에서만 숨김 (scene 에는 유지). */}
       {/* 모든 텍스처가 ApartmentModel 에서 미리 로드되므로 Suspense 불필요.
           room 은 항상 mount, <group visible> 로 Three.js 레벨에서만 숨김. */}
-      <MainVeranda visible={visibleSectors.has('mainVeranda')} />
+      <MainVeranda visible={visibleSectors.has('mainVeranda')} activeDoorId={activeDoorId} playerPos={playerPos} />
       <WorkVeranda visible={visibleSectors.has('workVeranda')} />
       <Laundry visible={visibleSectors.has('laundry')} />
       <OutdoorUnit
@@ -351,12 +351,12 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         contentsVisible={visibleSectors.has('outdoor')}
       />
       <Cage wallVisible={visibleSectors.has('cage') || visibleSectors.has('mainVeranda')} />
-      <BabyRoom visible={visibleSectors.has('baby')} />
-      <WorkRoom visible={visibleSectors.has('work')} playerPos={playerPos} allLightsOn={allLightsOn} />
+      <BabyRoom visible={visibleSectors.has('baby')} activeDoorId={activeDoorId} />
+      <WorkRoom visible={visibleSectors.has('work')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
       <Hallway visible={visibleSectors.has('hall')} playerPos={playerPos} allLightsOn={allLightsOn} />
       <MainBath visible={visibleSectors.has('mainBath')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
       <MasterBath visible={visibleSectors.has('mbBath')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
-      <LivingRoom visible={visibleSectors.has('lr')} />
+      <LivingRoom visible={visibleSectors.has('lr')} activeDoorId={activeDoorId} playerPos={playerPos} />
       <MasterBedroom visible={visibleSectors.has('mb')} activeDoorId={activeDoorId} playerPos={playerPos} allLightsOn={allLightsOn} />
       <Entrance visible={visibleSectors.has('entrance')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />
       <Kitchen visible={visibleSectors.has('kitchen')} playerPos={playerPos} allLightsOn={allLightsOn} activeDoorId={activeDoorId} />

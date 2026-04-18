@@ -6,8 +6,10 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
 import { TrestleDesk } from '../models/TrestleDesk'
-import { LR_W, right1Z, WALL_THICKNESS, babyRightWallX } from '../../data/apartment'
+import { WoodBlind } from '../shell/WoodBlind'
+import { LR_W, right1Z, WALL_THICKNESS, babyRightWallX, babyTopWallZ } from '../../data/apartment'
 import { useKTX2 } from '../../systems/useKTX2'
+import type { DoorId } from '../../data/sectors'
 
 const T2 = WALL_THICKNESS / 2
 
@@ -15,9 +17,10 @@ interface WorkRoomProps {
   visible: boolean
   playerPos?: [number, number]
   allLightsOn?: boolean
+  activeDoorId?: DoorId | null
 }
 
-export function WorkRoom({ visible, playerPos, allLightsOn }: WorkRoomProps) {
+export function WorkRoom({ visible, playerPos, allLightsOn, activeDoorId }: WorkRoomProps) {
   const closetDoorTex = useKTX2('/textures/walnut-closet-door.ktx2')
   const walnutTex = useMemo(() => {
     const t = closetDoorTex.clone()
@@ -138,6 +141,31 @@ export function WorkRoom({ visible, playerPos, allLightsOn }: WorkRoomProps) {
           )
         })}
       </group>
+
+      {/* 작업실베란다 창문 원목 블라인드 — 서측은 책장 회피, 동측은 창문 전폭 유지 */}
+      {(() => {
+        const shelfEastX = shelfBackX + shelfDepth                  // 책장 동쪽 면
+        const clearance = 0.02                                      // 책장과 20mm 여유
+        const winCX = babyRightWallX + 2.555 + T2 + 0.236 + 0.998   // 창문 센터 X
+        const winEastEdge = winCX + 0.998 + 0.04                     // 창문 동쪽 + 40mm 여유
+        const blindWestX = shelfEastX + clearance
+        const blindWidth = winEastEdge - blindWestX
+        const blindCX = (blindWestX + winEastEdge) / 2
+        return (
+          <WoodBlind
+            doorId="work-blind"
+            windowCenterX={blindCX}
+            windowCenterZ={babyTopWallZ - 1.119 - 0.770 + 0.795 + 1.418}
+            windowAxis="x"
+            windowWidth={blindWidth}
+            windowTop={2.000}
+            botY={0.800}
+            roomSide={1}
+            width={blindWidth}
+            activeDoorId={activeDoorId}
+          />
+        )
+      })()}
 
     </group>
     </>

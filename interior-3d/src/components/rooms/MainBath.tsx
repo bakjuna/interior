@@ -18,7 +18,7 @@ import {
   WALL_HEIGHT,
   mbDoorEnd,
 } from '../../data/apartment'
-import { useMirrorEnabled } from '../../systems/mirrorToggle'
+import { useMirrorActive, makeNonRecursiveReflector, isReflectorVisible } from '../../systems/mirrorToggle'
 
 const T2 = WALL_THICKNESS / 2
 
@@ -149,24 +149,22 @@ export function MainBath({ visible, playerPos, allLightsOn, activeDoorId }: Main
   const bathMirrorA = useRef<InstanceType<typeof Reflector> | null>(null)
   const bathMirrorB = useRef<InstanceType<typeof Reflector> | null>(null)
   if (!bathMirrorA.current) {
-    bathMirrorA.current = new Reflector(new THREE.PlaneGeometry(mcPanelW - 0.004, mcH - 0.004), {
-      textureWidth: 256, textureHeight: 256, color: 0xc8ccd0, clipBias: 0.003,
-    })
+    bathMirrorA.current = makeNonRecursiveReflector(new Reflector(new THREE.PlaneGeometry(mcPanelW - 0.004, mcH - 0.004), {
+      textureWidth: 512, textureHeight: 512, color: 0xc8ccd0, clipBias: 0.003,
+    }))
   }
   if (!bathMirrorB.current) {
-    bathMirrorB.current = new Reflector(new THREE.PlaneGeometry(mcPanelW - 0.004, mcH - 0.004), {
-      textureWidth: 256, textureHeight: 256, color: 0xc8ccd0, clipBias: 0.003,
-    })
+    bathMirrorB.current = makeNonRecursiveReflector(new Reflector(new THREE.PlaneGeometry(mcPanelW - 0.004, mcH - 0.004), {
+      textureWidth: 512, textureHeight: 512, color: 0xc8ccd0, clipBias: 0.003,
+    }))
   }
-  const mirrorOn = useMirrorEnabled()
-  const nearMirror = !!playerPos && (
-    Math.hypot(playerPos[0] - bL, playerPos[1] - mcZ) < 1.6
-  )
-  const showReflector = nearMirror && mirrorOn
-  useEffect(() => {
-    if (bathMirrorA.current) bathMirrorA.current.visible = showReflector
-    if (bathMirrorB.current) bathMirrorB.current.visible = showReflector
-  }, [showReflector])
+  const sectorActive = useMirrorActive('mainBath', playerPos)
+  const showReflector = sectorActive
+  useFrame(({ camera }) => {
+    const a = bathMirrorA.current, b = bathMirrorB.current
+    if (a) { const v = sectorActive && isReflectorVisible(a, camera); if (a.visible !== v) a.visible = v }
+    if (b) { const v = sectorActive && isReflectorVisible(b, camera); if (b.visible !== v) b.visible = v }
+  })
 
   const isBathCabActiveN = activeDoorId === 'bath-mirror-n'
   const isBathCabActiveS = activeDoorId === 'bath-mirror-s'
