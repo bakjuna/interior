@@ -674,7 +674,7 @@ export function WalkthroughView() {
           position: [LR_W / 2, height, LR_D / 2],
         }}
       >
-        <ambientLight intensity={isNight ? 0.08 : 0.6} />
+        <ambientLight intensity={isNight ? 0.08 : 1.2} />
         <directionalLight position={[5, 10, 5]} intensity={isNight ? 0 : 0.8} />
         <ApartmentModel showCeiling={true} playerPos={effectivePlayerPos} isNight={isNight} allLightsOn={effectiveAllLightsOn} doorOpenStates={doorOpenStates} activeDoorId={activeDoorId} onDoorOpenChange={handleDoorOpenChange} mirrorEnabled={mirrorEnabled} />
         {!isPrewarming && (

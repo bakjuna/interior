@@ -162,30 +162,32 @@ export function MasterBedroom({ visible, activeDoorId, playerPos, allLightsOn }:
           <Bed />
         </Suspense>
 
-        {/* 협탁 — 침대 머리맡 북쪽, 시계방향 90° 회전 (서랍 +X(동) 방향으로 열림). 침대 쪽 50mm 밀음 */}
+        {/* 협탁 — 북벽에 밀착, 180° 회전 (서랍이 남쪽=침대 방향). 가벽 동측에 10mm 갭 */}
         {(() => {
-          const partEastX = mbLeft + 1.476 + 0.025                // 가벽 동면 = 침대 서쪽 끝
-          const nsX = partEastX + 0.4 / 2 + 0.02                   // 가벽 동면에서 20mm 여유
-          const nsZ = 0.9 - 0.425 / 2 + 0.05                       // 침대 쪽 50mm 추가 이동
+          const partEastX = mbLeft + 1.476 + 0.025  // 가벽 동면
+          const wBot = 0.425                         // 협탁 하단 폭 (flare)
+          const D_ns = 0.4                           // 협탁 깊이
+          const nsX = partEastX + 0.01 + wBot / 2    // 가벽 동면에서 10mm 여유
+          const nsZ = D_ns / 2 + 0.01                // 북벽 10mm 여유
           return (
             <Nightstand
               position={[nsX, 0, nsZ]}
-              rotationY={-Math.PI / 2}
+              rotationY={Math.PI}
               activeDoorId={activeDoorId}
               playerPos={playerPos}
             />
           )
         })()}
 
-        {/* 하버드 책장 — 협탁 서랍 바로 북쪽, 180° 회전 (도어가 남쪽 = 침대 방향으로 열림) */}
+        {/* 하버드 책장 — 협탁 동측, 북벽 밀착, 180° 회전 (도어가 남쪽 = 침대 방향) */}
         {(() => {
           const W_bs = 0.845
           const D_bs = 0.4
           const partEastX = mbLeft + 1.476 + 0.025
-          const nsWestX = partEastX + 0.02                           // 협탁 서측 = mbLeft + 1.521
-          // 책장 서측 edge를 협탁 서측과 동일 라인 → center = nsWestX + W_bs/2
-          const bsX = nsWestX + W_bs / 2
-          // 뒷면이 북벽에 밀착. local back posts = +D/2 → 180° 회전 후 world z = bsZ - D/2. gap 10mm.
+          const wBot = 0.425
+          const nsEastX = partEastX + 0.01 + wBot     // 협탁 동측 edge
+          const bsWestX = nsEastX + 0.02              // 협탁과 20mm 갭
+          const bsX = bsWestX + W_bs / 2
           const bsZ = D_bs / 2 + 0.01
           return (
             <Bookshelf
