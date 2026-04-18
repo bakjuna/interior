@@ -13,7 +13,7 @@ import { tileGroutOnBeforeCompile } from '../primitives/bathroomTile'
 export function Floors() {
   const floorTex = useKTX2('/textures/walnut-floor.ktx2')
   const porcelainTex = useKTX2('/textures/porcelain-tile.ktx2')
-  const entranceTex = useKTX2('/textures/entrance-tile.ktx2')
+  const entranceTex = useKTX2('/textures/entrance-tile.v2.ktx2')
   const bathWallTex = useKTX2('/textures/bathroom-wall-tile.ktx2')
 
   const mergedFloors = useMemo(() => {

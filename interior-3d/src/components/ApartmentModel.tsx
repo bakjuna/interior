@@ -177,7 +177,7 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
 
   const floorTex = useKTX2('/textures/walnut-floor.ktx2')
   const porcelainTex = useKTX2('/textures/porcelain-tile.ktx2')
-  const entranceTex = useKTX2('/textures/entrance-tile.ktx2')
+  const entranceTex = useKTX2('/textures/entrance-tile.v2.ktx2')
   const bathroomWallTex = useKTX2('/textures/bathroom-wall-tile.ktx2')
 
   // 화장실 타일 메지(grout) — 흰색 라인. 타일 600×1200mm 기준 약 3mm 두께

@@ -43,7 +43,7 @@ export function useKTX2(url: string) {
 export const ALL_KTX2_URLS = [
   '/textures/walnut-floor.ktx2',
   '/textures/porcelain-tile.ktx2',
-  '/textures/entrance-tile.ktx2',
+  '/textures/entrance-tile.v2.ktx2',
   '/textures/bathroom-wall-tile.ktx2',
   '/textures/walnut-closet-door.ktx2',
   '/textures/walnut_door.ktx2',

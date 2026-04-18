@@ -114,18 +114,19 @@ function SplashScreen({ label, progress }: { label: string; progress: number }) 
   )
 }
 
-/** Canvas 밖에서 호출 가능한 전역 invalidate — 즉시 + 지연 2회로 React 리렌더 후에도 보장 */
+/** Canvas 밖에서 호출 가능한 전역 invalidate — demand 모드에서 R3F 가 다음 프레임에 렌더 */
 const globalInvalidateRef: { current: (() => void) | null } = { current: null }
 export function globalInvalidate() {
   globalInvalidateRef.current?.()
-  requestAnimationFrame(() => globalInvalidateRef.current?.())
-  setTimeout(() => globalInvalidateRef.current?.(), 50)
 }
 
 /** 상태 변경 시 R3F invalidate — 모바일에서 버튼 액션 후 리렌더 보장 */
 function Invalidator({ deps }: { deps: string }) {
   const { invalidate } = useThree()
-  globalInvalidateRef.current = invalidate
+  useEffect(() => {
+    globalInvalidateRef.current = invalidate
+    return () => { if (globalInvalidateRef.current === invalidate) globalInvalidateRef.current = null }
+  }, [invalidate])
   useEffect(() => { invalidate() }, [deps, invalidate])
   return null
 }
@@ -241,12 +242,18 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
       }
     }
 
+    // 마우스 이동은 euler 만 누적 → 다음 useFrame 에서 적용.
+    // invalidate 는 rAF 1회로 묶어서 1kHz 이벤트 폭격 방지.
+    let mouseDirty = false
     const onMouseMove = (e: MouseEvent) => {
       if (!isLocked.current) return
       euler.current.y -= e.movementX * MOUSE_SENSITIVITY
       euler.current.x -= e.movementY * MOUSE_SENSITIVITY
       euler.current.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, euler.current.x))
-      invalidate()   // 마우스 회전 시 재렌더 트리거
+      if (!mouseDirty) {
+        mouseDirty = true
+        requestAnimationFrame(() => { mouseDirty = false; invalidate() })
+      }
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -274,6 +281,7 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
       lastTouchX = touch.clientX
       lastTouchY = touch.clientY
     }
+    let touchDirty = false
     const onTouchMove = (e: TouchEvent) => {
       if (touchActiveId === null) return
       let touch: Touch | null = null
@@ -292,7 +300,10 @@ function FPSController({ bindings, height, isMobile, doorOpenStatesRef, onMove, 
       euler.current.y += dx * TOUCH_SENSITIVITY
       euler.current.x += dy * TOUCH_SENSITIVITY
       euler.current.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, euler.current.x))
-      invalidate()
+      if (!touchDirty) {
+        touchDirty = true
+        requestAnimationFrame(() => { touchDirty = false; invalidate() })
+      }
       if (e.cancelable) e.preventDefault()
     }
     const onTouchEnd = (e: TouchEvent) => {
@@ -655,7 +666,7 @@ export function WalkthroughView() {
         )}
         <Prewarm index={prewarmIndex} active={isPrewarming} onAdvance={advancePrewarm} />
         <Invalidator deps={`${isNight}|${allLightsOn}|${mirrorEnabled}|${activeDoorId}`} />
-        <FPSUpdater domRef={fpsRef} />
+        {!isMobile && <FPSUpdater domRef={fpsRef} />}
       </Canvas>
       {!isMobile && (
         <div

@@ -5,6 +5,22 @@ import * as THREE from 'three'
 import { ApartmentModel } from './ApartmentModel'
 import { LR_W, LR_D, WALL_HEIGHT } from '../data/apartment'
 
+/**
+ * Shadow map 은 정적 씬(조명 토글 시에만 변화) 이므로 autoUpdate=false 로 두고
+ * lightsOn 이 바뀔 때만 needsUpdate=true 로 한 프레임 재계산.
+ */
+function StaticShadowController({ lightsOn }: { lightsOn: boolean }) {
+  const { gl } = useThree()
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false
+    gl.shadowMap.needsUpdate = true
+  }, [gl])
+  useEffect(() => {
+    gl.shadowMap.needsUpdate = true
+  }, [lightsOn, gl])
+  return null
+}
+
 const KO_TO_EN: Record<string, string> = {
   'ㅈ': 'w', 'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd',
 }
@@ -92,6 +108,7 @@ export function BirdsEyeView() {
           screenSpacePanning
         />
         <WASDController controlsRef={controlsRef} />
+        <StaticShadowController lightsOn={lightsOn} />
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 15, 5]} intensity={1.0} />
         <ApartmentModel showCeiling={false} allLightsOn={lightsOn} showCityBackground={false} />
