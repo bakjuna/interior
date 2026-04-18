@@ -46,6 +46,22 @@ const MOVE_SPEED_MOBILE = 1.5
 const MOUSE_SENSITIVITY = 0.002
 const TOUCH_SENSITIVITY = 0.0035
 
+// 전체화면 API — iOS Safari 는 webkit prefix (iOS 16.4+ 에서 div requestFullscreen 지원)
+function getFullscreenElement(): Element | null {
+  return document.fullscreenElement || (document as any).webkitFullscreenElement || null
+}
+function toggleFullscreen() {
+  const el = getFullscreenElement()
+  if (el) {
+    const exit = document.exitFullscreen || (document as any).webkitExitFullscreen
+    exit?.call(document)?.catch?.(() => { /* noop */ })
+  } else {
+    const root = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }
+    const req = root.requestFullscreen || root.webkitRequestFullscreen
+    req?.call(root)?.catch?.(() => { /* noop */ })
+  }
+}
+
 // 매 프레임 재사용 — new THREE.Vector3() 할당 회피 (GC 압력 ↓)
 const _scratchDir = new THREE.Vector3()
 const _scratchRight = new THREE.Vector3()
@@ -763,23 +779,21 @@ export function WalkthroughView() {
       )}
 
       {isMobile && (
-        <>
-          <VirtualJoystick safeBottom="calc(env(safe-area-inset-bottom, 0px) + 20px)" pressKey={pressKey} />
-          <MobileControls
-            isNight={isNight}
-            allLightsOn={allLightsOn}
-            onToggleNight={() => { setIsNight((n) => !n); globalInvalidate() }}
-            onToggleAllLights={() => { setAllLightsOn((v) => (isNight ? !v : false)); globalInvalidate() }}
-            onOpenDoor={() => {
-              const id = activeDoorIdRef.current
-              if (id) doorRegistry.get(id)?.toggle()
-              globalInvalidate()
-            }}
-            onToggleMirror={() => { mirrorState.toggle(); globalInvalidate() }}
-            mirrorEnabled={mirrorEnabled}
-            holdProps={holdProps}
-          />
-        </>
+        <MobileControls
+          isNight={isNight}
+          allLightsOn={allLightsOn}
+          onToggleNight={() => { setIsNight((n) => !n); globalInvalidate() }}
+          onToggleAllLights={() => { setAllLightsOn((v) => (isNight ? !v : false)); globalInvalidate() }}
+          onOpenDoor={() => {
+            const id = activeDoorIdRef.current
+            if (id) doorRegistry.get(id)?.toggle()
+            globalInvalidate()
+          }}
+          onToggleMirror={() => { mirrorState.toggle(); globalInvalidate() }}
+          mirrorEnabled={mirrorEnabled}
+          holdProps={holdProps}
+          pressKey={pressKey}
+        />
       )}
     </>
   )
@@ -794,6 +808,7 @@ function MobileControls({
   onToggleMirror,
   mirrorEnabled,
   holdProps,
+  pressKey,
 }: {
   isNight: boolean
   allLightsOn: boolean
@@ -803,6 +818,7 @@ function MobileControls({
   onToggleMirror: () => void
   mirrorEnabled: boolean
   holdProps: (k: string) => any
+  pressKey: (k: string, down: boolean) => void
 }) {
   const padBtn: React.CSSProperties = {
     width: 56,
@@ -842,6 +858,19 @@ function MobileControls({
   //  - safe-area-inset-bottom 추가 마진
   //  - pointer-events:none 으로 캔버스 터치(시점 회전) 방해 안 함, 버튼에서만 auto
   const safeBottom = 'calc(env(safe-area-inset-bottom, 0px) + 20px)'
+  const safeTop = 'calc(env(safe-area-inset-top, 0px) + 12px)'
+
+  const [isFullscreen, setIsFullscreen] = useState(() => !!getFullscreenElement())
+  useEffect(() => {
+    const sync = () => setIsFullscreen(!!getFullscreenElement())
+    document.addEventListener('fullscreenchange', sync)
+    document.addEventListener('webkitfullscreenchange', sync as EventListener)
+    return () => {
+      document.removeEventListener('fullscreenchange', sync)
+      document.removeEventListener('webkitfullscreenchange', sync as EventListener)
+    }
+  }, [])
+
   return (
     <div
       data-mobile-ui
@@ -855,6 +884,36 @@ function MobileControls({
         pointerEvents: 'none',
       }}
     >
+      {/* 좌하단 — 가상 조이스틱 (MobileControls 의 100dvh 래퍼 안이라 거울 버튼과 같은 bottom 기준) */}
+      <VirtualJoystick safeBottom={safeBottom} pressKey={pressKey} />
+
+      {/* 우상단 — 전체화면 토글 (주소창/브라우저 chrome 숨기기) */}
+      <button
+        onClick={toggleFullscreen}
+        style={{
+          position: 'absolute',
+          top: safeTop,
+          right: 16,
+          width: 40,
+          height: 40,
+          padding: 0,
+          borderRadius: 10,
+          border: '1px solid rgba(255,255,255,0.25)',
+          background: 'rgba(22, 33, 62, 0.85)',
+          color: '#fff5e6',
+          fontSize: 18,
+          touchAction: 'manipulation',
+          pointerEvents: 'auto',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        aria-label={isFullscreen ? '전체화면 종료' : '전체화면'}
+      >
+        {isFullscreen ? '⤢' : '⛶'}
+      </button>
+
       {/* 우하단 — 액션 버튼 */}
       <div
         style={{
