@@ -75,6 +75,52 @@ export function DiningTable({ position, active }: DiningTableProps) {
     return t
   }, [marbleTex])
 
+  // 안방 bookshelf 와 동일한 오크 텍스처
+  const oakBaseTex = useKTX2('/textures/oak-wood.ktx2')
+  const oakMap = useMemo(() => {
+    const t = oakBaseTex.clone()
+    t.wrapS = THREE.RepeatWrapping
+    t.wrapT = THREE.RepeatWrapping
+    t.repeat.set(1, 1)
+    t.colorSpace = THREE.SRGBColorSpace
+    t.needsUpdate = true
+    return t
+  }, [oakBaseTex])
+
+  // U자 다리: 트렁크 20cm + 양쪽 암이 ±ARM_SPREAD_X 로 벌어져 상판 아래까지
+  const TRUNK_BOTTOM_Y = 0.03                 // 황동 받침 상단 (=base top)
+  const SPLIT_Y = TRUNK_BOTTOM_Y + 0.20       // 트렁크 20cm → y=0.23
+  const TOP_Y = TABLE_H - 0.015               // 상판(대리석) 하단에 flush = 0.735
+  const ARM_SPREAD_X = 0.33                   // 벌어지는 정도 (트렁크 높아진 만큼 축소)
+  const LEG_T = 0.18                          // 두께 180mm (Z)
+  const LEG_W = 0.3                           // 너비 300mm (X)
+  const INNER_TOP_X = ARM_SPREAD_X - LEG_W / 2 // 암 안쪽 top edge X (0.18)
+
+  // 트렁크+좌우 U자 암을 하나의 연속된 폴리곤으로 구성 → 겹침/z-fighting 방지
+  const legShape = useMemo(() => {
+    const s = new THREE.Shape()
+    s.moveTo(-LEG_W / 2, TRUNK_BOTTOM_Y)                 // 1) 트렁크 BL
+    s.lineTo(+LEG_W / 2, TRUNK_BOTTOM_Y)                 // 2) 트렁크 BR
+    s.lineTo(+LEG_W / 2, SPLIT_Y)                        // 3) 트렁크 TR (=우암 outer bottom)
+    s.lineTo(+ARM_SPREAD_X + LEG_W / 2, TOP_Y)           // 4) 우암 top outer
+    s.lineTo(+INNER_TOP_X, TOP_Y)                        // 5) 우암 top inner
+    // 6) U 곡선: 우암 inner → 좌암 inner (뾰족한 V 대신 부드러운 U)
+    s.bezierCurveTo(
+      +INNER_TOP_X, SPLIT_Y,
+      -INNER_TOP_X, SPLIT_Y,
+      -INNER_TOP_X, TOP_Y,
+    )
+    s.lineTo(-(ARM_SPREAD_X + LEG_W / 2), TOP_Y)         // 7) 좌암 top outer
+    s.lineTo(-LEG_W / 2, SPLIT_Y)                        // 8) 트렁크 TL
+    s.lineTo(-LEG_W / 2, TRUNK_BOTTOM_Y)                 // close
+    return s
+  }, [])
+  const legGeom = useMemo(() => {
+    const g = new THREE.ExtrudeGeometry(legShape, { depth: LEG_T, bevelEnabled: false })
+    g.translate(0, 0, -LEG_T / 2)                        // Z 중앙정렬
+    return g
+  }, [legShape])
+
   return (
     <>
       {/* lights outside group for stable Three.js light count */}
@@ -102,20 +148,14 @@ export function DiningTable({ position, active }: DiningTableProps) {
         <mesh geometry={topGeom} position={[tableX, TABLE_H, tableZ]}>
           <meshStandardMaterial map={marbleMap} roughness={0.15} metalness={0.05} />
         </mesh>
-        {/* 가운데 기둥 */}
-        <mesh position={[tableX, TABLE_H / 2 - 0.02, tableZ]}>
-          <cylinderGeometry args={[0.04, 0.04, TABLE_H - 0.06, 12]} />
-          <meshStandardMaterial color="#6b4226" roughness={0.7} />
-        </mesh>
-        {/* 받침판 */}
+        {/* 받침판 — 황동 40×70 */}
         <mesh position={[tableX, 0.015, tableZ]}>
-          <cylinderGeometry args={[0.3, 0.35, 0.03, 16]} />
-          <meshStandardMaterial color="#5a3620" roughness={0.7} />
+          <boxGeometry args={[0.7, 0.03, 0.4]} />
+          <meshStandardMaterial color="#b5a642" metalness={0.9} roughness={0.25} />
         </mesh>
-        {/* 기둥-상판 연결 */}
-        <mesh position={[tableX, TABLE_H - 0.05, tableZ]}>
-          <cylinderGeometry args={[0.15, 0.04, 0.06, 12]} />
-          <meshStandardMaterial color="#6b4226" roughness={0.7} />
+        {/* V자 다리 — 트렁크(10cm) + 두 암을 단일 폴리곤으로 합쳐 z-fighting 제거 */}
+        <mesh geometry={legGeom} position={[tableX, 0, tableZ]}>
+          <meshStandardMaterial map={oakMap} roughness={0.7} />
         </mesh>
 
         {/* 펜던트 조명 */}

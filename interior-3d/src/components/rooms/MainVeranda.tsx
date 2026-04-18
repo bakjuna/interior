@@ -67,7 +67,18 @@ export function MainVeranda({ visible, activeDoorId, playerPos }: MainVerandaPro
           const metalWestEdge = shelfX + 0.400  // 원목 선반 동쪽 엣지 (800mm/2)
           const metalX = metalWestEdge + metalW / 2
           const metalZ = northInnerZ + metalD / 2
-          return <MetalShelfUnit position={[metalX, 0, metalZ]} activeDoorId={activeDoorId} />
+          const cabinetEastEdge = metalX + metalW / 2
+          // 반띵 유리 선반 (500W × 1750H × 360D, 4발) — cabinet 바로 동쪽
+          const glassW = 0.500
+          const glassD = 0.360
+          const glassX = cabinetEastEdge + 0.005 + glassW / 2   // 5mm 갭
+          const glassZ = northInnerZ + glassD / 2                // 북벽 flush
+          return (
+            <>
+              <MetalShelfUnit position={[metalX, 0, metalZ]} activeDoorId={activeDoorId} />
+              <IronGlassShelfHalf position={[glassX, 0, glassZ]} />
+            </>
+          )
         })()}
       </group>
     </>
@@ -369,6 +380,91 @@ function ThreeTierShelf({
           />
         </mesh>
       ))}
+    </group>
+  )
+}
+
+/**
+ * 반띵 철제 유리 선반 — 500W × 1750H × 360D mm, 4발 (4 모서리 기둥만).
+ * WorkVeranda 의 6발짜리 IronGlassShelf 를 너비 절반으로 줄이고 중앙 기둥 제거.
+ */
+function IronGlassShelfHalf({
+  position,
+  rotation = 0,
+}: {
+  position: [number, number, number]
+  rotation?: number
+}) {
+  const W = 0.500
+  const H = 1.750
+  const D = 0.360
+  const panelT = 0.020
+  const postT = 0.020
+  const frameT = 0.020
+
+  const blackMat = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#0a0a0a', roughness: 0.95, metalness: 0.08 }),
+    [],
+  )
+
+  // 4 모서리 기둥만 (중앙 기둥 제거)
+  const postPositions: Array<[number, number]> = [
+    [-W / 2 + postT / 2, -D / 2 + postT / 2],
+    [-W / 2 + postT / 2,  D / 2 - postT / 2],
+    [ W / 2 - postT / 2, -D / 2 + postT / 2],
+    [ W / 2 - postT / 2,  D / 2 - postT / 2],
+  ]
+
+  const glassBotYs = [0.120, 0.530, 0.940, 1.350]
+  const topBotY = H - panelT
+  const gW = W - frameT * 2
+  const gD = D - frameT * 2
+
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      {postPositions.map(([px, pz], i) => (
+        <mesh key={`post-${i}`} position={[px, H / 2, pz]} material={blackMat}>
+          <boxGeometry args={[postT, H, postT]} />
+        </mesh>
+      ))}
+
+      {glassBotYs.map((ybot, i) => {
+        const cy = ybot + panelT / 2
+        return (
+          <group key={`glass-${i}`}>
+            <mesh position={[0, cy, 0]}>
+              <boxGeometry args={[gW, panelT, gD]} />
+              <meshPhysicalMaterial
+                color="#dceaef"
+                roughness={0.05}
+                metalness={0}
+                transmission={0.85}
+                thickness={0.02}
+                ior={1.5}
+                transparent
+                opacity={0.4}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+            <mesh position={[0, cy, -D / 2 + frameT / 2]} material={blackMat}>
+              <boxGeometry args={[W, frameT, frameT]} />
+            </mesh>
+            <mesh position={[0, cy, D / 2 - frameT / 2]} material={blackMat}>
+              <boxGeometry args={[W, frameT, frameT]} />
+            </mesh>
+            <mesh position={[-W / 2 + frameT / 2, cy, 0]} material={blackMat}>
+              <boxGeometry args={[frameT, frameT, gD]} />
+            </mesh>
+            <mesh position={[W / 2 - frameT / 2, cy, 0]} material={blackMat}>
+              <boxGeometry args={[frameT, frameT, gD]} />
+            </mesh>
+          </group>
+        )
+      })}
+
+      <mesh position={[0, topBotY + panelT / 2, 0]} material={blackMat}>
+        <boxGeometry args={[W, panelT, D]} />
+      </mesh>
     </group>
   )
 }

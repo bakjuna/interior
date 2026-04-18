@@ -31,15 +31,17 @@ interface DiningChairProps {
 }
 
 export function DiningChair({ position, rotationY = 0, doorId, activeDoorId }: DiningChairProps) {
-  const walnutBaseTex = useKTX2('/textures/walnut-closet-door.ktx2')
+  // 안방 bookshelf 와 동일한 oak 텍스처 — 원본 이미지 1회 매핑 (UV 는 각 geometry 가 직접 제어)
+  const oakBaseTex = useKTX2('/textures/oak-wood.ktx2')
   const frameTex = useMemo(() => {
-    const t = walnutBaseTex.clone()
-    t.wrapS = THREE.RepeatWrapping
-    t.wrapT = THREE.RepeatWrapping
+    const t = oakBaseTex.clone()
+    t.wrapS = THREE.ClampToEdgeWrapping
+    t.wrapT = THREE.ClampToEdgeWrapping
     t.repeat.set(1, 1)
     t.colorSpace = THREE.SRGBColorSpace
+    t.needsUpdate = true
     return t
-  }, [walnutBaseTex])
+  }, [oakBaseTex])
 
   // 검정 가죽 — 좌판·등받이 공용. ClampToEdge 로 repeat 없이 한 번 매핑.
   const leatherBaseTex = useLoader(THREE.TextureLoader, '/textures/leather-black.png')
@@ -119,7 +121,63 @@ export function DiningChair({ position, rotationY = 0, doorId, activeDoorId }: D
     )
   }, [foldAxisDir])
 
-  // 사이드 프레임 merged geometry — lower + rotated upper + wedge 통합 (좌/우)
+  // Wedge geometries 별도 (merge 성공 여부와 무관하게 보장)
+  const wedgeGeos = useMemo(() => {
+    const halfW_ = 0.215
+    const result: Record<string, THREE.BufferGeometry> = {}
+    for (const sz of [-1, 1]) {
+      const axisZ = sz * halfW_
+      const axisPos = new THREE.Vector3(foldLineMidX, foldLineMidY, axisZ)
+      const wedgeH = foldLineLen + 0.005
+      const wedgeR = 0.043
+      const thetaS = sz > 0 ? 0 : Math.PI - bendAngle
+      const wedge = new THREE.CylinderGeometry(
+        wedgeR, wedgeR, wedgeH, 24, 1, false, thetaS, bendAngle,
+      )
+      // 상단 사선 절단 (slope 0.3 → 내림) + 하단 사선 절단 (slope 0.1 → 올림, 반대 방향)
+      const pos = wedge.getAttribute('position') as THREE.BufferAttribute
+      const topY = wedgeH / 2
+      const botY = -wedgeH / 2
+      const slopeTop = (wedgeH * 0.3) / wedgeR
+      const slopeBot = (wedgeH * 0.1) / wedgeR
+      for (let i = 0; i < pos.count; i++) {
+        const y = pos.getY(i)
+        const x = pos.getX(i)
+        if (y > topY - 1e-4) {
+          const newY = Math.max(botY + 0.003, topY - slopeTop * Math.max(0, x))
+          pos.setY(i, newY)
+        } else if (y < botY + 1e-4) {
+          const newY = Math.min(topY - 0.003, botY + slopeBot * Math.max(0, x))
+          pos.setY(i, newY)
+        }
+      }
+      pos.needsUpdate = true
+      wedge.computeVertexNormals()
+      wedge.applyQuaternion(foldAxisQuat)
+      wedge.translate(axisPos.x, axisPos.y, axisPos.z)
+      // Planar UV projection (world X, Y) + 90° 회전 — mergedSideFrame 과 동일 매핑
+      {
+        const wpos = wedge.getAttribute('position') as THREE.BufferAttribute
+        const xMin = -0.2125, xMax = 0.053
+        const yMin = 0, yMax = 0.760
+        const scale = Math.max(xMax - xMin, yMax - yMin)
+        const wuvs = new Float32Array(wpos.count * 2)
+        for (let i = 0; i < wpos.count; i++) {
+          const x = wpos.getX(i)
+          const y = wpos.getY(i)
+          const u0 = (x - xMin) / scale
+          const v0 = (y - yMin) / scale
+          wuvs[i * 2] = 1 - v0
+          wuvs[i * 2 + 1] = u0
+        }
+        wedge.setAttribute('uv', new THREE.BufferAttribute(wuvs, 2))
+      }
+      result[String(sz)] = wedge
+    }
+    return result
+  }, [foldAxisDir, foldAxisQuat])
+
+  // 사이드 프레임 merged geometry — lower + rotated upper (wedge 제외)
   const mergedSideFrame = useMemo(() => {
     const halfW_ = 0.215
     const result: Record<string, THREE.BufferGeometry> = {}
@@ -141,24 +199,23 @@ export function DiningChair({ position, rotationY = 0, doorId, activeDoorId }: D
       upper.applyQuaternion(foldQuat)
       upper.translate(axisPos.x, axisPos.y, axisPos.z)
 
-      const wedgeH = foldLineLen + 0.008
-      const wedgeR = 0.043
-      const thetaS = sz > 0 ? 0 : Math.PI - bendAngle
-      const wedge = new THREE.CylinderGeometry(
-        wedgeR, wedgeR, wedgeH, 24, 1, false, thetaS, bendAngle,
-      )
-      wedge.applyQuaternion(foldAxisQuat)
-      wedge.translate(axisPos.x, axisPos.y, axisPos.z)
-
-      const merged = mergeGeometries([lower, upper, wedge])
+      const merged = mergeGeometries([lower, upper])
       if (merged) {
-        // 통일된 UV — XY 평면 기반 planar projection (같은 월드 X/Y 위치는 같은 텍스처 포인트)
+        // Planar UV projection (world X, Y) + 90° 회전 — 모든 면 (caps + side walls) 일관된 oak grain
         const pos = merged.getAttribute('position') as THREE.BufferAttribute
+        const xMin = -0.2125, xMax = 0.053
+        const yMin = 0, yMax = 0.760
+        const scale = Math.max(xMax - xMin, yMax - yMin)   // 정사각형 UV 공간
         const uvs = new Float32Array(pos.count * 2)
-        const scale = 0.6   // 0.6m 당 한 번 반복
         for (let i = 0; i < pos.count; i++) {
-          uvs[i * 2] = pos.getX(i) / scale
-          uvs[i * 2 + 1] = pos.getY(i) / scale
+          const x = pos.getX(i)
+          const y = pos.getY(i)
+          // 정규화 원본 UV
+          const u0 = (x - xMin) / scale
+          const v0 = (y - yMin) / scale
+          // 90° 회전: (u, v) → (1 - v, u)
+          uvs[i * 2] = 1 - v0
+          uvs[i * 2 + 1] = u0
         }
         merged.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
         result[String(sz)] = merged
@@ -171,7 +228,7 @@ export function DiningChair({ position, rotationY = 0, doorId, activeDoorId }: D
   // 밝게 + 붉은 기운 tint — R 채널 1.5× 추가 boost
   const frameMat = useMemo(() => new THREE.MeshStandardMaterial({
     map: frameTex,
-    color: new THREE.Color(2.55, 1.7, 1.7),   // (1.7 * 1.5, 1.7, 1.7) — 70% brighter + 50% redness
+    color: new THREE.Color(1.3875, 1.175, 1.175),   // tint 한 번 더 절반 — 약 17.5% brighter + 12.5% redness
     roughness: 0.55,
     metalness: 0.05,
   }), [frameTex])
@@ -194,10 +251,27 @@ export function DiningChair({ position, rotationY = 0, doorId, activeDoorId }: D
     s.lineTo(-0.020, H)
     s.quadraticCurveTo(-0.020, H * 0.5, -0.010, 0)
     s.closePath()
-    return new THREE.ExtrudeGeometry(s, {
+    const geo = new THREE.ExtrudeGeometry(s, {
       depth: FRAME_T * 0.8, bevelEnabled: true, bevelSegments: 2,
       bevelSize: 0.0015, bevelThickness: 0.0015, curveSegments: 16,
     })
+    // Planar UV projection (local X, Y) + 90° 회전 — 뒷다리와 동일. 옆면(side walls) 포함 일관된 oak grain.
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute
+    const xMin = -0.020, xMax = 0.020
+    const yMin = 0, yMax = H
+    const scale = Math.max(xMax - xMin, yMax - yMin)
+    const uvs = new Float32Array(pos.count * 2)
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i)
+      const y = pos.getY(i)
+      const u0 = (x - xMin) / scale
+      const v0 = (y - yMin) / scale
+      // 90° 회전: (u, v) → (1 - v, u)
+      uvs[i * 2] = 1 - v0
+      uvs[i * 2 + 1] = u0
+    }
+    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+    return geo
   }, [])
 
   // 좌판 쿠션 geo — rounded rectangle 을 ExtrudeGeometry 로 Y 방향 extrude.
@@ -318,41 +392,33 @@ export function DiningChair({ position, rotationY = 0, doorId, activeDoorId }: D
   return (
     <group position={[position[0], 0, position[1]]} rotation={[0, rotationY, 0]}>
       <group ref={innerGroupRef}>
-      {/* 좌/우 사이드 프레임 — lower+upper(160° fold)+wedge. merge 실패 fallback: 분리 렌더.
-          공유 frameMat (brightened + red tint) 로 텍스처 일관성 확보. */}
+      {/* 좌/우 사이드 프레임 — merged (lower+upper) + 별도 wedge mesh.
+          Wedge 는 merge 에서 분리되어 확실히 렌더 보장. */}
       {[-1, 1].map((sz) => {
         const zBase = sz * halfW
         const lowerZ = sz < 0 ? zBase - FRAME_T : zBase
         const upperZ = lowerZ
         const axisZ = sz * halfW
         const merged = mergedSideFrame[String(sz)]
-        if (merged) {
-          // merge 성공 — 단일 mesh
-          return <mesh key={`side-${sz}`} geometry={merged} material={frameMat} />
-        }
-        // fallback — 3개 분리
+        const wedgeGeo = wedgeGeos[String(sz)]
         return (
           <group key={`side-${sz}`}>
-            <mesh position={[0, 0, lowerZ]} geometry={sideFrameLowerGeo} material={frameMat} />
-            <FoldGroup
-              axisPosition={[foldLineMidX, foldLineMidY, axisZ]}
-              axisDir={foldAxisDir}
-              angle={sz < 0 ? -bendAngle : bendAngle}
-            >
-              <mesh position={[0, 0, upperZ]} geometry={sideFrameUpperGeo} material={frameMat} />
-            </FoldGroup>
-            <mesh
-              position={[foldLineMidX, foldLineMidY, axisZ]}
-              quaternion={foldAxisQuat}
-              material={frameMat}
-            >
-              <cylinderGeometry
-                args={[
-                  0.043, 0.043, foldLineLen + 0.010, 24, 1, false,
-                  sz > 0 ? 0 : Math.PI - bendAngle, bendAngle,
-                ]}
-              />
-            </mesh>
+            {merged ? (
+              <mesh geometry={merged} material={frameMat} />
+            ) : (
+              <>
+                <mesh position={[0, 0, lowerZ]} geometry={sideFrameLowerGeo} material={frameMat} />
+                <FoldGroup
+                  axisPosition={[foldLineMidX, foldLineMidY, axisZ]}
+                  axisDir={foldAxisDir}
+                  angle={sz < 0 ? -bendAngle : bendAngle}
+                >
+                  <mesh position={[0, 0, upperZ]} geometry={sideFrameUpperGeo} material={frameMat} />
+                </FoldGroup>
+              </>
+            )}
+            {/* Wedge — 사선 절단된 160° cylinder */}
+            <mesh geometry={wedgeGeo} material={frameMat} />
           </group>
         )
       })}
@@ -366,9 +432,8 @@ export function DiningChair({ position, rotationY = 0, doorId, activeDoorId }: D
             key={`front-leg-${sz}`}
             position={[0.195, 0, zOffset]}
             geometry={frontLegGeo}
-          >
-            <meshStandardMaterial map={frameTex} roughness={0.55} metalness={0.05} />
-          </mesh>
+            material={frameMat}
+          />
         )
       })}
 
