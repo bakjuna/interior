@@ -4,7 +4,7 @@
  * openShelf 지정 시 해당 영역은 문짝 대신 오픈 선반 + LED.
  */
 
-import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
+import { memo, useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { DoorTooltip, getDoorLabel } from '../ui/DoorTooltip'
 import * as THREE from 'three'
@@ -20,10 +20,16 @@ interface ClosetsProps {
   doorOpenStates?: Map<DoorId, boolean>
 }
 
-export function Closets({ activeDoorId, playerPos, allLightsOn, doorOpenStates }: ClosetsProps) {
+// 거실 LR bounds (lrLedActive 계산용) — comparator 와 본체가 공유
+const LR_BOUNDS = { xMin: 0, xMax: 3.972, zMin: 0, zMax: 3.666 } as const
+function isInLR(pos?: [number, number]) {
+  return !!pos && pos[0] >= LR_BOUNDS.xMin && pos[0] <= LR_BOUNDS.xMax && pos[1] >= LR_BOUNDS.zMin && pos[1] <= LR_BOUNDS.zMax
+}
+
+function ClosetsInner({ activeDoorId, playerPos, allLightsOn, doorOpenStates }: ClosetsProps) {
   void doorOpenStates
   // 거실장 LED 활성: 플레이어가 거실 내 또는 allLightsOn
-  const lrLedActive = !!allLightsOn || (!!playerPos && playerPos[0] >= 0 && playerPos[0] <= 3.972 && playerPos[1] >= 0 && playerPos[1] <= 3.666)
+  const lrLedActive = !!allLightsOn || isInLR(playerPos)
 
   // 붙박이 도어 개폐 상태 — 로컬 state (closet 전용). 내부 톤 분기용.
   const [closetOpen, setClosetOpen] = useState<Map<DoorId, boolean>>(() => new Map())
@@ -554,6 +560,15 @@ export function Closets({ activeDoorId, playerPos, allLightsOn, doorOpenStates }
     </>
   )
 }
+
+// playerPos 가 4Hz throttle 로 자주 바뀌어도 lrLedActive (거실 bounds) 가 안 바뀌면 skip
+export const Closets = memo(ClosetsInner, (prev, next) => {
+  if (prev.activeDoorId !== next.activeDoorId) return false
+  if (prev.allLightsOn !== next.allLightsOn) return false
+  if (prev.doorOpenStates !== next.doorOpenStates) return false
+  // playerPos 는 LR bounds 안/밖 여부로만 비교
+  return isInLR(prev.playerPos) === isInLR(next.playerPos)
+})
 
 /**
  * 붙박이장 인터랙티브 도어 — +X 방향(방 안쪽)으로 swing.

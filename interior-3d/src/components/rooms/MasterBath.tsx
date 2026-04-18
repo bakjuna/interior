@@ -4,7 +4,7 @@
  * 샤워부스/조적벽 없음.
  */
 
-import { Suspense, useState, useMemo, useRef, useEffect } from 'react'
+import { memo, Suspense, useState, useMemo, useRef, useEffect } from 'react'
 import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { DoorTooltip } from '../ui/DoorTooltip'
@@ -25,6 +25,7 @@ import {
   mbDoorEnd,
 } from '../../data/apartment'
 import { useMirrorActive, makeNonRecursiveReflector, isReflectorVisible } from '../../systems/mirrorToggle'
+import { playerSectorEqual } from '../../systems/visibility'
 
 interface MasterBathProps {
   visible: boolean
@@ -33,7 +34,7 @@ interface MasterBathProps {
   activeDoorId?: DoorId | null
 }
 
-export function MasterBath({ visible, playerPos, allLightsOn, activeDoorId }: MasterBathProps) {
+function MasterBathInner({ visible, playerPos, allLightsOn, activeDoorId }: MasterBathProps) {
   const bathroomWallTex = useKTX2('/textures/bathroom-wall-tile.ktx2')
 
   const makeTileTex = useMemo(() => {
@@ -452,3 +453,10 @@ export function MasterBath({ visible, playerPos, allLightsOn, activeDoorId }: Ma
     </>
   )
 }
+
+export const MasterBath = memo(MasterBathInner, (prev, next) => {
+  if (prev.visible !== next.visible) return false
+  if (prev.allLightsOn !== next.allLightsOn) return false
+  if (prev.activeDoorId !== next.activeDoorId) return false
+  return playerSectorEqual(prev.playerPos, next.playerPos)
+})

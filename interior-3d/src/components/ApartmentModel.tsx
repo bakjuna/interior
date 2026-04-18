@@ -282,6 +282,23 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
     return set
   }, [activeGroup])
 
+  // 각 다운라이트의 active 상태를 Map 으로 미리 계산 — map() 내부 할당/계산 제거
+  const downlightActiveMap = useMemo(() => {
+    const m = new Map<string, boolean>()
+    for (const d of downlightStatic) {
+      const inActiveGroup = activeGroupKeys?.has(d.key) ?? false
+      m.set(d.key, inActiveGroup || (!!allLightsOn && (d.sector ? visibleSectors.has(d.sector) : true)))
+    }
+    return m
+  }, [downlightStatic, activeGroupKeys, allLightsOn, visibleSectors])
+
+  // fallback pointLight 위치 — playerPos throttle 시 배열 재할당 방지
+  const fallbackLightPos = useMemo<[number, number, number]>(
+    () => [playerPos?.[0] ?? 0, WALL_HEIGHT - 0.1, playerPos?.[1] ?? 0],
+    [playerPos]
+  )
+  const fallbackLightIntensity = playerPos && !activeGroup ? 0.5 : 0
+
   // 방별 바닥 텍스처 — 1번만 생성 (매 렌더마다 clone 방지)
   const roomFloorTextures = useMemo(() => {
     return rooms.map((room) => {
@@ -315,18 +332,20 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
         visibleSectors={visibleSectors}
       />
       {/* 다운라이트 SpotLight — 원본과 동일, 모든 활성 라이트 렌더 */}
-      {downlightStatic.map((d, i) => {
-        const inActiveGroup = activeGroupKeys?.has(d.key) ?? false
-        const isActive = inActiveGroup ||
-          (!!allLightsOn && (d.sector ? visibleSectors.has(d.sector) : true))
-        return (
-          <DropCeilingLight key={`dl-${i}`} x={d.x} z={d.z} ceilingY={d.ceilingY} active={isActive} color={d.color} />
-        )
-      })}
+      {downlightStatic.map((d, i) => (
+        <DropCeilingLight
+          key={`dl-${i}`}
+          x={d.x}
+          z={d.z}
+          ceilingY={d.ceilingY}
+          active={downlightActiveMap.get(d.key) ?? false}
+          color={d.color}
+        />
+      ))}
       {/* 워크스루: 조명 없는 공간에서만 외부 라이트 — 항상 mount, intensity 로 제어 */}
       <pointLight
-        position={[playerPos?.[0] ?? 0, WALL_HEIGHT - 0.1, playerPos?.[1] ?? 0]}
-        intensity={playerPos && !activeGroup ? 0.5 : 0}
+        position={fallbackLightPos}
+        intensity={fallbackLightIntensity}
         distance={4}
         decay={2}
         color="#ffffff"

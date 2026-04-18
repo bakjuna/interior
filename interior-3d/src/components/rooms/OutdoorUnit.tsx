@@ -5,6 +5,7 @@
  * 도어는 shell/Doors.tsx 에서 렌더되므로 여기는 가벽 + AC만.
  */
 
+import { memo } from 'react'
 import * as THREE from 'three'
 import {
   WALL_THICKNESS,
@@ -22,7 +23,7 @@ interface OutdoorUnitProps {
   contentsVisible: boolean
 }
 
-export function OutdoorUnit({ wallVisible, contentsVisible }: OutdoorUnitProps) {
+export const OutdoorUnit = memo(function OutdoorUnit({ wallVisible, contentsVisible }: OutdoorUnitProps) {
   if (!wallVisible && !contentsVisible) return null
 
   const pX = 0.870 + 2.000  // 가벽 X (거실 창문 우측)
@@ -77,4 +78,4 @@ export function OutdoorUnit({ wallVisible, contentsVisible }: OutdoorUnitProps) 
       )}
     </group>
   )
-}
+})

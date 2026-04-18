@@ -22,6 +22,18 @@ export function findSector(x: number, z: number): SectorId | null {
 }
 
 /**
+ * playerPos 가 4Hz throttle 로 자주 바뀌어도, sector 는 방 경계 건널 때만 바뀜.
+ * React.memo comparator 용 — bounds 기반 activation / mirror sector 정책 모두
+ * sector 가 바뀔 때만 재계산되므로 sector equal 하면 skip 안전.
+ */
+export function playerSectorEqual(prev?: [number, number], next?: [number, number]): boolean {
+  if (prev === next) return true
+  const ps = prev ? findSector(prev[0], prev[1]) : null
+  const ns = next ? findSector(next[0], next[1]) : null
+  return ps === ns
+}
+
+/**
  * BFS — 시각 + 라이트 통합. visualOnly portal (베란다 창문 등)은 한 경로에서
  * 최대 1번만 통과 가능. 즉 mb → mainVeranda(창) → lr(창) 같은 2-hop은 차단.
  *

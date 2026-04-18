@@ -2,6 +2,7 @@
  * 세탁실 — L자형 (3-box). LG WashTower + 천장 다운라이트.
  */
 
+import { memo } from 'react'
 import { WashTower } from '../models/WashTower'
 import {
   WALL_THICKNESS,
@@ -18,7 +19,7 @@ interface LaundryProps {
   visible: boolean
 }
 
-export function Laundry({ visible }: LaundryProps) {
+export const Laundry = memo(function Laundry({ visible }: LaundryProps) {
   // 다운라이트 — 세탁실 가운데 (항상 켜짐)
   const lightX = (stair2X + T2 + rightWallX - T2) / 2
   const lightZ = (Math.min(stair3Z + T2, laundryBotZ - T2) + Math.max(stair3Z + T2, laundryBotZ - T2)) / 2
@@ -36,4 +37,4 @@ export function Laundry({ visible }: LaundryProps) {
       </group>
     </>
   )
-}
+})

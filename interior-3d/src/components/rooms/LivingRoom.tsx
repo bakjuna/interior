@@ -3,7 +3,7 @@
  * 코브 LED + 단내림은 shell/Ceilings.tsx 가 처리.
  */
 
-import { Suspense, useMemo } from 'react'
+import { memo, Suspense, useMemo } from 'react'
 import * as THREE from 'three'
 import { Sofa } from '../models/Sofa'
 import { useKTX2 } from '../../systems/useKTX2'
@@ -17,7 +17,8 @@ interface LivingRoomProps {
   playerPos?: [number, number]
 }
 
-export function LivingRoom({ visible, activeDoorId, playerPos }: LivingRoomProps) {
+export const LivingRoom = memo(
+  function LivingRoom({ visible, activeDoorId, playerPos }: LivingRoomProps) {
   void playerPos
   const walnutTex = useKTX2('/textures/walnut-closet-door.ktx2')
   const shelfTex = useMemo(() => {
@@ -142,5 +143,8 @@ export function LivingRoom({ visible, activeDoorId, playerPos }: LivingRoomProps
       />
     </group>
   )
-}
+  },
+  // playerPos 미사용 — visible, activeDoorId 만 비교
+  (prev, next) => prev.visible === next.visible && prev.activeDoorId === next.activeDoorId,
+)
 

@@ -2,7 +2,7 @@
  * 복도 — 메인화장실~아기방 도어 사이 벽에 걸린 저해상도 아크릴 웨딩 사진.
  */
 
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { useLoader } from '@react-three/fiber'
 import * as THREE from 'three'
 import { WALL_THICKNESS, bath2RightWallX, babyBottom } from '../../data/apartment'
@@ -13,7 +13,8 @@ interface HallwayProps {
   allLightsOn: boolean
 }
 
-export function Hallway({ visible }: HallwayProps) {
+export const Hallway = memo(
+  function Hallway({ visible }: HallwayProps) {
   // 64px 가로로 다운스케일된 웨딩 사진 — 아크릴 액자용
   const photoTex = useLoader(THREE.TextureLoader, '/textures/wedding-photo.png')
   const photoMat = useMemo(() => {
@@ -54,4 +55,7 @@ export function Hallway({ visible }: HallwayProps) {
       </mesh>
     </group>
   )
-}
+  },
+  // playerPos 와 allLightsOn 은 Hallway 내부에서 사용하지 않음 — visible 만 비교
+  (prev, next) => prev.visible === next.visible,
+)

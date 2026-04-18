@@ -6,9 +6,10 @@
  * 주방 활성: playerPos가 주방 bounds 내 또는 allLightsOn.
  */
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { playerSectorEqual } from '../../systems/visibility'
 import { CuckooWaterPurifier } from '../models/CuckooWaterPurifier'
 import { RiceCooker } from '../models/RiceCooker'
 import { LightWaveOven } from '../models/LightWaveOven'
@@ -37,7 +38,7 @@ interface KitchenProps {
   activeDoorId?: DoorId | null
 }
 
-export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: KitchenProps) {
+function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: KitchenProps) {
   const closetDoorTex = useKTX2('/textures/walnut-closet-door.ktx2')
   const kitchenTileTex = useKTX2('/textures/kitchen-tile.ktx2')
   const stoneTex = useKTX2('/textures/engineered-stone.ktx2')
@@ -1247,6 +1248,14 @@ export function Kitchen({ visible, playerPos, allLightsOn, activeDoorId }: Kitch
     </>
   )
 }
+
+// playerPos 4Hz throttle — sector 가 같으면 kitchenActive 도 변하지 않으므로 skip
+export const Kitchen = memo(KitchenInner, (prev, next) => {
+  if (prev.visible !== next.visible) return false
+  if (prev.allLightsOn !== next.allLightsOn) return false
+  if (prev.activeDoorId !== next.activeDoorId) return false
+  return playerSectorEqual(prev.playerPos, next.playerPos)
+})
 
 /**
  * 정수기 하단 밥솥 drawer — 슬라이드 인/아웃 (F 키 토글).

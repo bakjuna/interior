@@ -5,7 +5,7 @@
  * shadow map 해상도는 낮게(256) 유지하여 성능 절약.
  */
 
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, memo } from 'react'
 import * as THREE from 'three'
 import { useThree } from '@react-three/fiber'
 
@@ -19,7 +19,7 @@ interface DropCeilingLightProps {
   distance?: number
 }
 
-export function DropCeilingLight({ x, z, ceilingY, active, color = '#ffe0b0', intensity = 2.0, distance }: DropCeilingLightProps) {
+function DropCeilingLightInner({ x, z, ceilingY, active, color = '#ffe0b0', intensity = 2.0, distance }: DropCeilingLightProps) {
   const lightRef = useRef<THREE.SpotLight>(null)
   const { scene } = useThree()
   const targetRef = useRef<THREE.Object3D | null>(null)
@@ -63,3 +63,5 @@ export function DropCeilingLight({ x, z, ceilingY, active, color = '#ffe0b0', in
     />
   )
 }
+
+export const DropCeilingLight = memo(DropCeilingLightInner)

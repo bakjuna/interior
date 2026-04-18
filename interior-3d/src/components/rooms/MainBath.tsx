@@ -3,7 +3,7 @@
  * 4면 600×1200 포세린 타일, 우측벽은 도어 개구부 분할.
  */
 
-import { Suspense, useState, useMemo, useRef, useEffect } from 'react'
+import { memo, Suspense, useState, useMemo, useRef, useEffect } from 'react'
 import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { DoorTooltip } from '../ui/DoorTooltip'
@@ -19,6 +19,7 @@ import {
   mbDoorEnd,
 } from '../../data/apartment'
 import { useMirrorActive, makeNonRecursiveReflector, isReflectorVisible } from '../../systems/mirrorToggle'
+import { playerSectorEqual } from '../../systems/visibility'
 
 const T2 = WALL_THICKNESS / 2
 
@@ -29,7 +30,7 @@ interface MainBathProps {
   activeDoorId?: DoorId | null
 }
 
-export function MainBath({ visible, playerPos, allLightsOn, activeDoorId }: MainBathProps) {
+function MainBathInner({ visible, playerPos, allLightsOn, activeDoorId }: MainBathProps) {
   const bathroomWallTex = useKTX2('/textures/bathroom-wall-tile.ktx2')
 
   // 타일 텍스처 캐시 — 동일 (uRep, vRep) 조합은 1번만 clone
@@ -506,3 +507,12 @@ export function MainBath({ visible, playerPos, allLightsOn, activeDoorId }: Main
     </>
   )
 }
+
+// useMirrorActive('mainBath') sector 정책 ['entrance','hall','mainBath'] 도 sector
+// 바뀔 때만 변화. bathActive bounds 도 마찬가지 — sector 동일하면 skip.
+export const MainBath = memo(MainBathInner, (prev, next) => {
+  if (prev.visible !== next.visible) return false
+  if (prev.allLightsOn !== next.allLightsOn) return false
+  if (prev.activeDoorId !== next.activeDoorId) return false
+  return playerSectorEqual(prev.playerPos, next.playerPos)
+})

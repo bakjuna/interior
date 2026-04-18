@@ -4,7 +4,7 @@
  * 천장 다운라이트 2개 (항상 켜짐).
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import {
@@ -28,7 +28,8 @@ interface MainVerandaProps {
   playerPos?: [number, number]
 }
 
-export function MainVeranda({ visible, activeDoorId, playerPos }: MainVerandaProps) {
+export const MainVeranda = memo(
+  function MainVeranda({ visible, activeDoorId, playerPos }: MainVerandaProps) {
   void playerPos
   const z = LR_D + WALL_THICKNESS + verandaInnerD / 2
   // 안방 창문: X=[mbLeft+1.340, mbLeft+3.340], 공유벽 Z=LR_D
@@ -83,7 +84,9 @@ export function MainVeranda({ visible, activeDoorId, playerPos }: MainVerandaPro
       </group>
     </>
   )
-}
+  },
+  (prev, next) => prev.visible === next.visible && prev.activeDoorId === next.activeDoorId,
+)
 
 /**
  * BoxGeometry 월드-스케일 UV — 얇은 판에서도 일정한 나뭇결 크기.

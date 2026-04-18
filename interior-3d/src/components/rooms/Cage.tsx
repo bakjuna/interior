@@ -3,6 +3,7 @@
  * 가벽 (50mm, 도어 갭 있음, 상인방)만 — 도어는 shell/Doors.tsx에서 처리.
  */
 
+import { memo } from 'react'
 import {
   WALL_THICKNESS,
   WALL_HEIGHT,
@@ -18,7 +19,7 @@ interface CageProps {
   wallVisible: boolean
 }
 
-export function Cage({ wallVisible }: CageProps) {
+export const Cage = memo(function Cage({ wallVisible }: CageProps) {
   if (!wallVisible) return null
 
   const pX = mbLeft + 1.340
@@ -47,4 +48,4 @@ export function Cage({ wallVisible }: CageProps) {
       </mesh>
     </group>
   )
-}
+})

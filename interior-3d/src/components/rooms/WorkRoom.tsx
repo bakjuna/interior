@@ -3,12 +3,13 @@
  * 천장 단내림 + 코브 LED는 shell/Ceilings.tsx 가 처리.
  */
 
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import * as THREE from 'three'
 import { TrestleDesk } from '../models/TrestleDesk'
 import { WoodBlind } from '../shell/WoodBlind'
 import { LR_W, right1Z, WALL_THICKNESS, babyRightWallX, babyTopWallZ } from '../../data/apartment'
 import { useKTX2 } from '../../systems/useKTX2'
+import { playerSectorEqual } from '../../systems/visibility'
 import type { DoorId } from '../../data/sectors'
 
 const T2 = WALL_THICKNESS / 2
@@ -20,7 +21,7 @@ interface WorkRoomProps {
   activeDoorId?: DoorId | null
 }
 
-export function WorkRoom({ visible, playerPos, allLightsOn, activeDoorId }: WorkRoomProps) {
+function WorkRoomInner({ visible, playerPos, allLightsOn, activeDoorId }: WorkRoomProps) {
   const closetDoorTex = useKTX2('/textures/walnut-closet-door.ktx2')
   const walnutTex = useMemo(() => {
     const t = closetDoorTex.clone()
@@ -171,4 +172,11 @@ export function WorkRoom({ visible, playerPos, allLightsOn, activeDoorId }: Work
     </>
   )
 }
+
+export const WorkRoom = memo(WorkRoomInner, (prev, next) => {
+  if (prev.visible !== next.visible) return false
+  if (prev.allLightsOn !== next.allLightsOn) return false
+  if (prev.activeDoorId !== next.activeDoorId) return false
+  return playerSectorEqual(prev.playerPos, next.playerPos)
+})
 

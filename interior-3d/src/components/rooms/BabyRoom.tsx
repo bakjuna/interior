@@ -4,6 +4,7 @@
  * 천장 다운라이트는 ApartmentModel의 downlights 그룹이 처리 (Phase 6에서 이전).
  */
 
+import { memo } from 'react'
 import { ToddlerBed } from '../models/ToddlerBed'
 import { WoodBlind } from '../shell/WoodBlind'
 import { babyRight, babyTop, babyTopWallZ, babyLeft, WALL_HEIGHT } from '../../data/apartment'
@@ -14,7 +15,7 @@ interface BabyRoomProps {
   activeDoorId?: DoorId | null
 }
 
-export function BabyRoom({ visible, activeDoorId }: BabyRoomProps) {
+export const BabyRoom = memo(function BabyRoom({ visible, activeDoorId }: BabyRoomProps) {
   return (
     <group visible={visible}>
       <ToddlerBed
@@ -42,4 +43,4 @@ export function BabyRoom({ visible, activeDoorId }: BabyRoomProps) {
       />
     </group>
   )
-}
+})

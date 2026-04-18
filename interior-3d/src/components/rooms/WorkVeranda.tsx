@@ -4,7 +4,7 @@
  * 천장 다운라이트 1개 (항상 켜짐).
  */
 
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import * as THREE from 'three'
 import {
   WALL_THICKNESS,
@@ -19,7 +19,7 @@ interface WorkVerandaProps {
   visible: boolean
 }
 
-export function WorkVeranda({ visible }: WorkVerandaProps) {
+export const WorkVeranda = memo(function WorkVeranda({ visible }: WorkVerandaProps) {
   // 벽 중심: 서쪽 = babyRightWallX + 2.500, 동쪽 = babyRightWallX + 2.500 + 2.673.
   // 내측면은 중심에서 T2 안쪽.
   const minX = babyRightWallX + 2.500 + T2
@@ -47,7 +47,7 @@ export function WorkVeranda({ visible }: WorkVerandaProps) {
       </group>
     </>
   )
-}
+})
 
 /**
  * 1000 W × 1750 H × 360 D mm 철제 유리 선반.
