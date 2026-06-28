@@ -1213,13 +1213,13 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
               activeDoorId={activeDoorId}
             />
 
-            {/* 밥솥 오픈 선반 drawer — 오븐 바로 하단, 뚜껑 없음(오픈 트레이), +X 풀-아웃 */}
+            {/* 밥솥 오픈 선반 drawer — 오븐 바로 하단, 뚜껑 없음(오픈 트레이), 좌우 50mm씩 축소, +X 풀-아웃 */}
             <KitchenTallRiceDrawer
               frontX={tallFrontX}
               bottomY={lowerDoorH}
               topY={ovenBottomY}
-              zStart={tallZStart}
-              zEnd={tallZEnd}
+              zStart={tallZStart + 0.05}
+              zEnd={tallZEnd - 0.05}
               cabDepth={tallDepth}
               walnutTex={walnutBodyTex}
               doorId="kitchen-drawer"
