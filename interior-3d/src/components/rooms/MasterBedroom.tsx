@@ -66,6 +66,12 @@ export function MasterBedroom({ visible, activeDoorId, playerPos, allLightsOn }:
   const partOpeningS = 1.1  // 본가벽 남단 ~ 남벽, 남쪽 200mm 포켓 포함
   const partLen = LR_D - partOpeningN - partOpeningS  // ≈ 1.666
   const partCenterZ = partOpeningN + partLen / 2       // ≈ 1.733
+
+  // 가벽 라인조명 — 주방 라인조명과 동일 사양(8mm 폭, #fff0f0), 가벽 서측면 50mm 앞, 가벽 길이에 맞춤
+  // 가벽 X중심 mbLeft+1.476, 두께 50mm → 서면 mbLeft+1.451, 그 50mm 앞 = mbLeft+1.401
+  const partLineX = mbLeft + 1.476 - 0.025 - 0.05
+  const partLineWLight = 0.08
+  const partLineY = WALL_HEIGHT - 0.008
   const silk = useMemo(() => {
     const t = silkTex.clone()
     t.wrapS = THREE.RepeatWrapping
@@ -95,15 +101,30 @@ export function MasterBedroom({ visible, activeDoorId, playerPos, allLightsOn }:
 
   return (
     <>
-      {/* 거울 간접조명 — 하단만, 안방조명 연동 */}
-      <rectAreaLight position={[mbLeft + 0.01, 1.6 - 0.36, vanityZ]} width={0.50} height={0.02} intensity={mbActive ? 25 : 0} color="#fff5e6" rotation={[0, Math.PI / 2, 0]} />
-      {/* 거울 도어 수납장 — visible 밖 (낮에도 거울 동작) */}
-      <VanityMirrorCabinet
+      {/* 가벽 라인조명 — 주방 라인조명과 동일 사양 (가벽 서측 50mm 앞, 가벽 길이) */}
+      <rectAreaLight
+        position={[partLineX, partLineY - 0.005, partCenterZ]}
+        width={partLineWLight}
+        height={partLen}
+        intensity={mbActive ? 10 : 0}
+        color="#fff0f0"
+        rotation={[Math.PI / 2, 0, 0]}
+      />
+      {Array.from({ length: 10 }, (_, i) => (
+        <pointLight
+          key={`mb-partline-pl-${i}`}
+          position={[partLineX, WALL_HEIGHT - 0.02, (partCenterZ - partLen / 2) + partLen * ((i + 0.5) / 10)]}
+          intensity={mbActive ? 0.22 : 0}
+          distance={4.0}
+          decay={1}
+          color="#fff0f0"
+        />
+      ))}
+      {/* 화장대 타원 LED 거울 (MOCA 루미나 스타일) — visible 밖 (낮에도 거울 동작) */}
+      <OvalLedMirror
         mbLeft={mbLeft}
         vanityZ={vanityZ}
-        vanityW={vanityW}
-        walnutTex={walnutBodyTex}
-        activeDoorId={activeDoorId}
+        active={mbActive}
         playerPos={playerPos}
       />
       <group visible={visible}>
@@ -111,6 +132,12 @@ export function MasterBedroom({ visible, activeDoorId, playerPos, allLightsOn }:
         <mesh position={[mbLeft + 1.476, WALL_HEIGHT / 2, partCenterZ]}>
           <boxGeometry args={[0.05, WALL_HEIGHT, partLen]} />
           <meshStandardMaterial map={silk} roughness={0.55} metalness={0} />
+        </mesh>
+
+        {/* 가벽 라인조명 발광면 — 주방 라인조명과 동일 */}
+        <mesh position={[partLineX, partLineY, partCenterZ]}>
+          <boxGeometry args={[partLineWLight, 0.015, partLen]} />
+          <meshStandardMaterial color={mbActive ? '#fff' : '#444'} emissive={mbActive ? '#fff' : '#111'} emissiveIntensity={mbActive ? 3.0 : 0.1} />
         </mesh>
 
         {/* 2단 커튼 — 쉬어(회색빛) + 암막(짙은 회색), 붙박이~동쪽벽 전폭, F 인터랙션 */}
@@ -353,142 +380,95 @@ function VanityDrawers({
 }
 
 /**
- * 화장대 거울 도어 수납장 — 거울이 좌측(-Z)으로 열리며 내부 4분할 선반.
- * 150mm 깊이, 벽면(-X)에 밀착.
+ * 화장대 타원(스타디움) LED 거울 — MOCA 루미나 스타일.
+ * 전면 LED 링(직접조명) + 후면 벽 헤일로(간접조명) + Reflector 실거울.
+ * 서측 벽(mbLeft)에 밀착, +X(실내) 향함. 도어/수납 없음.
  */
-function VanityMirrorCabinet({
-  mbLeft, vanityZ, vanityW, walnutTex, activeDoorId, playerPos,
+function OvalLedMirror({
+  mbLeft, vanityZ, active, playerPos,
 }: {
-  mbLeft: number; vanityZ: number; vanityW: number
-  walnutTex: THREE.Texture; activeDoorId?: DoorId | null
+  mbLeft: number; vanityZ: number; active: boolean
   playerPos?: [number, number]
 }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const doorPivotRef = useRef<THREE.Group>(null)
-  const doorAngleRef = useRef(0)
-  const { invalidate } = useThree()
+  const W = 0.46          // 거울 폭 (Z)
+  const H = 0.78          // 거울 높이 (Y)
+  const cY = 1.55         // 중심 Y
+  const faceX = mbLeft + 0.03    // 거울 면 X (벽에서 30mm 돌출)
+  const led = 0.018       // LED 밴드 폭
+  const rim = 0.025       // LED 밴드 바깥쪽 거울 테두리 폭
 
-  const doorId: DoorId = 'mb-vanity-mirror'
-  const cabD = 0.150          // 캐비닛 깊이 (X, 벽에서 돌출)
-  const cabW = 0.50           // 캐비닛 폭 (Z)
-  const cabH = 0.70           // 캐비닛 높이
-  const cabCY = 1.6           // 캐비닛 중심 Y
-  const panelT = 0.010
-  const cabBackX = mbLeft + panelT / 2  // 뒷면 (벽쪽)
-  const cabFrontX = mbLeft + cabD       // 전면
-  const cabCX = mbLeft + cabD / 2
+  // 스타디움(타원) 셰이프 — 좌우 직선 + 상하 반원
+  const makeStadium = (w: number, h: number) => {
+    const s = new THREE.Shape()
+    const r = Math.min(w, h) / 2
+    const sy = Math.max(0.0001, h / 2 - r)
+    s.moveTo(w / 2, -sy)
+    s.lineTo(w / 2, sy)
+    s.absarc(0, sy, r, 0, Math.PI, false)
+    s.lineTo(-w / 2, -sy)
+    s.absarc(0, -sy, r, Math.PI, Math.PI * 2, false)
+    s.closePath()
+    return s
+  }
 
-  const toggleRef = useRef(() => setIsOpen(o => !o))
-  toggleRef.current = () => setIsOpen(o => !o)
-  useEffect(() => {
-    doorRegistry.register({
-      id: doorId,
-      position: [mbLeft + vanityW, vanityZ],  // 서랍장 frontX와 동일
-      y: 1.6,
-      toggle: () => toggleRef.current(),
-    })
-    return () => doorRegistry.unregister(doorId)
+  // 거울 면(전체 타원, LED 안팎 모두 거울) / LED 링(테두리 안쪽으로 inset) / 후면 벽 헤일로
+  const mirrorGeo = useMemo(() => new THREE.ShapeGeometry(makeStadium(W, H), 32), [])
+  const ledGeo = useMemo(() => {
+    const outer = makeStadium(W - rim * 2, H - rim * 2)
+    outer.holes.push(makeStadium(W - rim * 2 - led * 2, H - rim * 2 - led * 2))
+    return new THREE.ShapeGeometry(outer, 32)
   }, [])
 
-  const DOOR_ANGLE = Math.PI / 2  // 좌측(-Z)으로 열림
-  useFrame((_, rawDelta) => {
-    const delta = Math.min(rawDelta, 0.05)
-    const target = isOpen ? DOOR_ANGLE : 0
-    const diff = target - doorAngleRef.current
-    if (Math.abs(diff) > 0.001) {
-      doorAngleRef.current += diff * Math.min(1, delta * 6)
-      if (doorPivotRef.current) doorPivotRef.current.rotation.y = doorAngleRef.current
-      invalidate()
-    }
-  })
-
-  // Reflector 거울 — 1m 이내에서만 활성
+  // Reflector 실거울 — LED 링 안쪽 타원(원형 지오메트리를 타원으로 스케일)
+  const rx = (W - rim * 2 - led * 2) / 2 - 0.006
+  const ry = (H - rim * 2 - led * 2) / 2 - 0.006
   const reflectorObj = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(cabW - 0.004, cabH - 0.004)
+    const geo = new THREE.CircleGeometry(1, 48)
+    geo.scale(rx, ry, 1)
     return makeNonRecursiveReflector(new Reflector(geo, {
       textureWidth: 512, textureHeight: 512, color: 0xc8ccd0, clipBias: 0.003,
     }))
   }, [])
-  const cabFrontXVal = mbLeft + cabD
-  const nearMirror = !!playerPos && (
-    Math.hypot(playerPos[0] - cabFrontXVal, playerPos[1] - vanityZ) < 1.0
-  )
+  const nearMirror = !!playerPos && Math.hypot(playerPos[0] - faceX, playerPos[1] - vanityZ) < 1.0
   const mirrorOn = useMirrorEnabled()
   const showReflector = nearMirror && mirrorOn
   useEffect(() => {
     if (reflectorObj) reflectorObj.visible = showReflector
   }, [showReflector, reflectorObj])
 
-  const isActive = activeDoorId === doorId
-  const innerW = cabW - panelT * 2
-  const innerD = cabD - panelT * 2
-  const innerH = cabH - panelT * 2
-  const shelfT = 0.008
+  // 그룹 로컬 +Z = 월드 +X(실내). 벽면은 로컬 z = mbLeft - faceX (≈ -0.03)
+  const wallZ = mbLeft - faceX
 
   return (
-    <group>
-      {/* 캐비닛 본체 — 뒷판, 상/하판, 좌/우측면 */}
-      {/* 뒷판 (높이 5mm 축소 z-fighting 방지) */}
-      <mesh position={[cabBackX, cabCY, vanityZ]}>
-        <boxGeometry args={[panelT, cabH - 0.005, cabW]} />
-        <meshStandardMaterial color="#e8dcc0" roughness={0.5} />
-      </mesh>
-      {/* 상판 */}
-      <mesh position={[cabCX, cabCY + cabH / 2 - panelT / 2, vanityZ]}>
-        <boxGeometry args={[cabD, panelT, cabW]} />
-        <meshStandardMaterial map={walnutTex} roughness={0.45} />
-      </mesh>
-      {/* 하판 */}
-      <mesh position={[cabCX, cabCY - cabH / 2 + panelT / 2, vanityZ]}>
-        <boxGeometry args={[cabD, panelT, cabW]} />
-        <meshStandardMaterial map={walnutTex} roughness={0.45} />
-      </mesh>
-      {/* 좌측면 (-Z) */}
-      <mesh position={[cabCX, cabCY, vanityZ - cabW / 2 + panelT / 2]}>
-        <boxGeometry args={[cabD, cabH, panelT]} />
-        <meshStandardMaterial map={walnutTex} roughness={0.45} />
-      </mesh>
-      {/* 우측면 (+Z) */}
-      <mesh position={[cabCX, cabCY, vanityZ + cabW / 2 - panelT / 2]}>
-        <boxGeometry args={[cabD, cabH, panelT]} />
-        <meshStandardMaterial map={walnutTex} roughness={0.45} />
-      </mesh>
+    <group position={[faceX, cY, vanityZ]} rotation={[0, Math.PI / 2, 0]}>
+      {/* 간접조명 RectAreaLight — 벽(-X) 방향 조사, 실제 글로우 */}
+      <rectAreaLight
+        position={[0, 0, wallZ + 0.018]}
+        width={W}
+        height={H}
+        intensity={active ? 6 : 0}
+        color="#fff3e0"
+      />
 
-      {/* 4분할 선반 (3개 칸막이) */}
-      {[1, 2, 3].map(i => {
-        const sy = cabCY - cabH / 2 + panelT + innerH * i / 4
-        return (
-          <mesh key={`mirror-shelf-${i}`} position={[cabCX, sy, vanityZ]}>
-            <boxGeometry args={[innerD, shelfT, innerW]} />
-            <meshStandardMaterial color="#e8dcc0" roughness={0.5} />
-          </mesh>
-        )
-      })}
-
-      {/* 거울 도어 — 경첩: 좌측(-Z), 좌측으로 열림 */}
-      <group position={[cabFrontX, cabCY, vanityZ - cabW / 2]}>
-        <group ref={doorPivotRef}>
-          {/* 도어 뒷판 (거울 뒤) */}
-          <mesh position={[panelT / 2, 0, cabW / 2]}>
-            <boxGeometry args={[panelT, cabH - 0.004, cabW - 0.004]} />
-            <meshStandardMaterial color="#333" roughness={0.5} />
-          </mesh>
-          {/* 메탈릭 거울 면 (항상 표시) */}
-          <mesh position={[panelT + 0.001, 0, cabW / 2]} rotation={[0, Math.PI / 2, 0]}>
-            <planeGeometry args={[cabW - 0.004, cabH - 0.004]} />
-            <meshStandardMaterial color="#c8dce8" metalness={0.95} roughness={0.03} />
-          </mesh>
-          {/* Reflector 거울 — 가까울 때만 메탈릭 위에 겹침 */}
-          <group position={[panelT + 0.002, 0, cabW / 2]} rotation={[0, Math.PI / 2, 0]}>
-            <primitive object={reflectorObj} />
-          </group>
-        </group>
+      {/* 거울 면 — 메탈릭 (항상 표시) */}
+      <mesh geometry={mirrorGeo}>
+        <meshStandardMaterial color="#c8dce8" metalness={0.95} roughness={0.05} />
+      </mesh>
+      {/* Reflector 실거울 — 가까울 때만 메탈릭 위에 겹침 */}
+      <group position={[0, 0, 0.001]}>
+        <primitive object={reflectorObj} />
       </group>
 
-      {/* 툴팁 */}
-      {isActive && (
-        <DoorTooltip position={[cabFrontX + 0.05, cabCY + 0.20, vanityZ]} label={getDoorLabel(doorId, isOpen)} />
-      )}
+      {/* 전면 LED 링 (직접조명) */}
+      <mesh position={[0, 0, 0.003]} geometry={ledGeo}>
+        <meshStandardMaterial
+          color="#ffffff"
+          emissive={active ? '#fff3e0' : '#333333'}
+          emissiveIntensity={active ? 2.6 : 0.1}
+          toneMapped={false}
+          roughness={0.4}
+        />
+      </mesh>
     </group>
   )
 }

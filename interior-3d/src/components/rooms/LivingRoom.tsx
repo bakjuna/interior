@@ -9,7 +9,7 @@ import { Sofa } from '../models/Sofa'
 import { useKTX2 } from '../../systems/useKTX2'
 import { TwoLayerCurtain } from '../shell/TwoLayerCurtain'
 import type { DoorId } from '../../data/sectors'
-import { LR_D, LR_W, WALL_HEIGHT } from '../../data/apartment'
+import { LR_D, LR_W, WALL_HEIGHT, WALL_THICKNESS } from '../../data/apartment'
 
 interface LivingRoomProps {
   visible: boolean
@@ -46,37 +46,21 @@ export const LivingRoom = memo(
     return geo
   }, [])
 
-  const tvShelfGeo = useMemo(() => {
-    const w = 1.450, d = 0.300, r = 0.200, t = 0.018
-    const shape = new THREE.Shape()
-    // 벽쪽(Y=0)은 직각, 거실쪽(Y=d) 두 모서리만 R200
-    shape.moveTo(-w / 2, 0)
-    shape.lineTo(w / 2, 0)
-    shape.lineTo(w / 2, d - r)
-    shape.quadraticCurveTo(w / 2, d, w / 2 - r, d)
-    shape.lineTo(-w / 2 + r, d)
-    shape.quadraticCurveTo(-w / 2, d, -w / 2, d - r)
-    shape.lineTo(-w / 2, 0)
-    const geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false })
-    geo.rotateX(Math.PI / 2)
-    geo.translate(0, t / 2, 0)
-    return geo
-  }, [])
-
   return (
     <group visible={visible}>
-      {/* TV 하부 선반 — PS5 세로(390mm)+50mm 여유, R200 */}
-      <mesh geometry={tvShelfGeo} position={[2.832, 0.333, 0.005]}>
-        <meshStandardMaterial map={shelfTex} roughness={0.45} />
+      {/* 동측 벽 상단 사각 박스 — 단내림과 동일 높이(150mm), 폭 200mm, 동벽 따라 LR_D 전길이 */}
+      <mesh position={[LR_W - 0.10, WALL_HEIGHT - 0.075, LR_D / 2]}>
+        <boxGeometry args={[0.20, 0.15, LR_D + WALL_THICKNESS]} />
+        <meshStandardMaterial color="#f5f3f0" roughness={0.4} metalness={0.02} />
       </mesh>
 
-      {/* 사운드바 — Yamaha YAS-201 (886×98×121mm), TV 하단 50mm 아래, 앞면 R50 */}
-      <mesh geometry={soundbarGeo} position={[2.832, 0.831, 0.005]}>
+      {/* 사운드바 — Yamaha YAS-201 (886×98×121mm), TV 상단 50mm 위, 앞면 R50 */}
+      <mesh geometry={soundbarGeo} position={[2.832, 1.539, 0.105]}>
         <meshStandardMaterial color="#1a1a1a" roughness={0.3} metalness={0.2} />
       </mesh>
 
-      {/* TV — 거실/현관 사이 벽 */}
-      <group position={[2.832, 1.35, 0.005]}>
+      {/* TV — 거실/현관 사이 벽 (남측 면 z=0.1), 하단 600mm */}
+      <group position={[2.832, 1.02, 0.105]}>
         <mesh>
           <boxGeometry args={[1.450, 0.840, 0.015]} />
           <meshStandardMaterial color="#111" roughness={0.3} />

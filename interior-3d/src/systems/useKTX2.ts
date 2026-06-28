@@ -45,6 +45,8 @@ export const ALL_KTX2_URLS = [
   '/textures/porcelain-tile.ktx2',
   '/textures/entrance-tile.v2.ktx2',
   '/textures/bathroom-wall-tile.ktx2',
+  '/textures/bathroom-wall-tile-greige.ktx2',
+  '/textures/bathroom-wall-tile-cream.ktx2',
   '/textures/walnut-closet-door.ktx2',
   '/textures/walnut_door.ktx2',
   '/textures/silk.ktx2',

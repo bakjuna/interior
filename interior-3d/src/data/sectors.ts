@@ -97,10 +97,11 @@ export type DoorId =
   | 'kitchen-fridge-uc-1'         // 냉장고 상부 #2
   | 'kitchen-tall-lower'          // 키큰장 하단
   | 'kitchen-tall-upper'          // 키큰장 상단
-  | 'kitchen-uc-purifier'         // 정수기 상부
+  | 'kitchen-uc-purifier'         // 정수기 상부 (페어)
   | 'kitchen-uc-0'                // 북쪽 상부장
   | 'kitchen-uc-1'                // 중간 상부장
   | 'kitchen-uc-2'                // 남쪽 상부장
+  | 'kitchen-drawer-vacuum-top'   // 로봇청소기장 상단 drawer
   | 'shoe-mirror'                 // 신발장 거울
   | 'shoe-doors'                  // 신발장
   | 'bath-mirror-n'               // 욕실 거울장 좌

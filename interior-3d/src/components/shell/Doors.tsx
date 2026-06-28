@@ -80,7 +80,7 @@ export function Doors({ activeDoorId, onDoorOpenChange, playerPos }: DoorsProps)
         position={[-WALL_THICKNESS - 0.45 - 0.009, -T2]}
         axis="x"
         width={0.9}
-        height={2.1}
+        height={2.0}
         hinge="right"
         swing="in"
         tex={walnutDoorTex}
@@ -94,7 +94,7 @@ export function Doors({ activeDoorId, onDoorOpenChange, playerPos }: DoorsProps)
         position={[(mbDoorHinge + mbDoorEnd) / 2, -T2]}
         axis="x"
         width={0.9}
-        height={2.1}
+        height={1.9}
         hinge="right"
         swing="out"
         tex={walnutDoorTex}
@@ -108,7 +108,7 @@ export function Doors({ activeDoorId, onDoorOpenChange, playerPos }: DoorsProps)
         position={[bath2RightWallX, -WALL_THICKNESS - 0.1 - 0.45]}
         axis="z"
         width={0.9}
-        height={2.1}
+        height={1.9}
         hinge="left"
         swing="out"
         tex={walnutDoorTex}
@@ -122,7 +122,7 @@ export function Doors({ activeDoorId, onDoorOpenChange, playerPos }: DoorsProps)
         position={[bath2RightWallX, babyBottom - 0.22 - 0.45]}
         axis="z"
         width={0.9}
-        height={2.1}
+        height={2.0}
         hinge="left"
         swing="out"
         tex={walnutDoorTex}
@@ -136,7 +136,7 @@ export function Doors({ activeDoorId, onDoorOpenChange, playerPos }: DoorsProps)
         position={[babyRightWallX, babyTopWallZ - 0.5595]}
         axis="z"
         width={0.9}
-        height={2.1}
+        height={2.0}
         hinge="left"
         swing="out"
         tex={walnutDoorTex}
@@ -157,7 +157,7 @@ export function Doors({ activeDoorId, onDoorOpenChange, playerPos }: DoorsProps)
         position={[babyRightWallX + 2.555 - 0.1 + 0.250 + 0.45, -T2 - 1.591]}
         axis="x"
         width={0.9}
-        height={2.1}
+        height={2.0}
         hinge="left"
         swing="out"
         tex={walnutDoorTex}

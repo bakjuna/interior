@@ -27,9 +27,7 @@ import {
   mbBathBottom,
   babyLeft,
   babyRight,
-  babyTop,
   babyBottomZ,
-  right1Z,
   verandaInnerD,
   stairLeftX,
   stair2X,
@@ -245,13 +243,13 @@ export function ApartmentModel({ showCeiling = true, playerPos: rawPlayerPos, is
   // 위치/sector/단내림 여부/색상 등은 downlights 데이터 + 상수에만 의존하므로
   // 매 렌더마다 reduce 할 필요 없음. playerPos 변경 시 isActive 만 다시 계산.
   const downlightStatic = useMemo(() => {
-    const workTopZ = right1Z - 0.770 + 0.795 + 1.418 + 0.1
+    const workBotZ = -1.591  // 작업실 남측 내벽 (Ceilings.tsx 의 _workBotZ 와 동기)
     return downlights.map(([x, z]) => {
       const sector = findSector(x, z)
       const isDropCeilingBottom = z > LR_D - 0.8 && x >= mbLeft && x <= LR_W
-      const isDropCeilingBabyTop = z < babyTop + 0.8 && z >= babyTop && x >= babyLeft && x <= babyRight + 0.2
-      const isDropCeilingWorkTop = z < workTopZ + 0.8 && z >= workTopZ && x >= babyRight + 2.555 + 0.2 && x <= LR_W
-      const isDropCeiling = isDropCeilingBottom || isDropCeilingBabyTop || isDropCeilingWorkTop
+      const isDropCeilingBabyBot = z > babyBottomZ - 0.8 && z <= babyBottomZ && x >= babyLeft && x <= babyRight + 0.2
+      const isDropCeilingWorkBot = z > workBotZ - 0.8 && z <= workBotZ && x >= babyRight + 2.555 + 0.2 && x <= LR_W
+      const isDropCeiling = isDropCeilingBottom || isDropCeilingBabyBot || isDropCeilingWorkBot
       const ceilingY = isDropCeiling ? WALL_HEIGHT - 0.15 : WALL_HEIGHT
       // 화장대 앞 다운라이트 (안방 좌측 상단) → 흰색
       const isVanity = Math.abs(x - (mbLeft + 1.013)) < 0.05 && z < 0.8

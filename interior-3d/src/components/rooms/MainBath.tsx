@@ -5,7 +5,7 @@
 
 import { memo, Suspense, useState, useMemo, useRef, useEffect } from 'react'
 import * as THREE from 'three'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame, useThree, useLoader } from '@react-three/fiber'
 import { DoorTooltip } from '../ui/DoorTooltip'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { Toilet } from '../models/Toilet'
@@ -31,7 +31,9 @@ interface MainBathProps {
 }
 
 function MainBathInner({ visible, playerPos, allLightsOn, activeDoorId }: MainBathProps) {
-  const bathroomWallTex = useKTX2('/textures/bathroom-wall-tile.ktx2')
+  const bathroomWallTex = useKTX2('/textures/bathroom-wall-tile-greige.ktx2')
+  // 샤워부스 북측 벽 전용 — 우드 슬랫 타일 333×1000mm (세로). 벽 타일 제외 대상.
+  const showerSlatTex = useLoader(THREE.TextureLoader, '/textures/shower-wood-slat-333x1000.png')
 
   // 타일 텍스처 캐시 — 동일 (uRep, vRep) 조합은 1번만 clone
   const makeTileTex = useMemo(() => {
@@ -59,6 +61,24 @@ function MainBathInner({ visible, playerPos, allLightsOn, activeDoorId }: MainBa
   const cX = (bL + bR) / 2
   const innerW = bR - bL
   const innerD = Math.abs(bB - bT)
+
+  // 샤워부스 북측 벽 우드 슬랫 — 타일 300×1000mm 세로, 천장(상단)에 맞춰 격자 반복
+  const SLAT_W = 0.3
+  const SLAT_H = 1.0
+  const slatTex = useMemo(() => {
+    const tex = showerSlatTex.clone()
+    tex.wrapS = THREE.RepeatWrapping
+    tex.wrapT = THREE.RepeatWrapping
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.anisotropy = 8
+    const wallH = WALL_HEIGHT + 0.020
+    const vRep = wallH / SLAT_H
+    tex.repeat.set(innerW / SLAT_W, vRep)
+    // 상단(천장)을 타일 경계에 맞춤 → 잘린 타일은 바닥쪽에 위치
+    tex.offset.set(0, Math.ceil(vRep) - vRep)
+    tex.needsUpdate = true
+    return tex
+  }, [showerSlatTex, innerW])
 
   const bathActive = !!allLightsOn || (!!playerPos && playerPos[0] >= bL && playerPos[0] <= bR && playerPos[1] >= bB && playerPos[1] <= bT)
   const halfWallD = 0.100  // 서측 반벽 깊이
@@ -173,7 +193,7 @@ function MainBathInner({ visible, playerPos, allLightsOn, activeDoorId }: MainBa
   const toiletL = 0.68
   const toiletZ = oriVanZ + vanW / 2 - 0.2 + toiletL / 2
 
-  const doorH = 2.1
+  const doorH = 1.9
   const doorW = 0.9
   const doorZ = -WALL_THICKNESS - 0.1 - 0.45
   const doorZmin = doorZ - doorW / 2
@@ -223,21 +243,30 @@ function MainBathInner({ visible, playerPos, allLightsOn, activeDoorId }: MainBa
         <planeGeometry args={[innerW, WALL_HEIGHT + 0.020]} />
         <meshStandardMaterial map={makeTileTex(innerW / tileW, (WALL_HEIGHT + 0.020) / tileH)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
       </mesh>
+      {/* 북측 벽 — 샤워부스 우드 슬랫 타일 (333×1000 세로, 천장까지) */}
       <mesh position={[cX, (WALL_HEIGHT + 0.020) / 2 - 0.020, bB + 0.001]}>
         <planeGeometry args={[innerW, WALL_HEIGHT + 0.020]} />
-        <meshStandardMaterial map={makeTileTex(innerW / tileW, (WALL_HEIGHT + 0.020) / tileH)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
+        <meshStandardMaterial map={slatTex} roughness={0.55} metalness={0} />
       </mesh>
 
-      {/* 서측 반벽 (깊이 100mm, 높이 890mm) */}
-      <mesh position={[bL + halfWallD / 2, (halfWallH + 0.020) / 2 - 0.020, (bT + bB) / 2]}>
-        <boxGeometry args={[halfWallD, halfWallH + 0.020, innerD]} />
-        <meshStandardMaterial map={makeTileTex(innerD / tileW, halfWallH / tileH)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
-      </mesh>
-      {/* 반벽 상면 타일 */}
-      <mesh position={[bL + halfWallD / 2, halfWallH, (bT + bB) / 2]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[halfWallD, innerD]} />
-        <meshStandardMaterial map={makeTileTex(halfWallD / tileW, innerD / tileH)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
-      </mesh>
+      {/* 서측 반벽 (깊이 100mm, 높이 890mm) — 젠다이. 샤워부스 구간(유리 북측)은 제외하고 유리~남측만 */}
+      {(() => {
+        const zendaiD = bT - glassZ          // 유리선~남벽 길이 (샤워부스 쪽 제외)
+        const zendaiCz = (bT + glassZ) / 2
+        return (
+          <>
+            <mesh position={[bL + halfWallD / 2, (halfWallH + 0.020) / 2 - 0.020, zendaiCz]}>
+              <boxGeometry args={[halfWallD, halfWallH + 0.020, zendaiD]} />
+              <meshStandardMaterial map={makeTileTex(zendaiD / tileW, halfWallH / tileH)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
+            </mesh>
+            {/* 반벽 상면 타일 */}
+            <mesh position={[bL + halfWallD / 2, halfWallH, zendaiCz]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[halfWallD, zendaiD]} />
+              <meshStandardMaterial map={makeTileTex(halfWallD / tileW, zendaiD / tileH)} roughness={0.15} metalness={0.05} onBeforeCompile={tileGroutOnBeforeCompile} />
+            </mesh>
+          </>
+        )
+      })()}
 
       {/* 변기 */}
       <Suspense fallback={null}>

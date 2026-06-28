@@ -1,7 +1,7 @@
 /**
  * 천장 — 방별 천장 plane + 단내림(150mm) + 코브 LED.
  *
- * 단내림 영역: 안방/거실 하단(LR_D-0.8 ~ LR_D), 아기방/작업실 상단(top ~ top+0.8).
+ * 단내림 영역: 안방/거실 하단(LR_D-0.8 ~ LR_D), 아기방/작업실 하단(도어 벽쪽).
  * 코브 LED는 playerPos 또는 allLightsOn 으로 활성. 단내림은 방 경계를 가로지르므로
  * Rooms.tsx 가 아닌 shell에서 처리.
  */
@@ -36,6 +36,8 @@ const STUCCO_CEILING_ROOMS = new Set(['작업실베란다', '메인베란다', '
 const _workLeftX = babyRight + 2.555 + 0.1 + 0.1
 const _workRightX = LR_W
 const _workTopZ = right1Z - 0.770 + 0.795 + 1.418 + 0.1
+// 작업실 남측 내벽 — 복도 도어 벽 내측면 (z = -T2 - 1.591 + T2 = -1.591)
+const _workBotZ = -1.591
 const _workW = _workRightX - _workLeftX
 const _workCenterX = (_workLeftX + _workRightX) / 2
 
@@ -53,17 +55,10 @@ const LED_GEO = {
 const DROP_GEO = {
   mb: new THREE.BoxGeometry(MB_W + WALL_THICKNESS, DROP_H, DROP_D),
   lr: new THREE.BoxGeometry(LR_W + WALL_THICKNESS, DROP_H, DROP_D),
-  baby: new THREE.BoxGeometry(BABY_INNER_W + 0.2, DROP_H, DROP_D),
-  work: new THREE.BoxGeometry(_workW, DROP_H, DROP_D),
-}
-const DOWNLIGHT_GEO = {
-  cylinder: new THREE.CylinderGeometry(0.045, 0.045, 0.06, 16),
-  circle: new THREE.CircleGeometry(0.035, 16),
-  ring: new THREE.RingGeometry(0.035, 0.045, 16),
+  baby: new THREE.BoxGeometry(BABY_INNER_W + 0.2 - 0.01, DROP_H, DROP_D),  // 동측 10mm 축소
+  work: new THREE.BoxGeometry(_workW, DROP_H, DROP_D - 0.01),               // 남측 10mm 축소
 }
 const DROP_MAT = new THREE.MeshStandardMaterial({ color: '#f5f3f0', roughness: 0.4, metalness: 0.02 })
-const HOUSING_MAT = new THREE.MeshStandardMaterial({ color: '#222', roughness: 0.5 })
-const RING_MAT = new THREE.MeshStandardMaterial({ color: '#ccc', metalness: 0.6, roughness: 0.3 })
 
 function MergedCeilings() {
   const stuccoTex = useKTX2('/textures/stucco-wall.ktx2')
@@ -167,6 +162,7 @@ export function Ceilings({ showCeiling, playerPos, allLightsOn, visibleSectors }
   const workLeftX = _workLeftX
   const workRightX = _workRightX
   const workTopZ = _workTopZ
+  const workBotZ = _workBotZ
   const workCenterX = _workCenterX
   const workW = _workW
   const workInRoom = !!playerPos && playerPos[0] >= workLeftX - 0.2 && playerPos[0] <= workRightX + 0.1 && playerPos[1] <= -0.1 - 1.591 - 0.1 && playerPos[1] >= workTopZ - 0.2
@@ -204,54 +200,19 @@ export function Ceilings({ showCeiling, playerPos, allLightsOn, visibleSectors }
         rotation={[-Math.PI / 2, 0, 0]}
       />
 
-      {/* 안방 화장대 다운라이트 — 좌상단 300×300mm, 서측 10° 틸트 */}
-      {(() => {
-        const dlX = mbLeft + 0.27   // 화장대 상판 X 중심 (vanityW/2 = 0.27)
-        const dlZ = 0.3            // 화장대 Z 중심 (vanityZ)
-        const tiltRad = -30 * Math.PI / 180
-        const targetX = dlX - Math.tan(tiltRad) * WALL_HEIGHT
-        return (
-          <group>
-            {/* 천장~라이트 사이 실린더 하우징 */}
-            <mesh position={[dlX - 0.014, WALL_HEIGHT + 0.002, dlZ]} rotation={[Math.PI , 0, tiltRad]} geometry={DOWNLIGHT_GEO.cylinder} material={HOUSING_MAT} />
-            {/* 다운라이트 피팅 — circle + ring */}
-            <mesh position={[dlX, WALL_HEIGHT - 0.025, dlZ]} rotation={[Math.PI / 2, -tiltRad, 0]} geometry={DOWNLIGHT_GEO.circle}>
-              <meshStandardMaterial toneMapped={false} emissive={mbActive ? '#ffffff' : '#111'} emissiveIntensity={mbActive ? 2.0 : 0.1} color={mbActive ? '#ffffff' : '#222'} />
-            </mesh>
-            <mesh position={[dlX, WALL_HEIGHT - 0.026, dlZ]} rotation={[Math.PI / 2, -tiltRad, 0]} geometry={DOWNLIGHT_GEO.ring} material={RING_MAT} />
-            {/* 동쪽 30° 틸트 스팟라이트 */}
-            <spotLight
-              position={[dlX, WALL_HEIGHT - 0.01, dlZ]}
-              angle={Math.PI / 6}
-              penumbra={0.8}
-              intensity={mbActive ? 15 : 0}
-              color="#ffffff"
-              distance={3}
-              decay={2}
-              ref={(light: THREE.SpotLight | null) => {
-                if (light) {
-                  light.target.position.set(targetX, 0, dlZ)
-                  light.target.updateMatrixWorld()
-                }
-              }}
-            />
-          </group>
-        )
-      })()}
-
       {/* 안방 단내림 천장 */}
       <mesh position={[mbLeft + MB_W / 2, WALL_HEIGHT - 0.075, LR_D - 0.4]} geometry={DROP_GEO.mb} material={DROP_MAT} />
       {/* 거실 단내림 천장 */}
       <mesh position={[LR_W / 2, WALL_HEIGHT - 0.075, LR_D - 0.4]} geometry={DROP_GEO.lr} material={DROP_MAT} />
 
-      {/* 아기방 단내림 (상단벽쪽, 거울상) */}
-      <mesh position={[(babyLeft + babyRight + 0.2) / 2, WALL_HEIGHT - 0.075, babyTop + 0.4]} geometry={DROP_GEO.baby} material={DROP_MAT} />
+      {/* 아기방 단내림 (하단벽쪽, 도어 벽) — 동측 10mm 축소 → 중심 서측 5mm shift */}
+      <mesh position={[(babyLeft + babyRight + 0.2) / 2 - 0.005, WALL_HEIGHT - 0.075, babyBottomZ - 0.4]} geometry={DROP_GEO.baby} material={DROP_MAT} />
       {/* 아기방 LED 스트립 */}
-      <mesh position={[(babyLeft + babyRight + 0.2) / 2, WALL_HEIGHT - 0.008, babyTop + 0.8 + 0.01]} geometry={LED_GEO.baby}>
+      <mesh position={[(babyLeft + babyRight + 0.2) / 2, WALL_HEIGHT - 0.008, babyBottomZ - 0.8 - 0.01]} geometry={LED_GEO.baby}>
         <meshStandardMaterial color={babyActive ? '#fff' : '#444'} emissive={babyActive ? '#ffe0b0' : '#111'} emissiveIntensity={babyActive ? 3.0 : 0.1} />
       </mesh>
       <rectAreaLight
-        position={[(babyLeft + babyRight + 0.2) / 2, WALL_HEIGHT - 0.005, babyTop + 0.8 + 0.02]}
+        position={[(babyLeft + babyRight + 0.2) / 2, WALL_HEIGHT - 0.005, babyBottomZ - 0.8 - 0.02]}
         width={BABY_INNER_W + 0.2}
         height={0.03}
         intensity={babyActive ? 8 : 0}
@@ -259,13 +220,13 @@ export function Ceilings({ showCeiling, playerPos, allLightsOn, visibleSectors }
         rotation={[-Math.PI / 2, 0, 0]}
       />
 
-      {/* 작업실 단내림 (상단벽쪽, 거울상) */}
-      <mesh position={[workCenterX, WALL_HEIGHT - 0.075, workTopZ + 0.4]} geometry={DROP_GEO.work} material={DROP_MAT} />
-      <mesh position={[workCenterX, WALL_HEIGHT - 0.008, workTopZ + 0.8 + 0.01]} geometry={LED_GEO.work}>
+      {/* 작업실 단내림 (하단벽쪽, 복도 도어 벽) — 남측 10mm 축소 → 중심 북측 5mm shift */}
+      <mesh position={[workCenterX, WALL_HEIGHT - 0.075, workBotZ - 0.4 - 0.005]} geometry={DROP_GEO.work} material={DROP_MAT} />
+      <mesh position={[workCenterX, WALL_HEIGHT - 0.008, workBotZ - 0.8 - 0.01]} geometry={LED_GEO.work}>
         <meshStandardMaterial color={workActive ? '#fff' : '#444'} emissive={workActive ? '#ffe0b0' : '#111'} emissiveIntensity={workActive ? 3.0 : 0.1} />
       </mesh>
       <rectAreaLight
-        position={[workCenterX, WALL_HEIGHT - 0.005, workTopZ + 0.8 + 0.02]}
+        position={[workCenterX, WALL_HEIGHT - 0.005, workBotZ - 0.8 - 0.02]}
         width={workW}
         height={0.03}
         intensity={workActive ? 8 : 0}

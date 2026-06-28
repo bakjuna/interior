@@ -35,7 +35,7 @@ interface MasterBathProps {
 }
 
 function MasterBathInner({ visible, playerPos, allLightsOn, activeDoorId }: MasterBathProps) {
-  const bathroomWallTex = useKTX2('/textures/bathroom-wall-tile.ktx2')
+  const bathroomWallTex = useKTX2('/textures/bathroom-wall-tile-greige.ktx2')
 
   const makeTileTex = useMemo(() => {
     const cache = new Map<string, THREE.Texture>()
@@ -186,7 +186,7 @@ function MasterBathInner({ visible, playerPos, allLightsOn, activeDoorId }: Mast
   const isCabActiveR = activeDoorId === 'mb-bath-mirror-r'
 
   // 도어 관련
-  const doorH = 2.1
+  const doorH = 1.9
   const doorXmin = mbDoorHinge
   const doorXmax = mbDoorEnd
   const doorXc = (doorXmin + doorXmax) / 2

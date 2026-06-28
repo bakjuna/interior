@@ -7,7 +7,7 @@
  */
 
 import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { playerSectorEqual } from '../../systems/visibility'
 import { CuckooWaterPurifier } from '../models/CuckooWaterPurifier'
@@ -40,29 +40,47 @@ interface KitchenProps {
 
 function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: KitchenProps) {
   const closetDoorTex = useKTX2('/textures/walnut-closet-door.ktx2')
-  const kitchenTileTex = useKTX2('/textures/kitchen-tile.ktx2')
+  const kitchenTileTex = useLoader(THREE.TextureLoader, '/textures/kitchen-tile-teal.jpg')
   const stoneTex = useKTX2('/textures/engineered-stone.ktx2')
 
   const countertopTex = useMemo(() => {
     const t = stoneTex.clone()
-    t.wrapS = THREE.RepeatWrapping
-    t.wrapT = THREE.RepeatWrapping
+    t.wrapS = THREE.MirroredRepeatWrapping   // A → A' → A → A' (이상하게 보이지 않게)
+    t.wrapT = THREE.MirroredRepeatWrapping
     t.colorSpace = THREE.SRGBColorSpace
     t.needsUpdate = true
     return t
   }, [stoneTex])
 
-  // 백스플래시 타일 — 한 이미지 ≈ 1.95m × 0.9m
+  // 백스플래시 타일 — 새 이미지(teal): 좌우 300mm × 상하 450mm (image aspect 2:3 기준)
   // 동측 벽이 Z=-5.062 에서 X=kitRight → X=kitRight+0.055 로 5.5cm 들어가는 step 있음 (apartment.ts 231/301)
   // → 동측 슬랩을 두 부분으로 분할 + step 커버 perpendicular + 북쪽 wrap (창문 안 가리게 0.4m)
+  const TILE_IMG_W = 0.3    // 이미지 좌우 300mm
+  const TILE_IMG_H = 0.45   // 이미지 상하 450mm
+  // 메지(grout) — 이미지 안에 2 cols × 5 rows 타일 (각 150×90mm), 메지 3mm 흰색
+  const kitchenTileGroutOnBeforeCompile = useMemo(() => (shader: THREE.Shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `
+      #include <map_fragment>
+      vec2 _tuv = fract(vMapUv);
+      vec2 _ttile = vec2(fract(_tuv.x * 2.0), fract(_tuv.y * 5.0));
+      float _gx = 3.0 / 150.0;   // 0.02 (150mm 타일에 3mm 메지)
+      float _gy = 3.0 / 90.0;    // 0.0333 (90mm 타일에 3mm 메지)
+      if (_ttile.x < _gx || _ttile.x > 1.0 - _gx || _ttile.y < _gy || _ttile.y > 1.0 - _gy) {
+        diffuseColor.rgb = vec3(0.95);
+      }
+      `
+    )
+  }, [])
   const tileMapEastNorth = useMemo(() => {
     const tileH_ = 1.45 - 0.84
     const t = kitchenTileTex.clone()
-    t.wrapS = THREE.RepeatWrapping
-    t.wrapT = THREE.RepeatWrapping
+    t.wrapS = THREE.MirroredRepeatWrapping   // A → A' → A → A' (이상하게 보이지 않게)
+    t.wrapT = THREE.MirroredRepeatWrapping
     t.colorSpace = THREE.SRGBColorSpace
     // 동측 북쪽 슬랩 길이 = -5.062 - (-7.175) = 2.113
-    t.repeat.set(2.113 / 1.95, tileH_ / 0.9)
+    t.repeat.set(2.113 / TILE_IMG_W, tileH_ / TILE_IMG_H)
     t.needsUpdate = true
     return t
   }, [kitchenTileTex])
@@ -70,11 +88,11 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
   const tileMapEastSouth = useMemo(() => {
     const tileH_ = 1.45 - 0.84
     const t = kitchenTileTex.clone()
-    t.wrapS = THREE.RepeatWrapping
-    t.wrapT = THREE.RepeatWrapping
+    t.wrapS = THREE.MirroredRepeatWrapping   // A → A' → A → A' (이상하게 보이지 않게)
+    t.wrapT = THREE.MirroredRepeatWrapping
     t.colorSpace = THREE.SRGBColorSpace
     // 동측 남쪽 슬랩 길이 = -3.273 - (-5.062) = 1.789
-    t.repeat.set(1.789 / 1.95, tileH_ / 0.9)
+    t.repeat.set(1.789 / TILE_IMG_W, tileH_ / TILE_IMG_H)
     t.needsUpdate = true
     return t
   }, [kitchenTileTex])
@@ -83,10 +101,10 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
     const tileH_ = 1.45 - 0.84
     const northLen_ = 0.4   // 0.6 → 0.4 로 단축 (북쪽 벽 창문 X[+1.1, +2.0] 안 가리도록)
     const t = kitchenTileTex.clone()
-    t.wrapS = THREE.RepeatWrapping
-    t.wrapT = THREE.RepeatWrapping
+    t.wrapS = THREE.MirroredRepeatWrapping   // A → A' → A → A' (이상하게 보이지 않게)
+    t.wrapT = THREE.MirroredRepeatWrapping
     t.colorSpace = THREE.SRGBColorSpace
-    t.repeat.set(northLen_ / 1.95, tileH_ / 0.9)
+    t.repeat.set(northLen_ / TILE_IMG_W, tileH_ / TILE_IMG_H)
     t.needsUpdate = true
     return t
   }, [kitchenTileTex])
@@ -131,17 +149,17 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
   const lineLen = lineZend - lineZstart
   const lineCenterZ = (lineZstart + lineZend) / 2
   const fridgeFrontX = kitLeft + 0.050 + Refrigerator.D              // 냉장고장 동측면(전면, 벽 50mm gap)
-  const lowerCabFrontX = (kitRight - 0.3) - 0.3                     // 우측 하부장 서측면(전면)
-  const lineCenterX = (fridgeFrontX + lowerCabFrontX) / 2
-  const inductionW = 0.6
-  // 인덕션을 메인 하단장의 cab2|cab3 boundary 위에 배치 + 시계방향 90° 회전.
-  // 회전 후 본체의 월드 X 폭 = 0.5, 월드 Z 폭 = 0.58 (= inductionW - 0.02).
-  // X: 우측 벽에서 50mm 띄움.
-  // Z: extStartZ + 2.738 (= drawer 0.5 + cab1 0.4 + sink 0.838 + dish 0.6 + cab2 0.4 → cab2|cab3 boundary)
+  const lowerCabFrontX = kitRight - 0.72                              // 우측 하부장/상판 서측면 (720mm 통박스)
+  void fridgeFrontX
+  const lineCenterX = lowerCabFrontX                                  // LED 라인 = 상판 서측 끝
+  // 인덕션 — 회전 후 월드 X = 515mm (깊이, 벽-룸), 월드 Z = 830mm (벽 따라 가로)
+  // X: 우측 벽에서 50mm 띄움 (515mm 깊이 → 중심은 벽에서 50 + 515/2 = 307.5mm)
+  const inductionW = 0.83        // 가로(local X = 회전 후 world Z)
+  const inductionD = 0.515       // 세로(local Z = 회전 후 world X) — 깊이
   const inductionWallGap = 0.05  // 벽에서 50mm
-  const inductionGroupX = kitRight - inductionWallGap - 0.5 / 2
-  // 인덕션을 cab2/cab3 경계(남쪽 끝)에 배치
-  const inductionGroupZ = wall2300Z + T2 + 3.502
+  const inductionGroupX = kitRight - inductionWallGap - inductionD / 2
+  // 인덕션을 cab pair 정중앙에 배치 — extEndZ - cab23W/2 = -3.491 - 0.475 = -3.966
+  const inductionGroupZ = -T2 - 1.591 - 1.800 - 0.475
 
   return (
     <>
@@ -173,26 +191,80 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
         </mesh>
       </group>
 
-      {/* === 인덕션 (우측 ㄱ자 카운터 코너 — 시계방향 90° 회전) + 화구 3개 (좌 2 / 우 1) === */}
-      {/* 본체: 가로(local X = 회전 후 world Z) 580mm × 세로(local Z = 회전 후 world X) 515mm */}
+      {/* === 인덕션 — 515mm(깊이) × 830mm(가로), 4 화구 + 중앙 다운드래프트 환기구 + 컨트롤 패널 === */}
+      {/* 본체: 가로(local X = 회전 후 world Z) 830mm × 세로(local Z = 회전 후 world X) 515mm */}
+      {/* local +Z = 룸쪽(전면, 컨트롤 패널), local -Z = 벽쪽(후면) */}
       <group position={[inductionGroupX, 0, inductionGroupZ]} rotation={[0, -Math.PI / 2, 0]}>
+        {/* 본체 평판 (검정 유리) */}
         <mesh position={[0, 0.885, 0]}>
-          <boxGeometry args={[inductionW - 0.02, 0.01, 0.515]} />
-          <meshStandardMaterial color="#111" roughness={0.1} metalness={0.3} />
+          <boxGeometry args={[inductionW, 0.01, inductionD]} />
+          <meshStandardMaterial color="#0a0a0a" roughness={0.1} metalness={0.35} />
         </mesh>
-        {/* 좌 2: 긴 축의 좌측 1/3 영역에 앞/뒤로 배치 (작은 화구) */}
-        <mesh position={[-0.18, 0.892, -0.10]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.060, 0.080, 32]} />
-          <meshStandardMaterial color="#333" roughness={0.2} />
+        {/* 4개 화구 — 코너 (2 × 2) */}
+        {[
+          [-0.249, -0.115],  // 후-좌
+          [+0.249, -0.115],  // 후-우
+          [-0.249, +0.115],  // 전-좌
+          [+0.249, +0.115],  // 전-우
+        ].map((pos, i) => (
+          <group key={`burner-${i}`} position={[pos[0], 0.892, pos[1]]}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[0.078, 0.082, 48]} />
+              <meshStandardMaterial color="#4a4a4a" roughness={0.3} metalness={0.2} />
+            </mesh>
+            {/* "+" 마크 (중앙) */}
+            <mesh position={[0, 0.001, 0]}>
+              <boxGeometry args={[0.018, 0.0005, 0.002]} />
+              <meshStandardMaterial color="#666" roughness={0.4} />
+            </mesh>
+            <mesh position={[0, 0.001, 0]}>
+              <boxGeometry args={[0.002, 0.0005, 0.018]} />
+              <meshStandardMaterial color="#666" roughness={0.4} />
+            </mesh>
+          </group>
+        ))}
+        {/* 중앙 다운드래프트 환기구 — 그릴 (세로 슬랫) */}
+        {(() => {
+          const ventW = 0.166      // 가로(local X)
+          const ventD = 0.380      // 세로(local Z)
+          const ventCenterZ = -0.020  // 살짝 후방으로
+          const slatCount = 8
+          const slatGap = 0.004
+          const slatW = (ventW - slatGap * (slatCount + 1)) / slatCount
+          return (
+            <group position={[0, 0.890, ventCenterZ]}>
+              {/* 환기구 베이스 (검정 사각 — 슬랫 사이 어두운 영역) */}
+              <mesh>
+                <boxGeometry args={[ventW, 0.001, ventD]} />
+                <meshStandardMaterial color="#050505" roughness={0.4} />
+              </mesh>
+              {/* 세로 슬랫 */}
+              {Array.from({ length: slatCount }, (_, i) => {
+                const x = -ventW / 2 + slatGap + slatW / 2 + i * (slatW + slatGap)
+                return (
+                  <mesh key={`slat-${i}`} position={[x, 0.004, 0]}>
+                    <boxGeometry args={[slatW, 0.006, ventD - 0.02]} />
+                    <meshStandardMaterial color="#2c2c2c" roughness={0.5} metalness={0.3} />
+                  </mesh>
+                )
+              })}
+              {/* 중앙 핸들 (작은 타원 — 인디케이터) */}
+              <mesh position={[0, 0.008, 0.04]} rotation={[-Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.010, 0.010, 0.001, 16]} />
+                <meshStandardMaterial color="#777" roughness={0.3} metalness={0.6} />
+              </mesh>
+            </group>
+          )
+        })()}
+        {/* 컨트롤 패널 (전면 — local +Z) — 아이콘 / 슬라이더 영역 */}
+        <mesh position={[0, 0.892, 0.222]}>
+          <boxGeometry args={[0.70, 0.0005, 0.030]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.4} />
         </mesh>
-        <mesh position={[-0.18, 0.892, +0.10]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.060, 0.080, 32]} />
-          <meshStandardMaterial color="#333" roughness={0.2} />
-        </mesh>
-        {/* 우 1: 긴 축의 우측 1/3 영역에 가운데, 큰 화구 */}
-        <mesh position={[+0.10, 0.892, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.090, 0.115, 32]} />
-          <meshStandardMaterial color="#333" roughness={0.2} />
+        {/* LED 인디케이터 스트립 (최전면) */}
+        <mesh position={[0, 0.893, 0.247]}>
+          <boxGeometry args={[0.40, 0.0005, 0.004]} />
+          <meshStandardMaterial color="#222" emissive="#0a0a0a" emissiveIntensity={0.3} />
         </mesh>
       </group>
       {/* 옛 upperRightW 60cm 상부장 블록 제거 — 새 ㄱ자 ext IIFE 의 상부장 재구성 IIFE 가 대체 */}
@@ -200,38 +272,38 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
       {/* === ㄱ자 확장: 우측벽 따라 남쪽 (식기세척기 + 싱크 + 수전) === */}
       {(() => {
         const extWallInner = kitRight
-        const extCabCenterX = extWallInner - 0.3
+        const extCabCenterX = extWallInner - 0.36   // 하부장 720mm 폭 → 중심 360mm 안쪽 (동측 면이 벽에 flush)
         // 하부장/상판은 북쪽 벽까지 연장 (정수기·인덕션이 놓이던 빈 공간을 메움)
         const extStartZ = wall2300Z + T2
-        // 하부장은 우측 하부장(밥솥 칸)까지 통합 — 남쪽 끝 = babyDoorEnd + 0.42
         // 상부장은 별도 IIFE 에서 새로 구성 — 옛 변수(extUpper*) 제거
-        const babyDoorEnd = babyBottomZ - 0.22 - 0.9
-        const extEndZ = babyDoorEnd + 0.42
+        // 남쪽 끝 = 복도 벽 중심에서 북쪽으로 1800mm (식탁 자리)
+        const extEndZ = -T2 - 1.591 - 1.800
 
         // 수전(싱크): 북쪽에서 4번째 하부장 문이 시작하는 위치에 sink 북쪽 면 정렬.
         //   cabBefore 에 0.5m 폭 도어 3개 (round(1.5/0.5)=3) → 4번째 도어 = sink 첫 도어.
         //   sink 북쪽 면 = extStartZ + 1.5 (sinkHalfD 변해도 그대로 유지)
         // 싱크볼: 가로(Z) 838mm, 깊이(X) 500mm, 높이(Y) 400mm.
         // 식기세척기: 싱크 남쪽 면에서 0.05m 갭 후 시작.
-        // 컬럼 레이아웃 (N→S, extStartZ 기준):
-        // 컬럼 레이아웃 (N→S):
-        //   drawerN(0.5) | cab1(0.4, 단독) | dish(0.6) | sink(0.838) | tiny | drawerS(0.5) | cab(0.8, 페어)
+        // 컬럼 레이아웃 (N→S): drawerS 삭제 → cab pair 150mm 확장 + 뽑아쓰는 선반 (350mm)
+        //   drawerN(0.5) | cab1(0.4) | sink(0.838) | dish(0.6) | tiny | pull-shelf(0.35) | cab(0.95, 페어)
         const sinkHalfD = 0.838 / 2  // = 0.419
         const sinkW = 0.4            // X 깊이 (벽-룸 방향)
         const dishW = 0.6
         const cabW = 0.4             // 일반 하단장 도어 폭
-        const drawerColW = 0.5       // 양쪽 drawer 컬럼 폭
+        const drawerColW = 0.5       // drawerN 컬럼 폭
+        const cab23W = 0.95          // 인덕션 하단장 (cab pair 800mm → 950mm, 150mm 확장)
         const cab1Z0 = extStartZ + drawerColW            // drawerN 다음
-        const dishZstart = cab1Z0 + cabW                 // cab1(0.4) 다음
-        const dishZend = dishZstart + dishW
-        const sinkZstart = dishZend                      // dish 다음
+        const sinkZstart = cab1Z0 + cabW                 // cab1(0.4) 다음 — sink 먼저
         const sinkZend = sinkZstart + sinkHalfD * 2
         const sinkZpos = sinkZstart + sinkHalfD
-        const tinyZ0 = sinkZend                          // sink 다음
-        const drawerSZ0 = tinyZ0 + (extEndZ - sinkZend - drawerColW - cabW * 2)  // tiny 끝
-        const tinyLen = drawerSZ0 - tinyZ0
-        const cab2Z0 = drawerSZ0 + drawerColW            // drawerS 다음 (cab 페어 0.8)
-        const cab3Z0 = cab2Z0 + cabW                     // cab 후반부
+        const dishZstart = sinkZend                      // sink 다음 — dish 뒤로
+        const dishZend = dishZstart + dishW
+        // 뽑아쓰는 선반 — 식세기에 딱 붙도록 (tiny 흡수) → drawerSZ0 = dishZend
+        const pullShelfW = extEndZ - dishZend - cab23W   // ≈ 0.396m
+        const tinyZ0 = dishZend                          // dish 다음
+        const drawerSZ0 = dishZend                       // 뽑아쓰는 선반 시작 = dishZend (tiny 흡수, flush)
+        const tinyLen = drawerSZ0 - tinyZ0               // = 0
+        const cab2Z0 = drawerSZ0 + pullShelfW            // 뽑아쓰는 선반 다음 (cab pair 0.95)
 
         // === 정수기 하단 drawer 슬롯 ===
         // 첫 도어 컬럼(북단 0.5m)을 drawer + 하단 도어로 분할
@@ -239,7 +311,7 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
         const drawerZStart = extStartZ
         const drawerZEnd = extStartZ + drawerColLen
         const drawerSplitY = 0.42  // 하단 도어 / drawer 분할 Y (drawer 내부 ~38cm 확보)
-        const cabExtDepth = 0.6
+        const cabExtDepth = 0.72   // 하부장 = 상판 (통박스, 오버행 없음)
 
         // 메인 하부장 박스 — extStartZ → dishZstart, Y 0~0.42 lower 한 덩어리 (drawer + cab1 + sink_lower + cab2 + cab3)
         const mainCabLen = dishZstart - extStartZ        // = 2.538
@@ -277,6 +349,9 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
               const shelfInnerDepth = shelfDepth - 0.030  // 선반 내부 분리판은 동쪽 30mm 축소
               const shelfCX = cabWestX + shelfDepth / 2
               const divCX = cabWestX + shelfInnerDepth / 2
+              // 선반(내부 가로 판자) — 서측 75mm 추가 축소 (칸막이/바닥판은 그대로)
+              const shelfReducedDepth = shelfInnerDepth - 0.075       // 0.672 → 0.597
+              const shelfReducedCX = shelfCX + 0.075 / 2              // 동측 37.5mm shift (동측 끝 유지)
               const shelfT = 0.012
 
               // --- 북측 drawer 하단 영역 (Y 0~0.42) ---
@@ -294,8 +369,8 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
               const sinkLen = sinkAreaLen
 
               // --- cab2+cab3 영역 (페어 0.8, Y 0~0.84) ---
-              const cab23Len = cabW * 2
-              const cab23CZ = cab2Z0 + cabW
+              const cab23Len = cab23W                     // 0.95 (인덕션 하단장)
+              const cab23CZ = cab2Z0 + cab23Len / 2       // 중앙
               const cab3ShelfYs = [1, 2, 3].map(i => 0.84 * i / 4)
 
               return (
@@ -306,8 +381,8 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
                     <meshStandardMaterial color="#fff" roughness={0.6} />
                   </mesh>
                   {([] as number[]).map((sy, i) => (
-                    <mesh key={`north-shelf-${i}`} position={[shelfCX, sy, northCZ]}>
-                      <boxGeometry args={[shelfInnerDepth, shelfT, northLen]} />
+                    <mesh key={`north-shelf-${i}`} position={[shelfReducedCX, sy, northCZ]}>
+                      <boxGeometry args={[shelfReducedDepth, shelfT, northLen]} />
                       <meshStandardMaterial color="#fff" roughness={0.6} />
                     </mesh>
                   ))}
@@ -318,8 +393,8 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
                     <meshStandardMaterial color="#fff" roughness={0.6} />
                   </mesh>
                   {cab1ShelfYs.map((sy, i) => (
-                    <mesh key={`cab1-shelf-${i}`} position={[shelfCX, sy, cab1CZ]}>
-                      <boxGeometry args={[shelfInnerDepth, shelfT, cab1Len]} />
+                    <mesh key={`cab1-shelf-${i}`} position={[shelfReducedCX, sy, cab1CZ]}>
+                      <boxGeometry args={[shelfReducedDepth, shelfT, cab1Len]} />
                       <meshStandardMaterial color="#fff" roughness={0.6} />
                     </mesh>
                   ))}
@@ -330,14 +405,15 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
                     <meshStandardMaterial color="#fff" roughness={0.6} />
                   </mesh>
 
-                  {/* cab2+cab3 — 뒷판 + 선반 */}
-                  <mesh position={[backX, 0.42, cab23CZ]}>
-                    <boxGeometry args={[bpT, 0.84, cab23Len]} />
+                  {/* cab2+cab3 — 뒷판 (남측 20mm 축소) + 선반 */}
+                  <mesh position={[backX, 0.42, cab23CZ - 0.01]}>
+                    <boxGeometry args={[bpT, 0.84, cab23Len - 0.02]} />
                     <meshStandardMaterial color="#fff" roughness={0.6} />
                   </mesh>
+                  {/* cab23 선반 — 남측 20mm 추가 축소 (북측 끝 유지) */}
                   {[1, 2, 3].map((i) => (
-                    <mesh key={`cab23-shelf-${i}`} position={[shelfCX, 0.84 * i / 4, cab23CZ]}>
-                      <boxGeometry args={[shelfInnerDepth, shelfT, cab23Len]} />
+                    <mesh key={`cab23-shelf-${i}`} position={[shelfReducedCX, 0.84 * i / 4, cab23CZ - 0.01]}>
+                      <boxGeometry args={[shelfReducedDepth, shelfT, cab23Len - 0.02]} />
                       <meshStandardMaterial color="#fff" roughness={0.6} />
                     </mesh>
                   ))}
@@ -350,23 +426,15 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
                     </mesh>
                   ))}
 
-                  {/* 바닥판 — 식기세척기 영역 제외 (2분할) */}
-                  <mesh position={[shelfCX, bpT / 2, (extStartZ + dishZstart) / 2]}>
-                    <boxGeometry args={[shelfDepth, bpT, dishZstart - extStartZ]} />
-                    <meshStandardMaterial color="#fff" roughness={0.6} />
-                  </mesh>
-                  <mesh position={[shelfCX, bpT / 2, (dishZend + drawerSZ0) / 2]}>
-                    <boxGeometry args={[shelfDepth, bpT, drawerSZ0 - dishZend]} />
-                    <meshStandardMaterial color="#fff" roughness={0.6} />
-                  </mesh>
+                  {/* 바닥판 — 삭제됨 (사용자 요청) */}
 
-                  {/* 상판 — sink+식기세척기 영역 제외 (2분할) */}
-                  <mesh position={[extCabCenterX, 0.84 - bpT / 2, (extStartZ + dishZstart) / 2]}>
-                    <boxGeometry args={[cabExtDepth, bpT, dishZstart - extStartZ]} />
+                  {/* 상판 — sink+식기세척기 영역 제외 (swap 후: drawerN+cab1 / dish→drawerSZ0) */}
+                  <mesh position={[extCabCenterX, 0.84 - bpT / 2, (extStartZ + sinkZstart) / 2]}>
+                    <boxGeometry args={[cabExtDepth, bpT, sinkZstart - extStartZ]} />
                     <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
-                  <mesh position={[extCabCenterX, 0.84 - bpT / 2, (sinkZend + drawerSZ0) / 2]}>
-                    <boxGeometry args={[cabExtDepth, bpT, drawerSZ0 - sinkZend]} />
+                  <mesh position={[extCabCenterX, 0.84 - bpT / 2, (dishZend + drawerSZ0) / 2]}>
+                    <boxGeometry args={[cabExtDepth, bpT, drawerSZ0 - dishZend]} />
                     <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
 
@@ -378,104 +446,139 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
               <boxGeometry args={[cabExtDepth, 0.84 - drawerSplitY, 0.018]} />
               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
-            <mesh position={[extCabCenterX - 0.005, 0.42, (dishZstart + dishZend) / 2]}>
+            <mesh position={[extCabCenterX - 0.065, 0.42, (dishZstart + dishZend) / 2]}>
               <boxGeometry args={[0.6, 0.84, dishW]} />
               <meshStandardMaterial color="#e0e0e0" metalness={0.4} roughness={0.3} />
             </mesh>
-            <mesh position={[extCabCenterX - 0.301, 0.42, (dishZstart + dishZend) / 2]} rotation={[0, -Math.PI / 2, 0]}>
+            <mesh position={[extCabCenterX - 0.341, 0.42, (dishZstart + dishZend) / 2]} rotation={[0, -Math.PI / 2, 0]}>
               <planeGeometry args={[dishW - 0.01, 0.8]} />
               <meshStandardMaterial color="#d5d5d5" metalness={0.5} roughness={0.25} />
             </mesh>
-            <mesh position={[extCabCenterX - 0.31, 0.66, (dishZstart + dishZend) / 2]}>
+            <mesh position={[extCabCenterX - 0.35, 0.66, (dishZstart + dishZend) / 2]}>
               <boxGeometry args={[0.015, 0.02, 0.4]} />
               <meshStandardMaterial color="#aaa" metalness={0.8} roughness={0.15} />
             </mesh>
-            {/* sink/cab3 본체는 중공 구조에 포함됨 */}
-            {/* === drawerS 본체 — 빈공간(0~0.15) + 스윙도어 본체(0.15~0.40) + 드로어 슬롯(0.40~0.84) === */}
+            {/* drawerS 본체 — 삭제됨 (인덕션 하단장 확장으로 인해, 자리는 뽑아쓰는 선반) */}
+            {/* 남쪽 끝 마감 벽 — 동쪽으로 5cm 더 연장, 상판이 감싸도록 extEndZ 안쪽 (Z 두께 18mm, 남측 면 = extEndZ) */}
+            <mesh position={[extWallInner - (cabExtDepth + 0.05) / 2 + 0.05, 0.42, extEndZ - 0.009]}>
+              <boxGeometry args={[cabExtDepth + 0.05, 0.84, 0.018]} />
+              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+            </mesh>
+            {/* 동측 벽 step 보정 — stepZ 북쪽 영역에서 하부장 + 상판 동측을 55mm 동쪽으로 연장 (꺾인 벽에 flush) */}
             {(() => {
-              const lastColLen = 0.5
-              const lastColZStart = drawerSZ0
-              const lastColZEnd = drawerSZ0 + lastColLen
-              const lastColCenterZ = (lastColZStart + lastColZEnd) / 2
-              const swingBottomY = 0.15
-              const swingTopY = 0.40
-              const lastDrawerBottomY = 0.40
-              const lastDrawerTopY = 0.84
-              const slotPanelT = 0.018
-              const slotCenterY = (lastDrawerBottomY + lastDrawerTopY) / 2
-              const slotH = lastDrawerTopY - lastDrawerBottomY
+              const stepZ = (babyTop - T2) + 0.324
+              const stepDX = 0.055
+              const northLen = stepZ - extStartZ
+              const northCenterZ = (extStartZ + stepZ) / 2
               return (
                 <>
-                  {/* 스윙 도어 영역 본체 (Y 0.15 ~ 0.40) */}
-                  <mesh position={[extCabCenterX, (swingBottomY + swingTopY) / 2, lastColCenterZ]}>
-                    <boxGeometry args={[0.6, swingTopY - swingBottomY, lastColLen]} />
+                  {/* 하부장 본체 연장 (Y 0~0.84) */}
+                  <mesh position={[extWallInner + stepDX / 2, 0.42, northCenterZ]}>
+                    <boxGeometry args={[stepDX, 0.84, northLen]} />
                     <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
                   </mesh>
-                  {/* 드로어 슬롯 — 5면 중 후면(동) / 천장 / 북측 패널 (남측은 cabinet 남쪽 마감벽이 가림) */}
-                  <mesh position={[extWallInner - slotPanelT / 2, slotCenterY, lastColCenterZ]}>
-                    <boxGeometry args={[slotPanelT, slotH, lastColLen]} />
-                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-                  </mesh>
-                  <mesh position={[extCabCenterX, lastDrawerTopY - slotPanelT / 2, lastColCenterZ]}>
-                    <boxGeometry args={[0.6, slotPanelT, lastColLen]} />
-                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-                  </mesh>
-                  <mesh position={[extCabCenterX, slotCenterY, lastColZStart + slotPanelT / 2]}>
-                    <boxGeometry args={[0.6, slotH, slotPanelT]} />
-                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+                  {/* 상판 연장 (Y 0.84~0.88) — 상판은 동측 25mm 추가 확장과 정렬 */}
+                  <mesh position={[extWallInner + 0.025 + stepDX / 2, 0.86, northCenterZ]}>
+                    <boxGeometry args={[stepDX, 0.04, northLen]} />
+                    <meshStandardMaterial map={countertopTex} roughness={0.3} metalness={0.05} />
                   </mesh>
                 </>
               )
             })()}
-            {/* 남쪽 끝 마감 벽 — 동쪽으로 5cm 더 연장 (X depth 0.65, Z 두께 18mm) */}
-            <mesh position={[extWallInner - 0.65 / 2 + 0.05, 0.42, extEndZ + 0.009]}>
-              <boxGeometry args={[0.65, 0.84, 0.018]} />
-              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
-            </mesh>
             {/* === 컬럼 도어 === */}
-            {/* 정수기 drawer (북단 컬럼, drawerColW 0.5m) — 하단 도어 + 드로어 슬롯 */}
+            {/* 로봇청소기장 — 0~200 개방(로청) + 200~520 단문(바닥 없음) + 520~840 drawer + 북남 50% 벽 */}
             {(() => {
-              const dz = drawerZStart + drawerColLen / 2
-              const dw = drawerColLen
-              return (<group key="ext-lc-drawerN">
-                {/* 하단 도어 (drawer 아래) — F 인터랙션 */}
-                <KitchenLowerDoor
-                  frontX={extCabCenterX - 0.301}
-                  centerY={drawerSplitY / 2}
-                  doorH={drawerSplitY}
-                  zStart={drawerZStart}
-                  doorWidth={dw}
-                  handleY={0.30}
-                  walnutTex={walnutBodyTex}
-                  doorId="kitchen-lc-north"
-                  activeDoorId={activeDoorId}
-                />
-                {/* 캐비닛 슬롯 양쪽 고정 레일 트랙 */}
-                <mesh position={[extCabCenterX, drawerSplitY + 0.008 + 0.001, drawerZStart + 0.018 + 0.005]}>
-                  <boxGeometry args={[cabExtDepth - 0.04, 0.014, 0.018]} />
-                  <meshStandardMaterial color="#777" metalness={0.85} roughness={0.30} />
-                </mesh>
-                <mesh position={[extCabCenterX, drawerSplitY + 0.008 + 0.001, drawerZEnd - 0.018 - 0.005]}>
-                  <boxGeometry args={[cabExtDepth - 0.04, 0.014, 0.018]} />
-                  <meshStandardMaterial color="#777" metalness={0.85} roughness={0.30} />
-                </mesh>
-                {/* drawer (밥솥 포함, F 키 슬라이드) */}
-                <KitchenRiceCookerDrawer
-                  extWallInner={extWallInner}
-                  depth={cabExtDepth}
-                  drawerZStart={drawerZStart}
-                  drawerZEnd={drawerZEnd}
-                  drawerBottomY={drawerSplitY}
-                  drawerTopY={0.84}
-                  walnutTex={walnutBodyTex}
-                  doorId="kitchen-drawer"
-                  activeDoorId={activeDoorId}
-                />
-              </group>)
+              const vacuumOpenH = 0.20
+              const doorBottomY = vacuumOpenH        // 0.20
+              const doorTopY = 0.52                  // 도어는 520mm까지
+              const doorH = doorTopY - doorBottomY    // 0.32
+              const doorCenterY = (doorBottomY + doorTopY) / 2   // 0.36
+              const drawerSlotBotY = doorTopY        // 0.52
+              const drawerSlotTopY = 0.84
+              const bpT = 0.018
+              const interiorZLen = (drawerZEnd - drawerZStart) - bpT * 2
+              const interiorCenterZ = (drawerZStart + drawerZEnd) / 2
+              const interiorDepth = cabExtDepth - bpT
+              const interiorCenterX = extCabCenterX - bpT / 2
+              return (
+                <group key="ext-lc-north-vacuum">
+                  {/* 도어 영역과 drawer 영역 사이 격판 (Y=0.52) */}
+                  <mesh position={[interiorCenterX, drawerSlotBotY, interiorCenterZ]}>
+                    <boxGeometry args={[interiorDepth - 0.02, 0.012, interiorZLen]} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+                  </mesh>
+                  {/* 북측 벽 (50% — 도어+drawer 영역 200~840 중 도어 영역만, 320mm) */}
+                  <mesh position={[interiorCenterX, doorCenterY, drawerZStart + bpT / 2]}>
+                    <boxGeometry args={[interiorDepth, doorH, bpT]} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+                  </mesh>
+                  {/* 남측 벽 (50% — 도어 영역 200~520mm) */}
+                  <mesh position={[interiorCenterX, doorCenterY, drawerZEnd - bpT / 2]}>
+                    <boxGeometry args={[interiorDepth, doorH, bpT]} />
+                    <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+                  </mesh>
+                  {/* 도어 (Y 0.20 ~ 0.52, 단문, 한쪽 hinge — 바닥 없음 → 열면 로청 보임) */}
+                  <KitchenLowerDoor
+                    frontX={extCabCenterX - 0.341}
+                    centerY={doorCenterY}
+                    doorH={doorH}
+                    zStart={drawerZStart}
+                    doorWidth={drawerColLen}
+                    handleY={doorTopY - 0.06}
+                    walnutTex={walnutBodyTex}
+                    doorId="kitchen-lc-north"
+                    activeDoorId={activeDoorId}
+                  />
+                  {/* 상단 drawer (Y 0.52 ~ 0.84, 풀-아웃, 앞면 막힘 / 좌우 50% / 뒷 90% 벽) */}
+                  <KitchenRiceCookerDrawer
+                    extWallInner={extWallInner}
+                    depth={cabExtDepth}
+                    drawerZStart={drawerZStart}
+                    drawerZEnd={drawerZEnd}
+                    drawerBottomY={drawerSlotBotY}
+                    drawerTopY={drawerSlotTopY}
+                    walnutTex={walnutBodyTex}
+                    doorId="kitchen-drawer-vacuum-top"
+                    activeDoorId={activeDoorId}
+                    withRiceCooker={false}
+                    customFrontLipH={drawerSlotTopY - drawerSlotBotY}          // 0.32m (100%, 전면 막힘)
+                    customSideLipH={(drawerSlotTopY - drawerSlotBotY) * 0.5}   // 0.16m (50%)
+                    customBackLipH={(drawerSlotTopY - drawerSlotBotY) * 0.9}   // 0.288m (90%)
+                  />
+                  {/* 로봇청소기 — 하단 200mm 개방 영역에 항상 노출 */}
+                  {(() => {
+                    const vR = 0.16
+                    const vH = 0.085
+                    const vCX = extWallInner - cabExtDepth / 2
+                    const vCY = vH / 2 + 0.005
+                    const vCZ = (drawerZStart + drawerZEnd) / 2
+                    return (
+                      <group position={[vCX, vCY, vCZ]}>
+                        <mesh>
+                          <cylinderGeometry args={[vR, vR, vH, 32]} />
+                          <meshStandardMaterial color="#161616" roughness={0.45} metalness={0.30} />
+                        </mesh>
+                        <mesh position={[0, vH / 2 - 0.003, 0]}>
+                          <cylinderGeometry args={[vR - 0.005, vR - 0.005, 0.006, 32]} />
+                          <meshStandardMaterial color="#0a0a0a" roughness={0.30} metalness={0.40} />
+                        </mesh>
+                        <mesh position={[0, vH / 2 + 0.012, 0]}>
+                          <cylinderGeometry args={[0.035, 0.040, 0.024, 24]} />
+                          <meshStandardMaterial color="#222" roughness={0.25} metalness={0.50} />
+                        </mesh>
+                        <mesh position={[-vR + 0.01, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+                          <cylinderGeometry args={[0.006, 0.006, 0.004, 12]} />
+                          <meshStandardMaterial color="#3aa0ff" emissive="#3aa0ff" emissiveIntensity={1.5} />
+                        </mesh>
+                      </group>
+                    )
+                  })()}
+                </group>
+              )
             })()}
             {/* cab1 단독 — F 인터랙션 */}
             <KitchenLowerDoor
-              frontX={extCabCenterX - 0.301}
+              frontX={extCabCenterX - 0.341}
               centerY={0.42}
               doorH={0.84}
               zStart={cab1Z0}
@@ -485,13 +588,13 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
               doorId="kitchen-lc-cab3"
               activeDoorId={activeDoorId}
             />
-            {/* cab2+cab3 페어 (남쪽 0.8) — F 인터랙션 */}
+            {/* cab2+cab3 페어 (인덕션 하단장 0.95) — F 인터랙션 */}
             <KitchenLowerDoor
-              frontX={extCabCenterX - 0.301}
+              frontX={extCabCenterX - 0.341}
               centerY={0.42}
               doorH={0.84}
               zStart={cab2Z0}
-              doorWidth={cabW}
+              doorWidth={cab23W / 2}
               handleY={0.76}
               pair={true}
               walnutTex={walnutBodyTex}
@@ -500,7 +603,7 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
             />
             {/* 싱크 도어 페어 — F 인터랙션 */}
             <KitchenLowerDoor
-              frontX={extCabCenterX - 0.301}
+              frontX={extCabCenterX - 0.341}
               centerY={0.42}
               doorH={0.84}
               zStart={sinkZpos - sinkHalfD}
@@ -527,42 +630,20 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
                 closedFront={true}
               />
             )}
-            {/* drawerS 50cm 컬럼 (tiny 바로 남쪽) — 스윙 도어 패널 + 드로어 + 로청 */}
-            {(() => {
-              const lastColLen = 0.5
-              const lastColZStart = drawerSZ0
-              const lastColZEnd = drawerSZ0 + lastColLen
-              const swingBottomY = 0.15
-              const swingTopY = 0.40
-              return (
-                <group key="ext-lc-south-special">
-                  {/* 캐비닛 슬롯 양쪽 고정 레일 트랙 */}
-                  <mesh position={[extCabCenterX, 0.40 + 0.008 + 0.001, lastColZStart + 0.018 + 0.005]}>
-                    <boxGeometry args={[0.6 - 0.04, 0.014, 0.018]} />
-                    <meshStandardMaterial color="#777" metalness={0.85} roughness={0.30} />
-                  </mesh>
-                  <mesh position={[extCabCenterX, 0.40 + 0.008 + 0.001, lastColZEnd - 0.018 - 0.005]}>
-                    <boxGeometry args={[0.6 - 0.04, 0.014, 0.018]} />
-                    <meshStandardMaterial color="#777" metalness={0.85} roughness={0.30} />
-                  </mesh>
-                  {/* 드로어 (밥솥 없이) + 하단 스윙 도어 + 로봇청소기 (모두 같은 F 키 토글) */}
-                  <KitchenRiceCookerDrawer
-                    extWallInner={extWallInner}
-                    depth={0.6}
-                    drawerZStart={lastColZStart}
-                    drawerZEnd={lastColZEnd}
-                    drawerBottomY={0.40}
-                    drawerTopY={0.84}
-                    walnutTex={walnutBodyTex}
-                    doorId="kitchen-drawer-south"
-                    activeDoorId={activeDoorId}
-                    withRiceCooker={false}
-                    swingDoorBelow={{ bottomY: swingBottomY, topY: swingTopY, hingeZend: 'north' }}
-                    withVacuum={true}
-                  />
-                </group>
-              )
-            })()}
+            {/* 뽑아쓰는 선반 (drawerS 자리, 350mm, closedFront) — F 키로 슬라이드 */}
+            <KitchenRiceCookerDrawer
+              extWallInner={extWallInner}
+              depth={cabExtDepth}
+              drawerZStart={drawerSZ0}
+              drawerZEnd={drawerSZ0 + pullShelfW}
+              drawerBottomY={0}
+              drawerTopY={0.84}
+              walnutTex={walnutBodyTex}
+              doorId="kitchen-drawer-south"
+              activeDoorId={activeDoorId}
+              withRiceCooker={false}
+              closedFront={true}
+            />
             {/* === 싱크볼 + 수전 그룹 === */}
             <group>
             {(() => {
@@ -573,24 +654,20 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
               const depth = 0.215    // 볼 높이(Y) 215mm
               const topY = 0.86
               const ctH = 0.04
-              // 조리대(상판) — 동쪽(벽쪽, +X) 50mm + 서쪽(전면, -X) 50mm 양방향 연장.
-              // 싱크 위치는 그대로(extCabCenterX 기준) → 양옆 strip 모두 넓어짐 (대칭).
-              const ctBackExt = 0.05    // 동(벽)쪽 연장
-              const ctFrontExt = 0.05   // 서(전면)쪽 연장
-              const ctW = 0.62 + ctBackExt + ctFrontExt                          // 0.72
-              const ctCenterX = extCabCenterX + (ctBackExt - ctFrontExt) / 2     // 0 (대칭)
+              // 상판 — 동측(벽쪽)으로 25mm 확장 (하부장은 그대로, 동측 오버행 25mm)
+              const ctEastExt = 0.06                                // 동측 25mm 확장
+              const ctW = cabExtDepth + ctEastExt                    // 0.745
+              const ctCenterX = extCabCenterX + ctEastExt / 2        // 동측 12.5mm shift
               const sinkZstart = sinkZ - sinkD / 2
               const sinkZend = sinkZ + sinkD / 2
               const beforeLen = Math.abs(sinkZstart - extStartZ)
               const beforeCenterZ = (extStartZ + sinkZstart) / 2
-              // 상판 남쪽 끝을 cabAfter 본체보다 50mm 더 남쪽으로 연장
-              const ctSouthExt = 0.05
-              const ctEndZ = extEndZ + ctSouthExt
+              const ctEndZ = extEndZ                                 // 남측 연장 없음
               const afterLen = Math.abs(ctEndZ - sinkZend)
               const afterCenterZ = (sinkZend + ctEndZ) / 2
-              // 싱크 좌우 (X 방향) strip
-              const frontStripW = (0.62 - sinkW) / 2 + ctFrontExt   // 0.11 + 0.05 = 0.16
-              const backStripW  = (0.62 - sinkW) / 2 + ctBackExt    // 0.11 + 0.05 = 0.16
+              // 싱크 좌우 (X 방향) strip — 서측은 그대로, 동측만 25mm 확장
+              const frontStripW = (cabExtDepth - sinkW) / 2          // 0.16 (서측)
+              const backStripW  = (cabExtDepth - sinkW) / 2 + ctEastExt  // 0.185 (동측, 25mm 확장)
               return (
                 <>
                   {beforeLen > 0.01 && <mesh position={[ctCenterX, topY, beforeCenterZ]}><boxGeometry args={[ctW, ctH, beforeLen]} /><meshStandardMaterial map={countertopTex} roughness={0.3} metalness={0.05} /></mesh>}
@@ -688,9 +765,9 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
               const northSlabCenterZ = (northSlabZStart + northSlabZEnd) / 2
               const northSlabCenterX = extWallInner - tileThick / 2 - 0.001
 
-              // 남쪽 슬랩 (벽이 5.5cm 안쪽) — 상판 끝에 맞춤
+              // 남쪽 슬랩 (벽이 5.5cm 안쪽) — 상판 끝(extEndZ)에 정확히 맞춤
               const southSlabZStart = stepZ
-              const southSlabZEnd = extEndZ + 0.05
+              const southSlabZEnd = extEndZ
               const southSlabLen = southSlabZEnd - southSlabZStart
               const southSlabCenterZ = (southSlabZStart + southSlabZEnd) / 2
               const southSlabCenterX = extWallInner + stepDX - tileThick / 2 - 0.001
@@ -708,26 +785,26 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
                 <>
                   <mesh position={[northSlabCenterX, tileCenterY, northSlabCenterZ]}>
                     <boxGeometry args={[tileThick, tileH, northSlabLen]} />
-                    <meshStandardMaterial map={tileMapEastNorth} roughness={0.18} metalness={0.04} />
+                    <meshStandardMaterial map={tileMapEastNorth} roughness={0.25} metalness={0.04} onBeforeCompile={kitchenTileGroutOnBeforeCompile} />
                   </mesh>
                   <mesh position={[southSlabCenterX, tileCenterY, southSlabCenterZ]}>
                     <boxGeometry args={[tileThick, tileH, southSlabLen]} />
-                    <meshStandardMaterial map={tileMapEastSouth} roughness={0.18} metalness={0.04} />
+                    <meshStandardMaterial map={tileMapEastSouth} roughness={0.25} metalness={0.04} onBeforeCompile={kitchenTileGroutOnBeforeCompile} />
                   </mesh>
                   {/* step 커버 (5.5cm 면, 남쪽을 향함 = -Z 면) */}
                   <mesh position={[stepCoverCenterX, tileCenterY, stepCoverCenterZ]}>
                     <boxGeometry args={[stepDX, tileH, tileThick]} />
-                    <meshStandardMaterial map={tileMapNorth} roughness={0.18} metalness={0.04} />
+                    <meshStandardMaterial map={tileMapNorth} roughness={0.25} metalness={0.04} onBeforeCompile={kitchenTileGroutOnBeforeCompile} />
                   </mesh>
                   {/* 북쪽 벽 wrap 코너 마감 — 0.4m */}
                   <mesh position={[northWrapCenterX, tileCenterY, northWrapCenterZ]}>
                     <boxGeometry args={[northWrapLen, tileH, tileThick]} />
-                    <meshStandardMaterial map={tileMapNorth} roughness={0.18} metalness={0.04} />
+                    <meshStandardMaterial map={tileMapNorth} roughness={0.25} metalness={0.04} onBeforeCompile={kitchenTileGroutOnBeforeCompile} />
                   </mesh>
                 </>
               )
             })()}
-            {/* === 상부장 재구성 === 정수기 위 50cm + 후드 60cm + 나머지 40cm 균등(마지막 약간 큼) */}
+            {/* === 상부장 재구성 === 정수기 위(페어 1.0) + 페어0(1.0) + 페어1(0.8) + 페어2(0.8). 후드 삭제 */}
             {(() => {
               const upperY = 1.80
               const upperH = 0.70
@@ -735,44 +812,35 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
               const upperEastShift = 0.05
               const upperDepth = 0.35 + upperEastShift   // 남쪽 cab depth
               const upperX = extWallInner + upperEastShift - upperDepth / 2  // 남쪽 cab X 중심
-              // 북쪽 3개: 벽이 55mm 안쪽으로 튀어나옴 → 후면을 extWallInner 에 맞춤.
-              //   depth 0.35 (east shift 없음), 전면 X 는 남쪽과 동일 (= extWallInner - 0.35)
+              // 북쪽: 벽이 55mm 안쪽으로 튀어나옴 → 후면을 extWallInner 에 맞춤.
               const upperDepthN = 0.35
               const upperXN = extWallInner - upperDepthN / 2
 
-              // 슬롯 정의 — extStartZ(=캐비닛 북단) 에서 시작
-              // purifier(0.5) | 페어0(0.8) | 페어1(0.8) | 페어2(0.8) | hood(0.898)
-              const cab50W = 0.5     // 정수기 위 캐비닛 — 50cm
-              const hoodW = 0.898    // 후드 가로 898mm
-              const baseCabW = 0.4
+              // 슬롯 정의 — extStartZ(=캐비닛 북단) ~ extEndZ(=캐비닛 남단) 정확히 채움
+              // 기존: 정수기(1.0) + 페어0(1.0) + 페어1(0.8) + 페어2(0.8) = 3.6m
+              // 가용: extEndZ - extStartZ = 3.684m → 각 슬롯에 (3.684 - 3.6)/4 = 21mm씩 추가
+              const totalLen = extEndZ - extStartZ
+              const adjPerSlot = (totalLen - 3.6) / 4
+              const purifierW = 1.0 + adjPerSlot   // ≈ 1.021m
+              const pair0W = 1.0 + adjPerSlot      // ≈ 1.021m
+              const pair1W = 0.8 + adjPerSlot      // ≈ 0.821m
+              const pair2W = 0.8 + adjPerSlot      // ≈ 0.821m
 
-              const cab50ZStart = extStartZ
-              const cab50ZEnd = cab50ZStart + cab50W
-              const remainStartZ = cab50ZEnd           // 캐비닛 시작
-              const remainEndZ = extEndZ - hoodW       // 후드 앞까지
-              const remainLen = remainEndZ - remainStartZ
-              const cabCount = Math.max(1, Math.floor(remainLen / baseCabW))
-              // 후드는 페어2 끝 (1.0 + 0.8 + 0.8 = 2.6) 바로 남쪽
-              const hoodZStart = remainStartZ + 1.0 + 0.8 + 0.8
-              const hoodZEnd = hoodZStart + hoodW
-
-
-              const ucDoorIds: DoorId[] = [
-                'kitchen-uc-0', 'kitchen-uc-1', 'kitchen-uc-2',
-              ]
-              // 북쪽 3 = purifier + ext-uc-0 + ext-uc-1 → ext-uc index 0, 1 이 북쪽
-              const NORTH_REMAIN_COUNT = 2
+              const purifierZStart = extStartZ
+              const remainStartZ = purifierZStart + purifierW
 
               return (
                 <>
-                  {/* 50cm 정수기 위 캐비닛 — 내부 수평 3분할. 북쪽 wall 에 후면 정렬 */}
-                  <KitchenUpperCabinet
+                  {/* 정수기 위 페어 — 1.0m, 페어0와 동일한 구성 (북쪽 wall 에 후면 정렬) */}
+                  <KitchenUpperCabinetPair
                     key="ext-uc-purifier"
                     cabX={upperXN}
+                    cabX2={upperXN}
                     cabY={upperY}
-                    zStart={cab50ZStart}
-                    width={cab50W}
+                    zStart={purifierZStart}
+                    doorWidth={purifierW / 2}
                     depth={upperDepthN}
+                    depth2={upperDepthN}
                     height={upperH}
                     divisions={3}
                     walnutTex={walnutBodyTex}
@@ -780,59 +848,15 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
                     activeDoorId={activeDoorId}
                   />
 
-
-                  {/* 60cm 후드 — 캐노피 + 굴뚝 + 컨트롤 패널 */}
-                  {(() => {
-                    const hoodCenterZ = (hoodZStart + hoodZEnd) / 2
-                    const canopyBottomY = upperY - upperH / 2          // 1.45
-                    const canopyTopY = canopyBottomY + 0.10            // 1.55
-                    // 후드도 상부장과 같이 동쪽 50mm 연장 (동쪽 면 = extWallInner + 0.05)
-                    const canopyDepthX = 0.50    // 후드 깊이 500mm
-                    const canopyX = extWallInner + upperEastShift - canopyDepthX / 2
-                    const chimneyDepthX = 0.30
-                    const chimneyW = 0.30
-                    const chimneyX = extWallInner + upperEastShift - chimneyDepthX / 2
-                    const chimneyBottomY = canopyTopY
-                    const chimneyTopY = WALL_HEIGHT - 0.005  // 천장 간섭 방지 -5mm
-                    const chimneyCenterY = (chimneyBottomY + chimneyTopY) / 2
-                    return (
-                      <group key="ext-uc-hood">
-                        {/* 캐노피 (스테인레스 평판) */}
-                        <mesh position={[canopyX, (canopyBottomY + canopyTopY) / 2, hoodCenterZ]}>
-                          <boxGeometry args={[canopyDepthX, canopyTopY - canopyBottomY, hoodW]} />
-                          <meshStandardMaterial color="#bcbcc4" metalness={0.85} roughness={0.20} />
-                        </mesh>
-                        {/* 캐노피 바닥 그릴/필터 */}
-                        <mesh position={[canopyX + 0.02, canopyBottomY + 0.003, hoodCenterZ]}>
-                          <boxGeometry args={[canopyDepthX - 0.06, 0.006, hoodW - 0.10]} />
-                          <meshStandardMaterial color="#dcdce0" metalness={0.7} roughness={0.40} />
-                        </mesh>
-                        {/* 정면 컨트롤 패널 (검정 디스플레이) */}
-                        <mesh position={[canopyX - canopyDepthX / 2 - 0.0005, canopyBottomY + 0.05, hoodCenterZ]}>
-                          <boxGeometry args={[0.001, 0.030, 0.18]} />
-                          <meshStandardMaterial color="#0a0a0e" emissive="#1a2030" emissiveIntensity={0.6} />
-                        </mesh>
-                        {/* 굴뚝 박스 — 캐노피 위 → 천장 */}
-                        <mesh position={[chimneyX, chimneyCenterY, hoodCenterZ]}>
-                          <boxGeometry args={[chimneyDepthX, chimneyTopY - chimneyBottomY, chimneyW]} />
-                          <meshStandardMaterial color="#a4a4ac" metalness={0.85} roughness={0.30} />
-                        </mesh>
-                      </group>
-                    )
-                  })()}
-
-                  {/* 캐비닛 페어: 페어0(1.0) | 페어1(0.8) | 페어2(0.8) */}
+                  {/* 캐비닛 페어 (각 21mm씩 증가): 페어0 | 페어1 | 페어2 */}
                   {(() => {
                     const pairs: Array<{ dw: number; zs: number; depthA: number; depthB: number; id: DoorId }> = []
                     let z = remainStartZ
-                    // 페어0: doorWidth 0.5 (합 1.0)
-                    pairs.push({ dw: 0.5, zs: z, depthA: upperDepthN, depthB: upperDepthN, id: 'kitchen-uc-0' })
-                    z += 1.0
-                    // 페어1: doorWidth 0.4 (합 0.8)
-                    pairs.push({ dw: baseCabW, zs: z, depthA: upperDepth, depthB: upperDepth, id: 'kitchen-uc-1' })
-                    z += 0.8
-                    // 페어2: doorWidth 0.4 (합 0.8)
-                    pairs.push({ dw: baseCabW, zs: z, depthA: upperDepth, depthB: upperDepth, id: 'kitchen-uc-2' })
+                    pairs.push({ dw: pair0W / 2, zs: z, depthA: upperDepthN, depthB: upperDepthN, id: 'kitchen-uc-0' })
+                    z += pair0W
+                    pairs.push({ dw: pair1W / 2, zs: z, depthA: upperDepth, depthB: upperDepth, id: 'kitchen-uc-1' })
+                    z += pair1W
+                    pairs.push({ dw: pair2W / 2, zs: z, depthA: upperDepth, depthB: upperDepth, id: 'kitchen-uc-2' })
                     return pairs.map((p, pi) => (
                       <KitchenUpperCabinetPair
                         key={`ext-uc-pair-${pi}`}
@@ -844,7 +868,7 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
                         depth={p.depthA}
                         depth2={p.depthB}
                         height={upperH}
-                        divisions={4}
+                        divisions={3}
                         walnutTex={walnutBodyTex}
                         doorId={p.id}
                         activeDoorId={activeDoorId}
@@ -1057,14 +1081,16 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
         const tallZLen = tallZEnd - tallZStart
         const tallZCenter = (tallZStart + tallZEnd) / 2
 
-        // 분할: 하단 도어(0~lowerH) / 오븐 오픈 선반(lowerH~upperBottomY) / 상단 유리장+drawer(upperBottomY~tallTopY)
-        // 오픈 선반 H 를 70% 로 줄이고 그만큼 하단장을 연장 (구 0.85→1.03, 오픈 선반 0.6→0.42)
+        // 분할: 하단 도어(0~lowerDoorH) / 밥솥 서랍(lowerDoorH~ovenBottomY) / 오븐(ovenBottomY~ovenTopY)
+        //       / 상단 유리장+drawer(upperBottomY~tallTopY)
         const tallTopY = WALL_HEIGHT + 0.030 - 0.050   // 냉장고장 cabTopY와 동일
         const upperBottomY = 1.45
         const ovenSlotH = 0.42                       // 0.6 × 0.7
         const ovenTopY = upperBottomY                // 1.45
         const ovenBottomY = ovenTopY - ovenSlotH     // 1.03
-        const lowerH = ovenBottomY                   // 1.03
+        const riceDrawerH = 0.30                     // 밥솥 서랍 높이 — 오븐 바로 하단
+        const lowerDoorH = ovenBottomY - riceDrawerH // 하단 페어 도어 = 0.73
+        const lowerH = lowerDoorH                    // 하단장 본체 영역 (기존 변수 호환)
         const upperH = tallTopY - upperBottomY
 
         // drawer 슬롯은 visible 영역(kitLeft 부터)에서 30cm. 벽 안쪽 12cm 는 dead space.
@@ -1098,8 +1124,13 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
               <boxGeometry args={[displayDepthX, panelT, tallZLen - 0.010]} />
               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
-            {/* 상판 (lowerH에서 20mm 아래) */}
+            {/* 하단장 상판 (lowerH에서 20mm 아래) — 밥솥 서랍 바닥 겸함 */}
             <mesh position={[displayCenterX, lowerH - 0.020 - panelT / 2, tallZCenter]}>
+              <boxGeometry args={[displayDepthX, panelT, tallZLen - 0.010]} />
+              <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
+            </mesh>
+            {/* 밥솥 서랍 상판 (ovenBottomY에서 20mm 아래) — 오븐 슬롯 바닥 겸함 */}
+            <mesh position={[displayCenterX, ovenBottomY - 0.020 - panelT / 2, tallZCenter]}>
               <boxGeometry args={[displayDepthX, panelT, tallZLen - 0.010]} />
               <meshStandardMaterial map={walnutBodyTex} roughness={0.45} />
             </mesh>
@@ -1182,10 +1213,23 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
               activeDoorId={activeDoorId}
             />
 
-            {/* 오븐 — 오픈 선반 바닥(lowerH=0.85) 위에 안착. LightWaveOven H=0.330 → centerY=1.015 */}
+            {/* 밥솥 오픈 선반 drawer — 오븐 바로 하단, 뚜껑 없음(오픈 트레이), +X 풀-아웃 */}
+            <KitchenTallRiceDrawer
+              frontX={tallFrontX}
+              bottomY={lowerDoorH}
+              topY={ovenBottomY}
+              zStart={tallZStart}
+              zEnd={tallZEnd}
+              cabDepth={tallDepth}
+              walnutTex={walnutBodyTex}
+              doorId="kitchen-drawer"
+              activeDoorId={activeDoorId}
+            />
+
+            {/* 오븐 — ovenBottomY 위에 안착. LightWaveOven H=0.330 → centerY=ovenBottomY+0.165 */}
             <Suspense fallback={null}>
               <LightWaveOven
-                position={[tallFrontX - 0.515 / 2, lowerH + 0.330 / 2, tallZCenter]}
+                position={[tallFrontX - 0.515 / 2, ovenBottomY + 0.330 / 2, tallZCenter]}
                 rotation={Math.PI / 2}
               />
             </Suspense>
@@ -1209,35 +1253,41 @@ function KitchenInner({ visible, playerPos, allLightsOn, activeDoorId }: Kitchen
         )
       })()}
 
-      {/* === 식탁 + 펜던트 조명 + 의자 — 회전 해제(east-west), 주방 남쪽 빈 공간 가운데 === */}
+      {/* === 식탁 + 펜던트 조명 + 의자 — 90° 회전, 동측 벽 밀착 === */}
       {(() => {
-        // 식탁 1.8m(X) × 0.9m(Z). 주방 남쪽 빈 공간 Z [extEndZ_, kitchenSouthZ] = [-3.273, -1.591] (1.682m)
-        // 의자 4개 (2 N + 2 S) — 식탁 안쪽으로 200mm tucked
-        const extEndZ_ = (babyBottomZ - 0.22 - 0.9) + 0.42        // ≈ -3.273 (동측 하부장 남쪽 끝)
-        const tableCenterX = kitRight - 0.85             // 주방 X 가운데
-        const tableCenterZ = extEndZ_ + 0.75 + 0.45       // 빈 공간 Z 가운데 ≈ -2.432
+        // 식탁 90° 회전 후: 0.9m(X) × 1.8m(Z). 동측 벽(kitRight+0.055)에 long side 밀착
+        // 의자 4개: 서측 long side 3개 (동쪽 향함, rot=0) + 남측 short side 1개 (북쪽 향함, rot=π/2)
+        const extEndZ_ = -T2 - 1.591 - 1.800              // = -3.491 (하부장 남쪽 끝)
+        const tableWidthX = 0.9                            // 회전 후 X (TABLE_D)
+        const tableLenZ = 1.8                              // 회전 후 Z (TABLE_W)
+        const eastWallInnerX = kitRight + 0.055            // 동측 벽 내측면 (꺾인 벽)
+        const tableCenterX = eastWallInnerX - tableWidthX / 2   // = kitRight - 0.395
+        const tableCenterZ = extEndZ_ + tableLenZ / 2      // N face flush with extEndZ = -2.591
 
-        // 의자 4개 — 2개 북측(+ S 향함, rot -π/2), 2개 남측(N 향함, rot +π/2)
-        // 식탁 안쪽으로 200mm tucked: chair Z = tableCenterZ ± (0.45 + 0.23 - 0.20) = ±0.48
-        const nChairZ = tableCenterZ - 0.48
-        const sChairZ = tableCenterZ + 0.48
-        // 의자 X 위치 — 긴 축(1.8m) 위에 좌우 ±0.45
-        const chairXOffset = 0.45
-        const leftChairX = tableCenterX - chairXOffset
-        const rightChairX = tableCenterX + chairXOffset
+        // 서측 3개 의자 (동쪽 향함, rot=0) — long side 1.8m 균등 분할
+        const westChairX = tableCenterX - tableWidthX / 2 - 0.03   // = tableCenterX - 0.48
+        const chairZNorth = tableCenterZ - 0.6
+        const chairZMid = tableCenterZ
+        const chairZSouth = tableCenterZ + 0.6
+
+        // 남측 1개 의자 (복도쪽, 북쪽 향함, rot=π/2)
+        const southChairX = tableCenterX
+        const southChairZ = tableCenterZ + tableLenZ / 2 + 0.03    // = -1.661
 
         return (
           <>
-            {/* 식탁 — 회전 없음 (TABLE_W=1.8 along X, TABLE_D=0.9 along Z) */}
-            <DiningTable position={[tableCenterX, tableCenterZ]} active={kitchenActive} />
+            {/* 식탁 — 90° 회전 (동측 벽 밀착, long side N-S) */}
+            <group position={[tableCenterX, 0, tableCenterZ]} rotation={[0, Math.PI / 2, 0]}>
+              <DiningTable position={[0, 0]} active={kitchenActive} />
+            </group>
 
-            {/* 북측 의자 2개 (남쪽 향함, rot -π/2 → local +X = world +Z) */}
-            <DiningChair position={[leftChairX, nChairZ]} rotationY={-Math.PI / 2} doorId="kitchen-chair-nl" activeDoorId={activeDoorId} />
-            <DiningChair position={[rightChairX, nChairZ]} rotationY={-Math.PI / 2} doorId="kitchen-chair-nr" activeDoorId={activeDoorId} />
+            {/* 서측 3개 의자 (동쪽 향함, rot=0) */}
+            <DiningChair position={[westChairX, chairZNorth]} rotationY={0} doorId="kitchen-chair-nl" activeDoorId={activeDoorId} />
+            <DiningChair position={[westChairX, chairZMid]} rotationY={0} doorId="kitchen-chair-nr" activeDoorId={activeDoorId} />
+            <DiningChair position={[westChairX, chairZSouth]} rotationY={0} doorId="kitchen-chair-sl" activeDoorId={activeDoorId} />
 
-            {/* 남측 의자 2개 (북쪽 향함, rot +π/2 → local +X = world -Z) */}
-            <DiningChair position={[leftChairX, sChairZ]} rotationY={Math.PI / 2} doorId="kitchen-chair-sl" activeDoorId={activeDoorId} />
-            <DiningChair position={[rightChairX, sChairZ]} rotationY={Math.PI / 2} doorId="kitchen-chair-sr" activeDoorId={activeDoorId} />
+            {/* 남측 1개 의자 (복도쪽, 북쪽 향함, rot=π/2) */}
+            <DiningChair position={[southChairX, southChairZ]} rotationY={Math.PI / 2} doorId="kitchen-chair-sr" activeDoorId={activeDoorId} />
           </>
         )
       })()}
@@ -1285,6 +1335,10 @@ interface KitchenDrawerProps {
   swingDoorBelow?: SwingDoorBelow  // 동측 벽 캐비닛에서 drawer 아래 스윙 도어 — 동시에 F 로 회전
   withVacuum?: boolean  // drawer 슬라이드 그룹 안에서 함께 -X 로 나오는 로봇청소기
   closedFront?: boolean  // open-tray 대신 walnut 풀박스 + 도어 face (전체 column 이 통으로 슬라이드)
+  closedFrontShelfYs?: number[]  // closedFront 모드에서 선반 Y 위치 (없으면 기본 3단)
+  customSideLipH?: number  // open-tray 모드에서 측면 림 높이 커스텀 (없으면 기본 10mm)
+  customBackLipH?: number  // open-tray 모드에서 후면 림 높이 커스텀
+  customFrontLipH?: number  // open-tray 모드에서 정면 림 높이 커스텀 (없으면 30mm). 세팅시 drawer 중심에 정렬 (전면 막힘)
 }
 
 function KitchenRiceCookerDrawer({
@@ -1301,6 +1355,10 @@ function KitchenRiceCookerDrawer({
   swingDoorBelow,
   withVacuum = false,
   closedFront = false,
+  closedFrontShelfYs,
+  customSideLipH,
+  customBackLipH,
+  customFrontLipH,
 }: KitchenDrawerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const groupRef = useRef<THREE.Group>(null)
@@ -1424,8 +1482,8 @@ function KitchenRiceCookerDrawer({
         const shelfT = 0.008                       // 선반 두께
         const shelfDepth = colDx - 0.04            // X
         const shelfWidth = colW - 0.02             // Z
-        // 선반 Y 위치 (3개: 하/중/상)
-        const shelfYs = [
+        // 선반 Y 위치 — closedFrontShelfYs 가 있으면 그 위치, 없으면 기본 3단
+        const shelfYs = closedFrontShelfYs ?? [
           drawerBottomY + 0.05,
           drawerBottomY + colH * 0.40,
           drawerBottomY + colH * 0.75,
@@ -1484,26 +1542,40 @@ function KitchenRiceCookerDrawer({
         <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
       </mesh>
 
-      {/* drawer 정면 림 (30mm) — 손잡이 부착부 */}
-      <mesh position={[frontX + 0.009, drawerBottomY + panelT + lipH / 2, interiorCenterZ]}>
-        <boxGeometry args={[panelT, lipH, interiorLen - 0.005]} />
-        <meshStandardMaterial map={walnutTex} roughness={0.45} />
-      </mesh>
-      {/* drawer 측면 림 (10mm, 북) — 캐비닛 좌측 벽 안쪽 면에 인접 */}
-      <mesh position={[extWallInner - depth / 2, drawerBottomY + panelT + sideLipH / 2, interiorZStart + panelT / 2]}>
-        <boxGeometry args={[depth - 0.02, sideLipH, panelT]} />
-        <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
-      </mesh>
-      {/* drawer 측면 림 (10mm, 남) */}
-      <mesh position={[extWallInner - depth / 2, drawerBottomY + panelT + sideLipH / 2, interiorZEnd - panelT / 2]}>
-        <boxGeometry args={[depth - 0.02, sideLipH, panelT]} />
-        <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
-      </mesh>
-      {/* drawer 후면 림 (10mm, 동) */}
-      <mesh position={[extWallInner - 0.02, drawerBottomY + panelT + sideLipH / 2, interiorCenterZ]}>
-        <boxGeometry args={[panelT, sideLipH, interiorLen - 0.005]} />
-        <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
-      </mesh>
+      {/* drawer 정면 림 — customFrontLipH 설정시 drawer 중심 정렬 (전면 막힘), 기본 30mm */}
+      {(() => {
+        const eFrontLipH = customFrontLipH ?? lipH
+        const frontCenterY = customFrontLipH !== undefined ? drawerCenterY : drawerBottomY + panelT + eFrontLipH / 2
+        return (
+          <mesh position={[frontX + 0.009, frontCenterY, interiorCenterZ]}>
+            <boxGeometry args={[panelT, eFrontLipH, interiorLen - 0.005]} />
+            <meshStandardMaterial map={walnutTex} roughness={0.45} />
+          </mesh>
+        )
+      })()}
+      {/* drawer 측면 림 (북) — customSideLipH 우선, 없으면 10mm 기본 */}
+      {(() => {
+        const eSideLipH = customSideLipH ?? sideLipH
+        const eBackLipH = customBackLipH ?? sideLipH
+        return (
+          <>
+            <mesh position={[extWallInner - depth / 2, drawerBottomY + panelT + eSideLipH / 2, interiorZStart + panelT / 2]}>
+              <boxGeometry args={[depth - 0.02, eSideLipH, panelT]} />
+              <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
+            </mesh>
+            {/* drawer 측면 림 (남) */}
+            <mesh position={[extWallInner - depth / 2, drawerBottomY + panelT + eSideLipH / 2, interiorZEnd - panelT / 2]}>
+              <boxGeometry args={[depth - 0.02, eSideLipH, panelT]} />
+              <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
+            </mesh>
+            {/* drawer 후면 림 (동) */}
+            <mesh position={[extWallInner - 0.02, drawerBottomY + panelT + eBackLipH / 2, interiorCenterZ]}>
+              <boxGeometry args={[panelT, eBackLipH, interiorLen - 0.005]} />
+              <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
+            </mesh>
+          </>
+        )
+      })()}
 
       {/* 슬라이드 레일 (서랍 측면, drawer 와 함께 이동) — 메탈 박스 2개 (북/남) */}
       <mesh position={[extWallInner - depth / 2, drawerBottomY + 0.008, interiorZStart + 0.005]}>
@@ -1569,6 +1641,122 @@ function KitchenRiceCookerDrawer({
         </group>
       )
     })()}
+    </>
+  )
+}
+
+/**
+ * 키큰장(서벽) 빌트인 밥솥 서랍 — 1단 drawer, +X 슬라이드.
+ *  - 키큰장은 서벽에 부착되어 정면이 +X (룸 방향).
+ *  - drawer 열림 시 +X 방향으로 슬라이드 (밥솥과 함께).
+ */
+interface KitchenTallRiceDrawerProps {
+  frontX: number          // 캐비닛 정면 X (서벽 캐비닛 → tallFrontX, +X 방향이 룸쪽)
+  bottomY: number
+  topY: number
+  zStart: number
+  zEnd: number
+  cabDepth: number        // 캐비닛 X 깊이 (밥솥 배치용)
+  walnutTex: THREE.Texture
+  doorId: DoorId
+  activeDoorId?: DoorId | null
+}
+
+function KitchenTallRiceDrawer({
+  frontX,
+  bottomY,
+  topY,
+  zStart,
+  zEnd,
+  cabDepth,
+  walnutTex,
+  doorId,
+  activeDoorId,
+}: KitchenTallRiceDrawerProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const groupRef = useRef<THREE.Group>(null)
+  const offsetRef = useRef(0)
+  const { invalidate } = useThree()
+
+  const centerZ = (zStart + zEnd) / 2
+  const centerY = (bottomY + topY) / 2
+  const drawerH = topY - bottomY
+  const drawerW = zEnd - zStart
+
+  const toggleRef = useRef(() => setIsOpen((o) => !o))
+  toggleRef.current = () => setIsOpen((o) => !o)
+  useEffect(() => {
+    doorRegistry.register({
+      id: doorId,
+      position: [frontX, centerZ],
+      y: centerY - 0.10,
+      toggle: () => toggleRef.current(),
+    })
+    return () => doorRegistry.unregister(doorId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doorId])
+
+  const OPEN_DIST = 0.32   // +X 방향 슬라이드 (룸쪽)
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.05)
+    const target = isOpen ? OPEN_DIST : 0
+    const diff = target - offsetRef.current
+    if (Math.abs(diff) >= 0.0005) {
+      offsetRef.current += diff * Math.min(1, delta * 6)
+      if (groupRef.current) groupRef.current.position.x = offsetRef.current
+      invalidate()
+    }
+  })
+
+  const isActive = activeDoorId === doorId
+
+  const panelT = 0.018
+  const lipH = 0.03   // 림(테두리) 높이 30mm
+
+  return (
+    <>
+      <group ref={groupRef}>
+        {/* Drawer 바닥판 (월넛) */}
+        <mesh position={[frontX - cabDepth / 2, bottomY + panelT / 2, centerZ]}>
+          <boxGeometry args={[cabDepth - 0.02, panelT, drawerW - 0.02]} />
+          <meshStandardMaterial map={walnutTex} roughness={0.45} />
+        </mesh>
+        {/* 정면 림 — 손잡이 부착부 */}
+        <mesh position={[frontX - 0.009, bottomY + panelT + lipH / 2, centerZ]}>
+          <boxGeometry args={[panelT, lipH, drawerW - 0.02]} />
+          <meshStandardMaterial map={walnutTex} roughness={0.45} />
+        </mesh>
+        {/* 가로 손잡이 (정면 림 위) */}
+        <mesh position={[frontX + 0.005, bottomY + panelT + lipH + 0.010, centerZ]}>
+          <boxGeometry args={[0.018, 0.020, drawerW * 0.5]} />
+          <meshStandardMaterial color="#bbb" metalness={0.85} roughness={0.15} />
+        </mesh>
+        {/* 측면 림 (북) */}
+        <mesh position={[frontX - cabDepth / 2, bottomY + panelT + lipH / 2, centerZ - drawerW / 2 + panelT / 2]}>
+          <boxGeometry args={[cabDepth - 0.02, lipH, panelT]} />
+          <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
+        </mesh>
+        {/* 측면 림 (남) */}
+        <mesh position={[frontX - cabDepth / 2, bottomY + panelT + lipH / 2, centerZ + drawerW / 2 - panelT / 2]}>
+          <boxGeometry args={[cabDepth - 0.02, lipH, panelT]} />
+          <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
+        </mesh>
+        {/* 후면 림 */}
+        <mesh position={[frontX - cabDepth + 0.02, bottomY + panelT + lipH / 2, centerZ]}>
+          <boxGeometry args={[panelT, lipH, drawerW - 0.02]} />
+          <meshStandardMaterial color="#d8d2c4" roughness={0.5} metalness={0.05} />
+        </mesh>
+        {/* 밥솥 — drawer 위 (월넛 바닥 위, 캐비닛 중앙) */}
+        <Suspense fallback={null}>
+          <RiceCooker
+            position={[frontX - cabDepth / 2, bottomY + panelT + 0.005, centerZ]}
+            rotation={Math.PI / 2}
+          />
+        </Suspense>
+      </group>
+      {isActive && (
+        <DoorTooltip position={[frontX + 0.05, centerY + 0.15, centerZ]} label={getDoorLabel(doorId, isOpen)} />
+      )}
     </>
   )
 }
